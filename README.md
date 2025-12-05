@@ -1,6 +1,8 @@
-# ConsoleEbay - Multi-Tenant eBay Operations Platform
+# ListFlow - Multi-Tenant eBay Operations Platform
 
 A comprehensive, AI-powered eBay listing workflow system that automates the listing process while maintaining human oversight. Built for scale with multi-tenant support.
+
+> **Repository**: https://github.com/r0bug/listflow
 
 ## Features
 
@@ -53,19 +55,81 @@ A comprehensive, AI-powered eBay listing workflow system that automates the list
 - eBay Developer Account
 - Segmind API Key
 
-## Quick Start
+## Installation
 
-### Using Docker (Recommended)
+### Automated Installer (Recommended)
+
+The installer automatically detects dependencies, handles upgrades, and migrates data.
+
+#### Linux/macOS
+
+```bash
+# Clone the repository
+git clone https://github.com/r0bug/listflow.git
+cd listflow
+
+# Run the installer
+chmod +x install.sh
+./install.sh
+```
+
+#### Windows
+
+```powershell
+# Clone the repository
+git clone https://github.com/r0bug/listflow.git
+cd listflow
+
+# Run the installer (double-click or from PowerShell)
+.\install.bat
+```
+
+#### Installer Features
+
+- **Dependency Detection**: Checks for Node.js 18+, PostgreSQL 14+, Redis 6+
+- **Auto-Install**: Offers to install missing dependencies (Linux/macOS/Windows)
+- **Upgrade Detection**: Detects existing installations and preserves data
+- **Automatic Backup**: Creates backups before upgrades
+- **Database Migration**: Runs Prisma migrations automatically
+- **Configuration Wizard**: Interactive setup for database, Redis, and API keys
+- **Service Creation**: Optional systemd service (Linux) or desktop shortcuts (Windows)
+
+#### Installer Options
+
+```bash
+# Check dependencies only
+./install.sh --check
+
+# Show help
+./install.sh --help
+
+# Show version
+./install.sh --version
+```
+
+### Quick Start (After Installation)
+
+```bash
+# Linux/macOS
+./start.sh
+
+# Windows
+start.bat
+```
+
+This will start both backend and frontend servers and open your browser.
+
+### Using Docker
 
 ```bash
 # Clone and configure
-git clone <repo-url>
-cd ConsoleEbay
+git clone https://github.com/r0bug/listflow.git
+cd listflow
 cp .env.example .env
 # Edit .env with your API keys
 
 # Start all services
-docker-compose up
+docker-compose up -d
 ```
 
 Services:
@@ -99,7 +163,12 @@ cd client && npm run dev
 ## Project Structure
 
 ```
-ConsoleEbay/
+listflow/
+├── install.sh                    # Linux/macOS installer
+├── install.ps1                   # Windows PowerShell installer
+├── install.bat                   # Windows batch wrapper
+├── start.sh                      # Linux/macOS quick start
+├── start.bat                     # Windows quick start
 ├── src/                          # Backend source code
 │   ├── controllers/              # Request handlers
 │   ├── services/                 # Business logic
