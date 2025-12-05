@@ -1,0 +1,11 @@
+# eBay Tools Package Requirements
+
+# Core dependencies
+requests>=2.25.1
+pillow>=8.2.0
+beautifulsoup4>=4.9.3
+
+# Optional dependencies for specific features
+openpyxl>=3.0.9  # For Excel export functionality
+# lxml>=4.6.3  # For more efficient HTML parsing
+# selenium>=4.0.0  # For web browser automation if needed

@@ -1,0 +1,1010 @@
+// ConsoleEbay Platform Schema v2.0 (LTS Foundation)
+// This schema is designed for long-term stability.
+// New features should add tables/columns, never remove or rename existing ones.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// PLATFORM LEVEL
+// ============================================================================
+
+model PlatformSettings {
+  id                    String   @id @default("platform")
+  name                  String   @default("ConsoleEbay Platform")
+  version               String   @default("2.0.0")
+  maintenanceMode       Boolean  @default(false)
+  allowNewDomains       Boolean  @default(true)
+  defaultAiModel        String   @default("llava-v1.6")
+  maxDomainsPerPlatform Int      @default(100)
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// ============================================================================
+// MULTI-TENANCY: DOMAINS
+// ============================================================================
+
+model Domain {
+  id                String   @id @default(cuid())
+  code              String   @unique  // Short code: "ALPHA", "BETA"
+  name              String            // Display name: "Alpha Operations"
+  isActive          Boolean  @default(true)
+
+  // Settings (JSONB for flexibility)
+  settings          Json     @default("{}")
+  // Example settings:
+  // {
+  //   "defaultListingDuration": "GTC",
+  //   "autoAssignLocation": false,
+  //   "requirePhotoMinimum": 3,
+  //   "defaultShippingProfile": "standard"
+  // }
+
+  // Billing/subscription (future)
+  subscriptionTier  String   @default("free")
+  subscriptionEnds  DateTime?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  users               User[]
+  ebayAccounts        EbayAccount[]
+  warehouses          DomainWarehouse[]
+  items               Item[]
+  trustsGiven         DomainTrust[]     @relation("TrustGiver")
+  trustsReceived      DomainTrust[]     @relation("TrustReceiver")
+  listingTemplates    ListingTemplate[]
+  workstationSessions WorkstationSession[]
+
+  @@index([code])
+  @@index([isActive])
+}
+
+model DomainTrust {
+  id              String   @id @default(cuid())
+
+  // The domain granting the trust
+  giverDomain     Domain   @relation("TrustGiver", fields: [giverDomainId], references: [id])
+  giverDomainId   String
+
+  // The domain receiving the trust
+  receiverDomain  Domain   @relation("TrustReceiver", fields: [receiverDomainId], references: [id])
+  receiverDomainId String
+
+  // Type of trust granted
+  trustType       TrustType
+
+  // Is this trust active? (both sides must have active trusts for it to work)
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([giverDomainId, receiverDomainId, trustType])
+  @@index([giverDomainId])
+  @@index([receiverDomainId])
+}
+
+enum TrustType {
+  FULFILLMENT       // Can pick/pack/ship orders
+  LISTING_OVERFLOW  // Can create listings
+  READ_ONLY         // Can view items/stats
+}
+
+// ============================================================================
+// USERS & PERMISSIONS
+// ============================================================================
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String?   // Full password for web/remote access
+  pin             String?   // 4-6 digit PIN for quick local auth
+  pinHash         String?   // Hashed PIN for security
+  name            String
+  displayName     String?   // Short name for UI: "Bob", "AJ"
+  isActive        Boolean   @default(true)
+  isPlatformAdmin Boolean   @default(false)  // Super admin
+
+  // Domain membership
+  domain          Domain    @relation(fields: [domainId], references: [id])
+  domainId        String
+
+  // Role within domain
+  role            DomainRole @default(MEMBER)
+
+  // Granular permissions (JSONB for flexibility)
+  permissions     Json      @default("{}")
+  // Example:
+  // {
+  //   "steps": ["INGEST", "IDENTIFY", "POPULATE", "PRICE", "REVIEW", "APPROVE", "LIST"],
+  //   "ebayAccounts": ["acc_123", "acc_456"],
+  //   "warehouses": ["wh_789"]
+  // }
+
+  // Compensation tracking
+  compensationType String?   // "hourly", "per_item", "salary", "commission"
+  compensationRate Float?    // Rate per hour or per item
+
+  // Activity tracking
+  lastActiveAt    DateTime?
+  lastLoginAt     DateTime?
+
+  // Performance stats (denormalized for quick access)
+  itemsListedToday   Int     @default(0)
+  itemsListedWeek    Int     @default(0)
+  itemsListedMonth   Int     @default(0)
+  itemsListedAllTime Int     @default(0)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  sessions        UserSession[]
+  stepCompletions StepCompletion[]
+  itemsCreated    Item[]          @relation("ItemCreator")
+  performanceLogs UserPerformanceLog[]
+
+  @@index([email])
+  @@index([domainId])
+  @@index([isActive])
+}
+
+enum DomainRole {
+  OWNER     // Full control, can delete domain
+  ADMIN     // Full control within domain
+  MANAGER   // Can manage users and settings
+  MEMBER    // Standard permissions per user.permissions
+  VIEWER    // Read-only access
+}
+
+model UserSession {
+  id            String   @id @default(cuid())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+
+  token         String   @unique
+  refreshToken  String?  @unique
+
+  // Device info for session management
+  deviceType    String?  // "web", "desktop", "mobile"
+  deviceName    String?  // "Chrome on Windows", "iPhone 14"
+  ipAddress     String?
+
+  expiresAt     DateTime
+  refreshExpiresAt DateTime?
+
+  createdAt     DateTime @default(now())
+  lastUsedAt    DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ============================================================================
+// EBAY ACCOUNTS
+// ============================================================================
+
+model EbayAccount {
+  id              String   @id @default(cuid())
+
+  // Domain ownership
+  domain          Domain   @relation(fields: [domainId], references: [id])
+  domainId        String
+
+  // Account identification
+  name            String            // Display name: "Main Store"
+  ebayUsername    String?           // eBay seller username
+
+  // OAuth credentials (encrypted in production)
+  clientId        String?
+  clientSecret    String?
+  accessToken     String?  @db.Text
+  refreshToken    String?  @db.Text
+  tokenExpiresAt  DateTime?
+
+  // Legacy auth (if still needed)
+  legacyAuthToken String?  @db.Text
+
+  // Account settings
+  siteId          Int      @default(0)  // 0=US, 3=UK, 77=Germany, etc.
+  sandbox         Boolean  @default(false)
+  isActive        Boolean  @default(true)
+
+  // Seller info
+  paypalEmail     String?
+  postalCode      String?
+  defaultShippingProfileId String?
+  defaultReturnProfileId   String?
+  defaultPaymentProfileId  String?
+
+  // Sync tracking
+  lastSyncAt      DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  listings        ItemListing[]
+
+  @@unique([domainId, name])
+  @@index([domainId])
+  @@index([isActive])
+}
+
+// ============================================================================
+// WAREHOUSES & LOCATIONS
+// ============================================================================
+
+model Warehouse {
+  id              String   @id @default(cuid())
+
+  code            String   @unique  // "WH-MAIN", "WH-ANNEX"
+  name            String            // "Main Storage Facility"
+  address         String?
+  city            String?
+  state           String?
+  postalCode      String?
+  country         String   @default("US")
+  timezone        String   @default("America/New_York")
+
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  domains         DomainWarehouse[]
+  locations       WarehouseLocation[]
+
+  @@index([code])
+  @@index([isActive])
+}
+
+// Junction table: Domains can access multiple warehouses
+model DomainWarehouse {
+  id            String    @id @default(cuid())
+
+  domain        Domain    @relation(fields: [domainId], references: [id])
+  domainId      String
+
+  warehouse     Warehouse @relation(fields: [warehouseId], references: [id])
+  warehouseId   String
+
+  // Access level
+  canStore      Boolean   @default(true)   // Can store items here
+  canFulfill    Boolean   @default(true)   // Can fulfill from here
+
+  createdAt     DateTime  @default(now())
+
+  @@unique([domainId, warehouseId])
+  @@index([domainId])
+  @@index([warehouseId])
+}
+
+model WarehouseLocation {
+  id            String    @id @default(cuid())
+
+  warehouse     Warehouse @relation(fields: [warehouseId], references: [id])
+  warehouseId   String
+
+  // Location identifier: "A-1-3" (Aisle A, Rack 1, Shelf 3)
+  code          String
+
+  // Hierarchy (optional, for large warehouses)
+  zone          String?   // "A", "B", "RECEIVING"
+  aisle         String?
+  rack          String?
+  shelf         String?
+  bin           String?
+
+  // Capacity tracking (optional)
+  maxItems      Int?
+  currentItems  Int       @default(0)
+
+  isActive      Boolean   @default(true)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  items         Item[]
+
+  @@unique([warehouseId, code])
+  @@index([warehouseId])
+  @@index([code])
+}
+
+// ============================================================================
+// ITEMS (Core Entity)
+// ============================================================================
+
+model Item {
+  id              String   @id @default(cuid())
+
+  // Human-readable ID: "ALPHA-2024-000123"
+  displayId       String   @unique
+
+  // Domain ownership (permanent, never changes)
+  domain          Domain   @relation(fields: [domainId], references: [id])
+  domainId        String
+
+  // Who created this item
+  createdBy       User     @relation("ItemCreator", fields: [createdById], references: [id])
+  createdById     String
+
+  // Current workflow status
+  currentStep     WorkflowStep @default(INGEST)
+  status          ItemStatus   @default(ACTIVE)
+
+  // Identifiers (any of these can be used to identify)
+  sku             String?
+  upc             String?
+  isbn            String?
+  discogsMasterId String?
+  discogsReleaseId String?
+  customIdentifier String?
+
+  // AI-generated content
+  title           String?
+  description     String?  @db.Text
+  category        String?
+  categoryId      String?  // eBay category ID
+  condition       String?
+  conditionId     Int?     // eBay condition ID
+  brand           String?
+  manufacturer    String?
+  model           String?
+  mpn             String?  // Manufacturer Part Number
+
+  // Item specifics (JSONB for eBay item specifics)
+  itemSpecifics   Json     @default("[]")
+  // Example: [{"name": "Color", "value": "Black"}, {"name": "Size", "value": "Large"}]
+
+  // Keywords/tags for search
+  keywords        String[]
+
+  // AI analysis results (JSONB)
+  aiAnalysis      Json?
+  // Stores full AI response, confidence scores, justifications
+
+  // Pricing
+  costPrice       Float?   // What we paid
+  suggestedPrice  Float?   // AI suggestion
+  startingPrice   Float?   // Auction start
+  buyNowPrice     Float?   // BIN price
+  shippingCost    Float?
+
+  // Physical location (assigned at APPROVE step)
+  location        WarehouseLocation? @relation(fields: [locationId], references: [id])
+  locationId      String?
+
+  // Quantity
+  quantity        Int      @default(1)
+  quantityListed  Int      @default(0)
+  quantitySold    Int      @default(0)
+
+  // Source tracking (how was this item created?)
+  creationSource  ItemCreationSource @default(MANUAL)
+  listingTemplate ListingTemplate? @relation("CreatedFromListingTemplate", fields: [listingTemplateId], references: [id])
+  listingTemplateId String?
+
+  // Timestamps
+  ingestedAt      DateTime @default(now())
+  identifiedAt    DateTime?
+  populatedAt     DateTime?
+  pricedAt        DateTime?
+  reviewedAt      DateTime?
+  approvedAt      DateTime?
+  listedAt        DateTime?
+  soldAt          DateTime?
+  fulfilledAt     DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  photos          ItemPhoto[]
+  listing         ItemListing?
+  stepCompletions StepCompletion[]
+
+  @@index([displayId])
+  @@index([domainId])
+  @@index([currentStep])
+  @@index([status])
+  @@index([sku])
+  @@index([upc])
+  @@index([isbn])
+  @@index([locationId])
+  @@index([listingTemplateId])
+  @@index([createdAt])
+}
+
+enum WorkflowStep {
+  INGEST      // Photos/identifiers entered
+  IDENTIFY    // AI determining what it is
+  POPULATE    // AI generating listing content
+  PRICE       // AI suggesting price
+  REVIEW      // Human reviewing
+  APPROVE     // Human approving, assigning location
+  LIST        // Pushing to eBay
+  LISTED      // Live on eBay
+  SOLD        // Item sold
+  FULFILL     // Picking, packing, shipping
+  COMPLETE    // Shipped, tracking uploaded
+  CANCELLED   // Listing cancelled/removed
+}
+
+enum ItemStatus {
+  ACTIVE      // In workflow
+  PAUSED      // Temporarily paused
+  ERROR       // AI or system error
+  ARCHIVED    // Completed, kept for records
+  DELETED     // Soft deleted
+}
+
+enum ItemCreationSource {
+  MANUAL        // Created manually (typed in)
+  PHOTO_IMPORT  // Created from photo import
+  UPC_SCAN      // Created from UPC barcode scan
+  ISBN_SCAN     // Created from ISBN scan
+  DISCOGS       // Created from Discogs lookup
+  SELL_SIMILAR  // Cloned from existing eBay listing
+  API           // Created via API
+  BULK_IMPORT   // Imported from CSV/spreadsheet
+}
+
+model ItemPhoto {
+  id            String   @id @default(cuid())
+
+  item          Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  itemId        String
+
+  // File paths
+  originalPath  String            // Original uploaded file
+  optimizedPath String?           // Resized/optimized version
+  thumbnailPath String?           // Small thumbnail
+  ebayUrl       String?           // URL after upload to eBay
+
+  // Photo metadata
+  filename      String
+  mimeType      String
+  fileSize      Int               // Bytes
+  width         Int?
+  height        Int?
+
+  // Ordering
+  sortOrder     Int      @default(0)
+  isPrimary     Boolean  @default(false)
+
+  // AI analysis for this specific photo
+  aiAnalysis    Json?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([itemId])
+  @@index([sortOrder])
+}
+
+// ============================================================================
+// LISTINGS (eBay Integration)
+// ============================================================================
+
+model ItemListing {
+  id              String   @id @default(cuid())
+
+  // Item this listing is for
+  item            Item     @relation(fields: [itemId], references: [id])
+  itemId          String   @unique
+
+  // eBay account used
+  ebayAccount     EbayAccount @relation(fields: [ebayAccountId], references: [id])
+  ebayAccountId   String
+
+  // eBay listing details
+  ebayItemId      String?  @unique
+  ebayListingUrl  String?
+
+  // Listing type
+  listingType     ListingType @default(FIXED_PRICE)
+  listingDuration String   @default("GTC")  // GTC, Days_7, Days_30, etc.
+
+  // Pricing at time of listing
+  startPrice      Float
+  buyNowPrice     Float?
+  reservePrice    Float?
+
+  // Status
+  status          ListingStatus @default(DRAFT)
+
+  // eBay response data
+  ebayFees        Json?    // Fee breakdown from eBay
+  ebayResponse    Json?    // Full API response
+
+  // If sold
+  soldPrice       Float?
+  soldAt          DateTime?
+  buyerUsername   String?
+  buyerEmail      String?
+
+  // Shipping
+  shippingService String?
+  shippingCost    Float?
+  trackingNumber  String?
+  trackingCarrier String?
+  shippedAt       DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([ebayItemId])
+  @@index([ebayAccountId])
+  @@index([status])
+}
+
+enum ListingType {
+  AUCTION       // Traditional auction
+  FIXED_PRICE   // Buy It Now
+  AUCTION_BIN   // Auction with Buy It Now option
+}
+
+enum ListingStatus {
+  DRAFT         // Not yet submitted
+  PENDING       // Submitted, awaiting confirmation
+  ACTIVE        // Live on eBay
+  SOLD          // Item sold
+  ENDED         // Listing ended (unsold)
+  CANCELLED     // Manually cancelled
+  ERROR         // Failed to list
+}
+
+// ============================================================================
+// WORKFLOW AUDIT TRAIL
+// ============================================================================
+
+model StepCompletion {
+  id              String   @id @default(cuid())
+
+  // Item this step is for
+  item            Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  itemId          String
+
+  // Which step was completed
+  step            WorkflowStep
+
+  // Who completed it
+  completedBy     User     @relation(fields: [completedById], references: [id])
+  completedById   String
+
+  // What action was taken
+  action          StepAction
+
+  // AI-related (if applicable)
+  aiConfidence    Float?   // 0-100
+  aiJustification String?  @db.Text
+  aiModel         String?  // Which AI model was used
+
+  // Human input (if applicable)
+  humanContext    String?  @db.Text  // Context provided for redo
+  humanNotes      String?  @db.Text  // Any notes from reviewer
+
+  // Timing
+  durationSeconds Int?     // How long the step took
+
+  // Snapshot of data at this step (for audit)
+  dataSnapshot    Json?
+
+  createdAt       DateTime @default(now())
+
+  @@index([itemId])
+  @@index([completedById])
+  @@index([step])
+  @@index([createdAt])
+}
+
+enum StepAction {
+  ACCEPT    // Accepted AI output or moved forward
+  EDIT      // Made manual edits
+  REDO      // Requested AI to redo with context
+  SKIP      // Skipped this step
+  REJECT    // Rejected item entirely
+  AUTO      // Automatic (system action)
+}
+
+// ============================================================================
+// MARKET RESEARCH (Sold Data)
+// ============================================================================
+
+model SoldItemCache {
+  id              String   @id @default(cuid())
+
+  // eBay item info
+  ebayItemId      String   @unique
+  title           String
+
+  // Pricing
+  soldPrice       Float
+  shippingPrice   Float?
+  totalPrice      Float?
+
+  // Item details
+  condition       String?
+  category        String?
+  categoryId      String?
+  seller          String?
+  sellerFeedback  Int?
+
+  // Listing details
+  listingType     String?
+  bidCount        Int?
+  watchCount      Int?
+
+  // Images
+  imageUrl        String?
+  thumbnailUrl    String?
+
+  // Dates
+  soldDate        DateTime
+  listingEndDate  DateTime?
+
+  // Search metadata
+  searchQuery     String?
+
+  // Source
+  source          String   @default("scraper")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([title])
+  @@index([soldDate])
+  @@index([searchQuery])
+  @@index([category])
+  @@index([soldPrice])
+}
+
+model PriceResearchCache {
+  id              String   @id @default(cuid())
+
+  searchQuery     String   @unique
+
+  // Aggregated stats
+  averagePrice    Float
+  medianPrice     Float
+  minPrice        Float
+  maxPrice        Float
+  sampleSize      Int
+
+  // Percentiles
+  price25th       Float?
+  price75th       Float?
+
+  // Cache management
+  lastUpdated     DateTime @default(now())
+  expiresAt       DateTime
+
+  // References to source data
+  soldItemIds     String[]
+
+  createdAt       DateTime @default(now())
+
+  @@index([searchQuery])
+  @@index([expiresAt])
+}
+
+// ============================================================================
+// SYNC SUPPORT (Offline Clients)
+// ============================================================================
+
+model SyncLog {
+  id              String   @id @default(cuid())
+
+  // Which client
+  userId          String
+  deviceId        String
+  deviceType      String   // "desktop", "mobile"
+
+  // Sync details
+  direction       String   // "push", "pull"
+  itemCount       Int
+
+  // Status
+  status          String   // "success", "partial", "failed"
+  conflicts       Int      @default(0)
+
+  // Error info (if any)
+  errorMessage    String?
+
+  startedAt       DateTime
+  completedAt     DateTime?
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([deviceId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// EXTERNAL API TRACKING
+// ============================================================================
+
+model ExternalApiCall {
+  id              String   @id @default(cuid())
+
+  // Which API
+  apiName         String   // "ebay", "discogs", "segmind", "upc"
+  endpoint        String
+  method          String
+
+  // Request
+  requestBody     Json?
+
+  // Response
+  statusCode      Int?
+  responseBody    Json?
+
+  // Timing
+  durationMs      Int?
+
+  // Context
+  itemId          String?
+  userId          String?
+
+  // Error
+  errorMessage    String?
+
+  createdAt       DateTime @default(now())
+
+  @@index([apiName])
+  @@index([itemId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// PERFORMANCE TRACKING
+// ============================================================================
+
+model UserPerformanceLog {
+  id              String   @id @default(cuid())
+
+  user            User     @relation(fields: [userId], references: [id])
+  userId          String
+
+  // Period this log covers
+  date            DateTime @db.Date  // Day this record is for
+
+  // Step counts
+  itemsIngested   Int      @default(0)
+  itemsIdentified Int      @default(0)
+  itemsPopulated  Int      @default(0)
+  itemsPriced     Int      @default(0)
+  itemsReviewed   Int      @default(0)
+  itemsApproved   Int      @default(0)
+  itemsListed     Int      @default(0)
+  itemsFulfilled  Int      @default(0)
+
+  // Time tracking (seconds)
+  totalTimeWorked Int      @default(0)
+  avgTimePerItem  Float?
+
+  // Quality metrics
+  aiRedoRequests  Int      @default(0)  // How many times AI had to redo
+  editsMade       Int      @default(0)  // Manual edits to AI content
+  rejectionsGiven Int      @default(0)  // Items rejected
+
+  // Session tracking
+  sessionsCount   Int      @default(0)
+  firstActivity   DateTime?
+  lastActivity    DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}
+
+// ============================================================================
+// LISTING TEMPLATES (Reusable listing blueprints)
+// ============================================================================
+
+model ListingTemplate {
+  id                String   @id @default(cuid())
+
+  // Domain ownership
+  domain            Domain   @relation(fields: [domainId], references: [id])
+  domainId          String
+
+  // Template identification
+  name              String            // "PS5 Console", "iPhone 14 Pro"
+  description       String?           // Internal notes about this template
+  tags              String[]          // For searching: ["gaming", "console", "sony"]
+
+  // Source (how was this template created?)
+  sourceType        TemplateSourceType @default(MANUAL)
+  sourceEbayItemId  String?           // If created from Sell Similar
+
+  // ─────────────────────────────────────────────────────────────
+  // LISTING CONTENT (the actual template data)
+  // ─────────────────────────────────────────────────────────────
+
+  // Title - can include placeholders: "{Brand} {Model} {Condition} {Color}"
+  titleTemplate     String?
+  // Example: "Apple iPhone {Model} {Storage} {Color} - {Condition}"
+
+  // Category
+  categoryId        String?
+  categoryName      String?
+  categoryPath      String?           // "Cell Phones > iPhones"
+
+  // Condition
+  defaultCondition  String?
+  defaultConditionId Int?
+
+  // Item Specifics - array of {name, value, required}
+  // Value can be placeholder: "{input}" means user must provide
+  itemSpecifics     Json     @default("[]")
+  // Example: [
+  //   {"name": "Brand", "value": "Apple", "locked": true},
+  //   {"name": "Model", "value": "{input}", "required": true},
+  //   {"name": "Storage Capacity", "value": "{input}", "required": true},
+  //   {"name": "Color", "value": "{input}", "required": false}
+  // ]
+
+  // Description - HTML with optional placeholders
+  descriptionTemplate String? @db.Text
+  // Can include: {title}, {brand}, {model}, {condition}, {specifics}
+
+  // ─────────────────────────────────────────────────────────────
+  // PRICING GUIDANCE
+  // ─────────────────────────────────────────────────────────────
+
+  suggestedPriceMin Float?
+  suggestedPriceMax Float?
+  defaultListingType String?  @default("FIXED_PRICE") // FIXED_PRICE, AUCTION
+  defaultDuration   String?  @default("GTC")
+
+  // ─────────────────────────────────────────────────────────────
+  // SHIPPING & POLICIES
+  // ─────────────────────────────────────────────────────────────
+
+  defaultShippingProfileId String?
+  defaultReturnProfileId   String?
+  defaultPaymentProfileId  String?
+  estimatedShippingCost    Float?
+  estimatedWeight          Float?  // pounds
+  packageDimensions        Json?   // {length, width, height}
+
+  // ─────────────────────────────────────────────────────────────
+  // TEMPLATE IMAGES (optional reference images)
+  // ─────────────────────────────────────────────────────────────
+
+  referenceImageUrls String[]  // Example photos for reference
+  requiresPhotos     Boolean   @default(true)
+  minimumPhotos      Int       @default(1)
+
+  // ─────────────────────────────────────────────────────────────
+  // USAGE & METADATA
+  // ─────────────────────────────────────────────────────────────
+
+  isActive          Boolean  @default(true)
+  isPublic          Boolean  @default(false)  // Shared across domains?
+  timesUsed         Int      @default(0)
+  lastUsedAt        DateTime?
+
+  createdBy         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Items created from this template
+  itemsCreated      Item[]   @relation("CreatedFromListingTemplate")
+
+  @@unique([domainId, name])
+  @@index([domainId])
+  @@index([isActive])
+  @@index([tags])
+  @@index([sourceType])
+}
+
+enum TemplateSourceType {
+  MANUAL          // Created from scratch in template editor
+  SELL_SIMILAR    // Created from an eBay listing fetch
+  AI_GENERATED    // AI created based on product type
+  IMPORTED        // Imported from CSV/external source
+}
+
+// ============================================================================
+// SELL SIMILAR CACHE (Temporary cache of fetched eBay listings)
+// ============================================================================
+
+model SellSimilarCache {
+  id              String   @id @default(cuid())
+
+  // Source eBay listing
+  ebayItemId        String   @unique
+  listingUrl        String?
+  seller            String?
+  sellerFeedback    Int?
+
+  // Fetched listing data
+  title             String
+  description       String?  @db.Text
+  category          String?
+  categoryId        String?
+  condition         String?
+  conditionId       Int?
+  brand             String?
+
+  // Item specifics from source
+  itemSpecifics     Json     @default("[]")
+
+  // Images from source (URLs)
+  imageUrls         String[]
+
+  // Pricing from source
+  price             Float?
+  priceType         String?  // "BIN", "auction", "best_offer"
+  shippingCost      Float?
+
+  // Listing status at fetch time
+  listingStatus     String?  // "active", "sold", "ended"
+  soldDate          DateTime?
+  soldPrice         Float?
+
+  // Cache management
+  fetchedAt         DateTime @default(now())
+  expiresAt         DateTime // Cache for 24 hours
+
+  // Who fetched it
+  fetchedByDomainId String?
+  fetchedByUserId   String?
+
+  @@index([ebayItemId])
+  @@index([expiresAt])
+}
+
+// ============================================================================
+// QUICK USER SWITCHING (for shared workstations)
+// ============================================================================
+
+model WorkstationSession {
+  id              String   @id @default(cuid())
+
+  // Device identification
+  deviceId        String   // Unique device identifier
+  deviceName      String?  // "Listing Station 1", "Warehouse Tablet"
+
+  // Current active user (can be null if logged out)
+  currentUserId   String?
+
+  // Domain this workstation belongs to
+  domain          Domain   @relation(fields: [domainId], references: [id])
+  domainId        String
+
+  // Recent users for quick switch (last 5)
+  recentUserIds   String[]
+
+  // Session state
+  lastActivityAt  DateTime @default(now())
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([deviceId])
+  @@index([domainId])
+  @@index([currentUserId])
+}

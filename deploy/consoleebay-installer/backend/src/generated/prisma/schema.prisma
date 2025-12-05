@@ -1,0 +1,235 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String   @unique // e.g., "NYC", "LA", "CHI"
+  address   String?
+  timezone  String   @default("UTC")
+  isActive  Boolean  @default(true)
+  serverUrl String? // API endpoint for this location
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users        User[]
+  items        Item[]
+  ebayAccounts EbayAccount[]
+
+  @@index([code])
+  @@index([isActive])
+}
+
+model EbayAccount {
+  id          String @id @default(cuid())
+  accountName String @unique
+  email       String
+
+  // eBay API Credentials
+  appId        String  @map("app_id")
+  certId       String  @map("cert_id")
+  devId        String  @map("dev_id")
+  authToken    String? @map("auth_token") @db.Text
+  refreshToken String? @map("refresh_token") @db.Text
+
+  // Account settings
+  sandbox     Boolean @default(false)
+  siteId      Int     @default(0) // 0 = US, 3 = UK, etc.
+  paypalEmail String?
+  postalCode  String?
+
+  // Status
+  isActive Boolean   @default(true)
+  lastSync DateTime?
+
+  // Location this account belongs to
+  location   Location @relation(fields: [locationId], references: [id])
+  locationId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  items Item[]
+
+  @@index([accountName])
+  @@index([locationId])
+  @@index([isActive])
+}
+
+model User {
+  id       String   @id @default(cuid())
+  email    String   @unique
+  name     String
+  role     UserRole
+  password String
+
+  // Location assignment
+  location   Location? @relation(fields: [locationId], references: [id])
+  locationId String?
+
+  // Activity tracking
+  lastActive    DateTime?
+  isOnline      Boolean   @default(false)
+  currentItemId String? // Item currently being worked on
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  itemsCreated    Item[]           @relation("ItemCreator")
+  workflowActions WorkflowAction[]
+  sessions        UserSession[]
+
+  @@index([email])
+  @@index([role])
+  @@index([locationId])
+  @@index([isOnline])
+}
+
+model Item {
+  id     String        @id @default(cuid())
+  sku    String?       @unique
+  stage  WorkflowStage @default(PHOTO_UPLOAD)
+  status ItemStatus    @default(ACTIVE)
+
+  // Location and eBay Account
+  location      Location     @relation(fields: [locationId], references: [id])
+  locationId    String
+  ebayAccount   EbayAccount? @relation(fields: [ebayAccountId], references: [id])
+  ebayAccountId String?
+
+  // Basic info (Stage 1)
+  createdBy   User   @relation("ItemCreator", fields: [createdById], references: [id])
+  createdById String
+
+  // AI Generated (Stage 2)
+  title       String?
+  description String?  @db.Text
+  category    String?
+  condition   String?
+  brand       String?
+  features    String[]
+  keywords    String[]
+  aiAnalysis  Json?
+
+  // Pricing (Stage 4)
+  startingPrice Float?
+  buyNowPrice   Float?
+  shippingCost  Float?
+
+  // eBay Integration (Stage 5)
+  ebayId      String?   @unique
+  publishedAt DateTime?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  photos          Photo[]
+  workflowActions WorkflowAction[]
+
+  @@index([stage])
+  @@index([status])
+  @@index([createdAt])
+  @@index([sku])
+  @@index([locationId])
+  @@index([ebayAccountId])
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
+model Photo {
+  id     String @id @default(cuid())
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  itemId String
+
+  originalPath  String
+  thumbnailPath String?
+  optimizedPath String?
+
+  isPrimary Boolean @default(false)
+  order     Int     @default(0)
+
+  // AI Analysis results for this specific photo
+  analysis    Json?
+  processedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([itemId])
+  @@index([isPrimary])
+}
+
+model WorkflowAction {
+  id     String @id @default(cuid())
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  itemId String
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  fromStage WorkflowStage
+  toStage   WorkflowStage
+  action    String // "approve", "reject", "edit", etc.
+  notes     String?       @db.Text
+  changes   Json? // Track what was changed
+
+  createdAt DateTime @default(now())
+
+  @@index([itemId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum UserRole {
+  ADMIN
+  PHOTOGRAPHER // Stage 1: Upload photos
+  PROCESSOR // Stage 2-3: Review AI results
+  PRICER // Stage 4: Set prices
+  PUBLISHER // Stage 5: Final review & publish
+  MANAGER // Can access all stages
+}
+
+enum WorkflowStage {
+  PHOTO_UPLOAD // Stage 1: Photos uploaded
+  AI_PROCESSING // Stage 2: Being processed by AI
+  REVIEW_EDIT // Stage 3: Review/edit AI results
+  PRICING // Stage 4: Set pricing
+  FINAL_REVIEW // Stage 5: Final review before publishing
+  PUBLISHED // Complete: Listed on eBay
+  REJECTED // Rejected at any stage
+}
+
+enum ItemStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+  ERROR
+}

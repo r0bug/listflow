@@ -1,0 +1,41 @@
+{
+  "title": "My Items for Sale",
+  "contact_info": {
+    "name": "John Doe",
+    "phone": "(555) 123-4567",
+    "email": "john@example.com",
+    "location": "Seattle, WA"
+  },
+  "items": [
+    {
+      "id": "item_20250123_001",
+      "title": "Vintage Camera",
+      "description": "Beautiful vintage film camera in excellent working condition. This classic camera has been well-maintained and produces stunning photographs. Perfect for photography enthusiasts and collectors alike.",
+      "price": "$250",
+      "location": "Downtown Seattle",
+      "contact_info": "Call or text (555) 123-4567",
+      "status": "available",
+      "photos": [],
+      "thumbnail": "",
+      "created_date": "2025-01-23T10:00:00",
+      "updated_date": "2025-01-23T10:00:00",
+      "category": "Electronics",
+      "condition": "Excellent"
+    },
+    {
+      "id": "item_20250123_002",
+      "title": "Mountain Bike",
+      "description": "High-quality mountain bike, barely used. Features 21-speed gear system, comfortable seat, and sturdy frame. Great for trails and city riding.",
+      "price": "$450",
+      "location": "North Seattle",
+      "contact_info": "Email preferred: john@example.com",
+      "status": "available",
+      "photos": [],
+      "thumbnail": "",
+      "created_date": "2025-01-23T11:00:00",
+      "updated_date": "2025-01-23T11:00:00",
+      "category": "Sports & Outdoors",
+      "condition": "Like New"
+    }
+  ]
+}

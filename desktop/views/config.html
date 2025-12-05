@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Configuration - ConsoleEbay</title>
+    <link rel="stylesheet" href="styles/config.css">
+</head>
+<body>
+    <div class="config-container">
+        <header class="config-header">
+            <h1>Configuration Settings</h1>
+        </header>
+
+        <div class="config-tabs">
+            <button class="tab-btn active" data-tab="servers">Servers & Locations</button>
+            <button class="tab-btn" data-tab="ebay">eBay Accounts</button>
+            <button class="tab-btn" data-tab="ai">AI Settings</button>
+            <button class="tab-btn" data-tab="general">General</button>
+        </div>
+
+        <div class="config-content">
+            <!-- Servers Tab -->
+            <div id="servers-tab" class="tab-content active">
+                <h2>Server Locations</h2>
+                <p class="help-text">Configure multiple server locations for distributed operations.</p>
+                
+                <div class="server-list" id="serverList">
+                    <!-- Populated dynamically -->
+                </div>
+                
+                <button class="btn-add" onclick="showAddServerForm()">+ Add Server Location</button>
+                
+                <div id="addServerForm" class="form-section hidden">
+                    <h3>Add New Server</h3>
+                    <form onsubmit="addServer(event)">
+                        <div class="form-group">
+                            <label>Location Name</label>
+                            <input type="text" id="serverName" required placeholder="e.g., New York Office">
+                        </div>
+                        <div class="form-group">
+                            <label>Location Code</label>
+                            <input type="text" id="serverCode" required placeholder="e.g., NYC" maxlength="5">
+                        </div>
+                        <div class="form-group">
+                            <label>Server URL</label>
+                            <input type="url" id="serverUrl" required placeholder="http://server.example.com:3001">
+                        </div>
+                        <div class="form-group">
+                            <label>Timezone</label>
+                            <select id="serverTimezone">
+                                <option value="America/New_York">Eastern Time</option>
+                                <option value="America/Chicago">Central Time</option>
+                                <option value="America/Denver">Mountain Time</option>
+                                <option value="America/Los_Angeles">Pacific Time</option>
+                                <option value="UTC">UTC</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">Add Server</button>
+                            <button type="button" class="btn-secondary" onclick="hideAddServerForm()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- eBay Accounts Tab -->
+            <div id="ebay-tab" class="tab-content">
+                <h2>eBay Account Configuration</h2>
+                <p class="help-text">Manage multiple eBay seller accounts and their API credentials.</p>
+                
+                <div class="account-list" id="ebayAccountList">
+                    <!-- Populated dynamically -->
+                </div>
+                
+                <button class="btn-add" onclick="showAddEbayForm()">+ Add eBay Account</button>
+                
+                <div id="addEbayForm" class="form-section hidden">
+                    <h3>Add eBay Account</h3>
+                    <form onsubmit="addEbayAccount(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Account Name</label>
+                                <input type="text" id="ebayAccountName" required placeholder="My eBay Store">
+                            </div>
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input type="email" id="ebayEmail" required placeholder="seller@example.com">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Location</label>
+                                <select id="ebayLocation" required>
+                                    <!-- Populated with available locations -->
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Environment</label>
+                                <select id="ebaySandbox">
+                                    <option value="false">Production</option>
+                                    <option value="true">Sandbox (Testing)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <h4>API Credentials</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>App ID (Client ID)</label>
+                                <input type="text" id="ebayAppId" required placeholder="Your eBay App ID">
+                            </div>
+                            <div class="form-group">
+                                <label>Cert ID (Client Secret)</label>
+                                <input type="password" id="ebayCertId" required placeholder="Your eBay Cert ID">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Dev ID</label>
+                                <input type="text" id="ebayDevId" placeholder="Your eBay Dev ID (optional)">
+                            </div>
+                            <div class="form-group">
+                                <label>Auth Token</label>
+                                <input type="password" id="ebayAuthToken" placeholder="User Auth Token (optional)">
+                            </div>
+                        </div>
+                        
+                        <h4>Account Settings</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>PayPal Email</label>
+                                <input type="email" id="paypalEmail" placeholder="paypal@example.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Postal Code</label>
+                                <input type="text" id="postalCode" placeholder="10001">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Site</label>
+                                <select id="ebaySiteId">
+                                    <option value="0">eBay US</option>
+                                    <option value="3">eBay UK</option>
+                                    <option value="77">eBay Germany</option>
+                                    <option value="71">eBay France</option>
+                                    <option value="15">eBay Australia</option>
+                                    <option value="2">eBay Canada</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">Add Account</button>
+                            <button type="button" class="btn-secondary" onclick="hideAddEbayForm()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- AI Settings Tab -->
+            <div id="ai-tab" class="tab-content">
+                <h2>AI Configuration</h2>
+                <p class="help-text">Configure Segmind API settings for image analysis.</p>
+                
+                <form onsubmit="saveAISettings(event)">
+                    <div class="form-group">
+                        <label>Segmind API Key</label>
+                        <input type="password" id="segmindApiKey" placeholder="Your Segmind API key">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Preferred Model</label>
+                        <select id="segmindModel">
+                            <option value="llava-v1.6">LLaVA v1.6 (Fast, Good quality)</option>
+                            <option value="claude-3.7-sonnet">Claude 3.7 Sonnet (Balanced)</option>
+                            <option value="claude-3-opus">Claude 3 Opus (Best quality)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="autoProcess">
+                            Automatically process photos after upload
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Processing Delay (seconds)</label>
+                        <input type="number" id="processingDelay" min="1" max="10" value="2">
+                        <span class="help-text">Delay between API requests to avoid rate limiting</span>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">Save AI Settings</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- General Settings Tab -->
+            <div id="general-tab" class="tab-content">
+                <h2>General Settings</h2>
+                
+                <form onsubmit="saveGeneralSettings(event)">
+                    <div class="form-group">
+                        <label>Theme</label>
+                        <select id="theme">
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                            <option value="auto">Auto (System)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Dashboard Refresh Interval</label>
+                        <select id="refreshInterval">
+                            <option value="5000">5 seconds</option>
+                            <option value="10000">10 seconds</option>
+                            <option value="30000">30 seconds</option>
+                            <option value="60000">1 minute</option>
+                            <option value="0">Manual only</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="notifications">
+                            Enable desktop notifications
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="soundAlerts">
+                            Enable sound alerts
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Default Queue View</label>
+                        <select id="defaultQueueView">
+                            <option value="all">All Stages</option>
+                            <option value="my-items">My Items Only</option>
+                            <option value="location">My Location Only</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">Save Settings</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="config-footer">
+            <button class="btn-close" onclick="window.close()">Close</button>
+        </div>
+    </div>
+
+    <script src="../src/config.js"></script>
+</body>
+</html>
