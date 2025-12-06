@@ -50,7 +50,7 @@ class SoldDataService {
     console.log('Initializing Puppeteer browser...');
 
     this.browser = await puppeteer.launch({
-      headless: headless ? 'new' : false,
+      headless: headless,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',

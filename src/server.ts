@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import authRoutes from './routes/auth.routes';
 import listingRoutes from './routes/listing.routes';
 import uploadRoutes from './routes/upload.routes';
 import workflowRoutes from './routes/workflow.routes';
@@ -22,6 +23,7 @@ app.use(generalLimiter);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+app.use('/api/v1/auth', authRoutes);
 app.use('/api/listings', listingRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/workflow', workflowRoutes);
