@@ -73,8 +73,10 @@ router.post('/login', async (req, res) => {
 router.post('/pin-login', async (req, res) => {
   try {
     const { userId, pin } = req.body;
+    console.log('PIN login attempt:', { userId, pinLength: pin?.length });
 
     if (!userId || !pin) {
+      console.log('Missing userId or pin');
       return res.status(400).json({ success: false, error: 'User ID and PIN required' });
     }
 
@@ -87,11 +89,15 @@ router.post('/pin-login', async (req, res) => {
     });
 
     if (!user) {
+      console.log('User not found:', userId);
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
+    console.log('Found user:', user.id, user.email);
+
     // Verify PIN (stored as bcrypt hash in password field)
     const validPin = await bcrypt.compare(pin, user.password);
+    console.log('PIN validation result:', validPin);
     if (!validPin) {
       return res.status(401).json({ success: false, error: 'Invalid PIN' });
     }
