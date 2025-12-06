@@ -11,7 +11,7 @@ interface PinPadProps {
   maxLength?: number;
 }
 
-const PinPad: React.FC<PinPadProps> = ({ pin, onPinChange, onSubmit, maxLength = 6 }) => {
+const PinPad: React.FC<PinPadProps> = ({ pin, onPinChange, onSubmit, maxLength = 4 }) => {
   const handlePress = (value: string) => {
     if (value === 'clear') {
       onPinChange('');
