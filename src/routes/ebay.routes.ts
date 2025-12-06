@@ -366,7 +366,7 @@ router.get('/listing/:itemId', async (req, res) => {
   }
 });
 
-// Search eBay for items (completed/sold items for research)
+// Search eBay for SOLD/COMPLETED items (for price research)
 // GET /api/v1/ebay/search
 router.get('/search', async (req, res) => {
   try {
@@ -376,62 +376,97 @@ router.get('/search', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Search query is required' });
     }
 
-    // Get application token for Browse API
-    const accessToken = await getApplicationToken();
-    if (!accessToken) {
-      return res.status(500).json({ success: false, error: 'Failed to authenticate with eBay' });
+    const clientId = process.env.EBAY_CLIENT_ID;
+    if (!clientId) {
+      return res.status(500).json({
+        success: false,
+        error: 'eBay not configured. Add EBAY_CLIENT_ID to .env'
+      });
     }
 
     const sandbox = process.env.EBAY_SANDBOX === 'true';
 
-    // Use Browse API to search for items
+    // Use Finding API's findCompletedItems to get SOLD listings
+    // This is the correct API for getting sold/completed items
+    const apiUrl = sandbox
+      ? 'https://svcs.sandbox.ebay.com/services/search/FindingService/v1'
+      : 'https://svcs.ebay.com/services/search/FindingService/v1';
+
     const searchParams = new URLSearchParams({
-      q: q,
-      limit: String(Math.min(Number(limit), 50)),
-      filter: 'buyingOptions:{FIXED_PRICE}', // Focus on Buy It Now items
+      'OPERATION-NAME': 'findCompletedItems',
+      'SERVICE-VERSION': '1.13.0',
+      'SECURITY-APPNAME': clientId,
+      'RESPONSE-DATA-FORMAT': 'JSON',
+      'REST-PAYLOAD': '',
+      'keywords': q,
+      'paginationInput.entriesPerPage': String(Math.min(Number(limit), 100)),
+      // Filter to only show items that actually sold (not just ended)
+      'itemFilter(0).name': 'SoldItemsOnly',
+      'itemFilter(0).value': 'true',
+      'sortOrder': 'EndTimeSoonest',
     });
 
-    const apiUrl = sandbox
-      ? `https://api.sandbox.ebay.com/buy/browse/v1/item_summary/search?${searchParams}`
-      : `https://api.ebay.com/buy/browse/v1/item_summary/search?${searchParams}`;
-
-    const response = await fetch(apiUrl, {
+    const response = await fetch(`${apiUrl}?${searchParams}`, {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        'X-EBAY-SOA-GLOBAL-ID': 'EBAY-US',
       },
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('eBay search error:', errorData);
+      const errorText = await response.text();
+      console.error('eBay Finding API error:', errorText);
       return res.status(response.status).json({
         success: false,
-        error: errorData.errors?.[0]?.message || 'Failed to search eBay'
+        error: 'Failed to search eBay sold items'
       });
     }
 
     const data = await response.json();
 
-    // Transform the results
-    const items = (data.itemSummaries || []).map((item: any) => ({
-      itemId: item.itemId,
-      title: item.title,
-      price: parseFloat(item.price?.value || '0'),
-      currency: item.price?.currency || 'USD',
-      condition: item.condition || 'Unknown',
-      imageUrl: item.image?.imageUrl || item.thumbnailImages?.[0]?.imageUrl,
-      itemWebUrl: item.itemWebUrl,
-      seller: item.seller?.username,
-      location: item.itemLocation?.postalCode || item.itemLocation?.city,
-    }));
+    // Check for API errors
+    const ack = data.findCompletedItemsResponse?.[0]?.ack?.[0];
+    if (ack === 'Failure') {
+      const errorMsg = data.findCompletedItemsResponse?.[0]?.errorMessage?.[0]?.error?.[0]?.message?.[0];
+      console.error('eBay Finding API failure:', errorMsg);
+      return res.status(400).json({
+        success: false,
+        error: errorMsg || 'eBay search failed'
+      });
+    }
 
-    // Calculate price statistics
+    // Extract items from the response
+    const searchResult = data.findCompletedItemsResponse?.[0]?.searchResult?.[0];
+    const rawItems = searchResult?.item || [];
+
+    // Transform the results
+    const items = rawItems.map((item: any) => {
+      // Get the selling status to find actual sold price
+      const sellingStatus = item.sellingStatus?.[0];
+      const soldPrice = parseFloat(sellingStatus?.currentPrice?.[0]?.__value__ || '0');
+      const soldState = sellingStatus?.sellingState?.[0]; // 'EndedWithSales' for sold items
+
+      return {
+        itemId: item.itemId?.[0],
+        title: item.title?.[0],
+        price: soldPrice,
+        currency: sellingStatus?.currentPrice?.[0]?.['@currencyId'] || 'USD',
+        condition: item.condition?.[0]?.conditionDisplayName?.[0] || 'Unknown',
+        imageUrl: item.galleryURL?.[0],
+        itemWebUrl: item.viewItemURL?.[0],
+        seller: item.sellerInfo?.[0]?.sellerUserName?.[0],
+        location: item.location?.[0],
+        endTime: item.listingInfo?.[0]?.endTime?.[0],
+        soldState,
+      };
+    });
+
+    // Calculate price statistics from sold prices
     const prices = items.map((item: any) => item.price).filter((p: number) => p > 0);
+    const sortedPrices = [...prices].sort((a: number, b: number) => a - b);
     const stats = prices.length > 0 ? {
       count: prices.length,
       average: prices.reduce((a: number, b: number) => a + b, 0) / prices.length,
-      median: prices.sort((a: number, b: number) => a - b)[Math.floor(prices.length / 2)],
+      median: sortedPrices[Math.floor(sortedPrices.length / 2)],
       min: Math.min(...prices),
       max: Math.max(...prices),
     } : null;
@@ -439,12 +474,12 @@ router.get('/search', async (req, res) => {
     res.json({
       success: true,
       query: q,
-      total: data.total || items.length,
+      total: parseInt(searchResult?.['@count'] || items.length),
       items,
       stats,
     });
   } catch (error) {
-    console.error('Error searching eBay:', error);
+    console.error('Error searching eBay sold items:', error);
     res.status(500).json({ success: false, error: 'Failed to search eBay' });
   }
 });
