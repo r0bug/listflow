@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Package,
@@ -6,7 +6,6 @@ import {
   Clock,
   Eye,
   Edit,
-  Trash2,
   ExternalLink,
   Search,
   Filter,
@@ -14,7 +13,9 @@ import {
   CheckCircle,
   XCircle,
   TrendingUp,
-  Loader2
+  Loader2,
+  X,
+  ChevronDown
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -44,6 +45,12 @@ interface ListingStats {
   avgSalePrice: number;
 }
 
+interface FilterOptions {
+  priceMin: number | null;
+  priceMax: number | null;
+  sortBy: 'recent' | 'price_asc' | 'price_desc' | 'views';
+}
+
 export const Listings: React.FC = () => {
   const navigate = useNavigate();
   const { type } = useParams<{ type?: string }>();
@@ -59,6 +66,24 @@ export const Listings: React.FC = () => {
     totalRevenue: 0,
     avgSalePrice: 0
   });
+
+  // Filter state
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [filters, setFilters] = useState<FilterOptions>({
+    priceMin: null,
+    priceMax: null,
+    sortBy: 'recent'
+  });
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  // Edit modal state
+  const [editingListing, setEditingListing] = useState<Listing | null>(null);
+  const [editForm, setEditForm] = useState({ title: '', price: 0 });
+  const [isSaving, setIsSaving] = useState(false);
+
+  // End listing confirmation
+  const [endingListing, setEndingListing] = useState<Listing | null>(null);
+  const [isEnding, setIsEnding] = useState(false);
 
   const loadListings = async () => {
     setIsLoading(true);
@@ -94,12 +119,47 @@ export const Listings: React.FC = () => {
     loadListings();
   }, []);
 
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const listings = activeTab === 'active' ? activeListings : soldListings;
 
-  const filteredListings = listings.filter(listing =>
-    listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    listing.ebayId.includes(searchQuery)
-  );
+  // Apply filters and search
+  const filteredListings = listings
+    .filter(listing => {
+      // Search filter
+      const matchesSearch = listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        listing.ebayId.includes(searchQuery);
+      if (!matchesSearch) return false;
+
+      // Price filter
+      const price = listing.soldPrice || listing.price;
+      if (filters.priceMin !== null && price < filters.priceMin) return false;
+      if (filters.priceMax !== null && price > filters.priceMax) return false;
+
+      return true;
+    })
+    .sort((a, b) => {
+      switch (filters.sortBy) {
+        case 'price_asc':
+          return (a.soldPrice || a.price) - (b.soldPrice || b.price);
+        case 'price_desc':
+          return (b.soldPrice || b.price) - (a.soldPrice || a.price);
+        case 'views':
+          return b.views - a.views;
+        case 'recent':
+        default:
+          return new Date(b.listedAt).getTime() - new Date(a.listedAt).getTime();
+      }
+    });
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -111,6 +171,85 @@ export const Listings: React.FC = () => {
     setActiveTab(tab);
     navigate(`/listings/${tab}`);
   };
+
+  const handleEditClick = (listing: Listing) => {
+    setEditingListing(listing);
+    setEditForm({ title: listing.title, price: listing.price });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingListing) return;
+
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/dashboard/listings/${editingListing.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editForm.title,
+          price: editForm.price,
+          buyNowPrice: editForm.price
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        // Update local state
+        setActiveListings(prev => prev.map(l =>
+          l.id === editingListing.id
+            ? { ...l, title: editForm.title, price: editForm.price }
+            : l
+        ));
+        setEditingListing(null);
+      } else {
+        console.error('Failed to save:', result.error);
+      }
+    } catch (error) {
+      console.error('Error saving listing:', error);
+    }
+    setIsSaving(false);
+  };
+
+  const handleEndClick = (listing: Listing) => {
+    setEndingListing(listing);
+  };
+
+  const handleConfirmEnd = async () => {
+    if (!endingListing) return;
+
+    setIsEnding(true);
+    try {
+      const response = await fetch(`/api/dashboard/listings/${endingListing.id}/end`, {
+        method: 'POST'
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        // Remove from active listings
+        setActiveListings(prev => prev.filter(l => l.id !== endingListing.id));
+        setEndingListing(null);
+        // Update stats
+        setStats(prev => ({ ...prev, totalActive: prev.totalActive - 1 }));
+      } else {
+        console.error('Failed to end listing:', result.error);
+      }
+    } catch (error) {
+      console.error('Error ending listing:', error);
+    }
+    setIsEnding(false);
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      priceMin: null,
+      priceMax: null,
+      sortBy: 'recent'
+    });
+  };
+
+  const hasActiveFilters = filters.priceMin !== null ||
+    filters.priceMax !== null ||
+    filters.sortBy !== 'recent';
 
   return (
     <div className="p-6 space-y-6">
@@ -200,10 +339,100 @@ export const Listings: React.FC = () => {
             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50">
-          <Filter size={20} />
-          Filters
-        </button>
+
+        {/* Filter Dropdown */}
+        <div className="relative" ref={filterRef}>
+          <button
+            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50",
+              hasActiveFilters ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200"
+            )}
+          >
+            <Filter size={20} />
+            Filters
+            {hasActiveFilters && (
+              <span className="text-xs bg-blue-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                !
+              </span>
+            )}
+            <ChevronDown size={16} />
+          </button>
+
+          {showFilterDropdown && (
+            <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-20">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-gray-900">Filters</h3>
+                {hasActiveFilters && (
+                  <button
+                    onClick={resetFilters}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    Reset all
+                  </button>
+                )}
+              </div>
+
+              {/* Sort By */}
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+                <select
+                  value={filters.sortBy}
+                  onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as FilterOptions['sortBy'] })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  <option value="recent">Most Recent</option>
+                  <option value="price_asc">Price: Low to High</option>
+                  <option value="price_desc">Price: High to Low</option>
+                  <option value="views">Most Views</option>
+                </select>
+              </div>
+
+              {/* Price Range */}
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Price Range</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center flex-1">
+                    <span className="text-gray-500 text-sm mr-1">$</span>
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      value={filters.priceMin ?? ''}
+                      onChange={(e) => setFilters({
+                        ...filters,
+                        priceMin: e.target.value ? parseFloat(e.target.value) : null
+                      })}
+                      className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm"
+                      min="0"
+                    />
+                  </div>
+                  <span className="text-gray-400">-</span>
+                  <div className="flex items-center flex-1">
+                    <span className="text-gray-500 text-sm mr-1">$</span>
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      value={filters.priceMax ?? ''}
+                      onChange={(e) => setFilters({
+                        ...filters,
+                        priceMax: e.target.value ? parseFloat(e.target.value) : null
+                      })}
+                      className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm"
+                      min="0"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowFilterDropdown(false)}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              >
+                Apply Filters
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Listings Grid */}
@@ -223,9 +452,13 @@ export const Listings: React.FC = () => {
               key={listing.id}
               className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
             >
-              {/* Image placeholder */}
-              <div className="h-40 bg-gray-100 flex items-center justify-center">
-                <Package size={40} className="text-gray-300" />
+              {/* Image */}
+              <div className="h-40 bg-gray-100 flex items-center justify-center overflow-hidden">
+                {listing.imageUrl ? (
+                  <img src={listing.imageUrl} alt={listing.title} className="w-full h-full object-cover" />
+                ) : (
+                  <Package size={40} className="text-gray-300" />
+                )}
               </div>
 
               <div className="p-4">
@@ -281,11 +514,18 @@ export const Listings: React.FC = () => {
                   </a>
                   {listing.status === 'active' && (
                     <>
-                      <button className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 rounded-lg">
+                      <button
+                        onClick={() => handleEditClick(listing)}
+                        className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
+                      >
                         <Edit size={14} />
                         Edit
                       </button>
-                      <button className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
+                      <button
+                        onClick={() => handleEndClick(listing)}
+                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                        title="End Listing"
+                      >
                         <XCircle size={18} />
                       </button>
                     </>
@@ -296,6 +536,109 @@ export const Listings: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* Edit Modal */}
+      {editingListing && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Edit Listing</h2>
+              <button
+                onClick={() => setEditingListing(null)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <input
+                  type="text"
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Price ($)</label>
+                <input
+                  type="number"
+                  value={editForm.price}
+                  onChange={(e) => setEditForm({ ...editForm, price: parseFloat(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setEditingListing(null)}
+                className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={isSaving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSaving && <Loader2 size={16} className="animate-spin" />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* End Listing Confirmation Modal */}
+      {endingListing && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">End Listing</h2>
+              <button
+                onClick={() => setEndingListing(null)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-gray-600 mb-4">
+              Are you sure you want to end this listing?
+            </p>
+            <div className="bg-gray-50 rounded-lg p-3 mb-4">
+              <p className="font-medium text-gray-900 line-clamp-2">{endingListing.title}</p>
+              <p className="text-sm text-gray-500 mt-1">Price: ${endingListing.price.toFixed(2)}</p>
+            </div>
+            <p className="text-sm text-red-600 mb-4">
+              This action cannot be undone. The listing will be removed from eBay.
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setEndingListing(null)}
+                className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmEnd}
+                disabled={isEnding}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isEnding && <Loader2 size={16} className="animate-spin" />}
+                End Listing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

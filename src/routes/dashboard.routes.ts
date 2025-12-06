@@ -547,6 +547,229 @@ router.get('/item/:id', async (req, res) => {
   }
 });
 
+// PUT /api/dashboard/item/:id - Update item fields
+router.put('/item/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      description,
+      category,
+      condition,
+      brand,
+      itemSpecifics,
+      startingPrice,
+      buyNowPrice
+    } = req.body;
+
+    // Build update data
+    const updateData: any = {};
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (category !== undefined) updateData.category = category;
+    if (condition !== undefined) updateData.condition = condition;
+    if (brand !== undefined) updateData.brand = brand;
+    if (startingPrice !== undefined) updateData.startingPrice = startingPrice;
+    if (buyNowPrice !== undefined) updateData.buyNowPrice = buyNowPrice;
+
+    // Store item specifics in aiAnalysis JSON
+    if (itemSpecifics !== undefined) {
+      const existingItem = await prisma.item.findUnique({
+        where: { id },
+        select: { aiAnalysis: true }
+      });
+      const existingAnalysis = (existingItem?.aiAnalysis as any) || {};
+      updateData.aiAnalysis = {
+        ...existingAnalysis,
+        specifics: itemSpecifics.reduce((acc: any, spec: { name: string; value: string }) => {
+          acc[spec.name] = spec.value;
+          return acc;
+        }, {})
+      };
+    }
+
+    const item = await prisma.item.update({
+      where: { id },
+      data: updateData
+    });
+
+    res.json({
+      success: true,
+      data: item,
+      message: 'Item updated successfully'
+    });
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+    console.error('Error updating item:', error);
+    res.status(500).json({ success: false, error: 'Failed to update item' });
+  }
+});
+
+// POST /api/dashboard/item/:id/advance - Advance item to next workflow stage
+router.post('/item/:id/advance', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+
+    const item = await prisma.item.findUnique({
+      where: { id },
+      select: { stage: true }
+    });
+
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    // Define stage progression
+    const stageOrder = [
+      'PHOTO_UPLOAD',
+      'AI_PROCESSING',
+      'REVIEW_EDIT',
+      'PRICING',
+      'FINAL_REVIEW',
+      'PUBLISHED'
+    ];
+
+    const currentIndex = stageOrder.indexOf(item.stage);
+    if (currentIndex === -1 || currentIndex >= stageOrder.length - 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot advance item - already at final stage or invalid stage'
+      });
+    }
+
+    const nextStage = stageOrder[currentIndex + 1] as any;
+
+    // Update item and create workflow action
+    const [updatedItem] = await prisma.$transaction([
+      prisma.item.update({
+        where: { id },
+        data: { stage: nextStage }
+      }),
+      prisma.workflowAction.create({
+        data: {
+          itemId: id,
+          userId: 'system', // TODO: Get from auth context
+          fromStage: item.stage,
+          toStage: nextStage,
+          action: 'advance',
+          notes: notes || null
+        }
+      })
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        id: updatedItem.id,
+        stage: updatedItem.stage
+      },
+      message: `Item advanced to ${nextStage}`
+    });
+  } catch (error) {
+    console.error('Error advancing item:', error);
+    res.status(500).json({ success: false, error: 'Failed to advance item' });
+  }
+});
+
+// POST /api/dashboard/item/:id/reject - Reject item
+router.post('/item/:id/reject', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const item = await prisma.item.findUnique({
+      where: { id },
+      select: { stage: true }
+    });
+
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    // Update item and create workflow action
+    const [updatedItem] = await prisma.$transaction([
+      prisma.item.update({
+        where: { id },
+        data: { stage: 'REJECTED' }
+      }),
+      prisma.workflowAction.create({
+        data: {
+          itemId: id,
+          userId: 'system', // TODO: Get from auth context
+          fromStage: item.stage,
+          toStage: 'REJECTED',
+          action: 'reject',
+          notes: reason || null
+        }
+      })
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        id: updatedItem.id,
+        stage: updatedItem.stage
+      },
+      message: 'Item rejected'
+    });
+  } catch (error) {
+    console.error('Error rejecting item:', error);
+    res.status(500).json({ success: false, error: 'Failed to reject item' });
+  }
+});
+
+// GET /api/dashboard/item/:id/navigation - Get prev/next items in same stage
+router.get('/item/:id/navigation', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const item = await prisma.item.findUnique({
+      where: { id },
+      select: { stage: true, createdAt: true }
+    });
+
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    // Get items in same stage
+    const [prevItem, nextItem] = await Promise.all([
+      prisma.item.findFirst({
+        where: {
+          stage: item.stage,
+          status: 'ACTIVE',
+          createdAt: { lt: item.createdAt }
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true }
+      }),
+      prisma.item.findFirst({
+        where: {
+          stage: item.stage,
+          status: 'ACTIVE',
+          createdAt: { gt: item.createdAt }
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true }
+      })
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        prevId: prevItem?.id || null,
+        nextId: nextItem?.id || null
+      }
+    });
+  } catch (error) {
+    console.error('Error getting navigation:', error);
+    res.status(500).json({ success: false, error: 'Failed to get navigation' });
+  }
+});
+
 // GET /api/dashboard/inventory/locations - Get all locations with item counts
 router.get('/inventory/locations', async (req, res) => {
   try {
@@ -1028,6 +1251,320 @@ router.post('/templates/:id/use', async (req, res) => {
     }
     console.error('Error using template:', error);
     res.status(500).json({ success: false, error: 'Failed to use template' });
+  }
+});
+
+// ============================================================================
+// BULK OPERATIONS
+// ============================================================================
+
+// POST /api/dashboard/items/bulk-advance - Advance multiple items to next stage
+router.post('/items/bulk-advance', async (req, res) => {
+  try {
+    const { itemIds, targetStage } = req.body;
+
+    if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'itemIds array is required' });
+    }
+
+    // Define stage progression
+    const stageOrder = [
+      'PHOTO_UPLOAD',
+      'AI_PROCESSING',
+      'REVIEW_EDIT',
+      'PRICING',
+      'FINAL_REVIEW',
+      'PUBLISHED'
+    ];
+
+    // Get all items
+    const items = await prisma.item.findMany({
+      where: { id: { in: itemIds } },
+      select: { id: true, stage: true }
+    });
+
+    const results: { success: string[]; failed: { id: string; error: string }[] } = {
+      success: [],
+      failed: []
+    };
+
+    // Process each item
+    for (const item of items) {
+      try {
+        let nextStage: string;
+
+        if (targetStage) {
+          // Use specified target stage
+          nextStage = targetStage;
+        } else {
+          // Advance to next stage in sequence
+          const currentIndex = stageOrder.indexOf(item.stage);
+          if (currentIndex === -1 || currentIndex >= stageOrder.length - 1) {
+            results.failed.push({ id: item.id, error: 'Already at final stage or invalid stage' });
+            continue;
+          }
+          nextStage = stageOrder[currentIndex + 1];
+        }
+
+        await prisma.$transaction([
+          prisma.item.update({
+            where: { id: item.id },
+            data: { stage: nextStage as any }
+          }),
+          prisma.workflowAction.create({
+            data: {
+              itemId: item.id,
+              userId: 'system',
+              fromStage: item.stage,
+              toStage: nextStage as any,
+              action: 'bulk_advance',
+              notes: `Bulk advanced to ${nextStage}`
+            }
+          })
+        ]);
+
+        results.success.push(item.id);
+      } catch (error) {
+        results.failed.push({ id: item.id, error: 'Failed to advance' });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: results,
+      message: `Advanced ${results.success.length} items, ${results.failed.length} failed`
+    });
+  } catch (error) {
+    console.error('Error bulk advancing items:', error);
+    res.status(500).json({ success: false, error: 'Failed to bulk advance items' });
+  }
+});
+
+// POST /api/dashboard/items/bulk-price - Set prices for multiple items
+router.post('/items/bulk-price', async (req, res) => {
+  try {
+    const { itemIds, priceAdjustment } = req.body;
+
+    if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'itemIds array is required' });
+    }
+
+    // Get all items with their current prices
+    const items = await prisma.item.findMany({
+      where: { id: { in: itemIds } },
+      select: { id: true, stage: true, startingPrice: true, buyNowPrice: true }
+    });
+
+    const results: { success: string[]; failed: { id: string; error: string }[] } = {
+      success: [],
+      failed: []
+    };
+
+    for (const item of items) {
+      try {
+        const updateData: any = {};
+
+        if (priceAdjustment) {
+          // Apply price adjustment (percentage or fixed)
+          if (priceAdjustment.type === 'percentage') {
+            const multiplier = 1 + (priceAdjustment.value / 100);
+            if (item.startingPrice) updateData.startingPrice = Math.round(item.startingPrice * multiplier * 100) / 100;
+            if (item.buyNowPrice) updateData.buyNowPrice = Math.round(item.buyNowPrice * multiplier * 100) / 100;
+          } else if (priceAdjustment.type === 'fixed') {
+            updateData.startingPrice = priceAdjustment.startingPrice;
+            updateData.buyNowPrice = priceAdjustment.buyNowPrice;
+          }
+        }
+
+        // Advance to PRICING stage if not already there or beyond
+        const stageOrder = ['PHOTO_UPLOAD', 'AI_PROCESSING', 'REVIEW_EDIT', 'PRICING', 'FINAL_REVIEW', 'PUBLISHED'];
+        const currentIndex = stageOrder.indexOf(item.stage);
+        const pricingIndex = stageOrder.indexOf('PRICING');
+
+        if (currentIndex < pricingIndex) {
+          updateData.stage = 'PRICING';
+        }
+
+        await prisma.$transaction([
+          prisma.item.update({
+            where: { id: item.id },
+            data: updateData
+          }),
+          prisma.workflowAction.create({
+            data: {
+              itemId: item.id,
+              userId: 'system',
+              fromStage: item.stage,
+              toStage: updateData.stage || item.stage,
+              action: 'bulk_price',
+              notes: priceAdjustment ? `Bulk pricing applied` : 'Moved to pricing stage'
+            }
+          })
+        ]);
+
+        results.success.push(item.id);
+      } catch (error) {
+        results.failed.push({ id: item.id, error: 'Failed to update price' });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: results,
+      message: `Updated ${results.success.length} items, ${results.failed.length} failed`
+    });
+  } catch (error) {
+    console.error('Error bulk pricing items:', error);
+    res.status(500).json({ success: false, error: 'Failed to bulk price items' });
+  }
+});
+
+// PUT /api/dashboard/listings/:id - Update a listing
+router.put('/listings/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, price, buyNowPrice, status } = req.body;
+
+    const updateData: any = {};
+    if (title !== undefined) updateData.title = title;
+    if (price !== undefined) updateData.price = price;
+    if (buyNowPrice !== undefined) updateData.buyNowPrice = buyNowPrice;
+    if (status !== undefined) updateData.status = status;
+
+    const listing = await prisma.listing.update({
+      where: { id },
+      data: updateData
+    });
+
+    res.json({
+      success: true,
+      data: listing,
+      message: 'Listing updated successfully'
+    });
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ success: false, error: 'Listing not found' });
+    }
+    console.error('Error updating listing:', error);
+    res.status(500).json({ success: false, error: 'Failed to update listing' });
+  }
+});
+
+// POST /api/dashboard/listings/:id/end - End a listing
+router.post('/listings/:id/end', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const listing = await prisma.listing.update({
+      where: { id },
+      data: {
+        status: 'ended',
+        endedAt: new Date()
+      }
+    });
+
+    res.json({
+      success: true,
+      data: listing,
+      message: 'Listing ended successfully'
+    });
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ success: false, error: 'Listing not found' });
+    }
+    console.error('Error ending listing:', error);
+    res.status(500).json({ success: false, error: 'Failed to end listing' });
+  }
+});
+
+// GET /api/dashboard/reports/export - Export reports data as JSON
+router.get('/reports/export', async (req, res) => {
+  try {
+    const { range = '30d', format = 'json' } = req.query;
+
+    // Calculate date range
+    const now = new Date();
+    let startDate = new Date();
+    switch (range) {
+      case '7d': startDate.setDate(now.getDate() - 7); break;
+      case '30d': startDate.setDate(now.getDate() - 30); break;
+      case '90d': startDate.setDate(now.getDate() - 90); break;
+      case '1y': startDate.setFullYear(now.getFullYear() - 1); break;
+      default: startDate.setDate(now.getDate() - 30);
+    }
+
+    // Get sold listings in date range with full details
+    const soldListings = await prisma.listing.findMany({
+      where: {
+        status: 'sold',
+        soldAt: { gte: startDate }
+      },
+      select: {
+        id: true,
+        title: true,
+        price: true,
+        soldPrice: true,
+        category: true,
+        soldAt: true,
+        listedAt: true,
+        ebayId: true
+      },
+      orderBy: { soldAt: 'desc' }
+    });
+
+    // Calculate summary metrics
+    const totalRevenue = soldListings.reduce((sum, l) => sum + (l.soldPrice || l.price), 0);
+    const itemsSold = soldListings.length;
+    const avgSalePrice = itemsSold > 0 ? totalRevenue / itemsSold : 0;
+
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      dateRange: { start: startDate.toISOString(), end: now.toISOString() },
+      summary: {
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        itemsSold,
+        avgSalePrice: Math.round(avgSalePrice * 100) / 100
+      },
+      transactions: soldListings.map(l => ({
+        id: l.id,
+        ebayId: l.ebayId,
+        title: l.title,
+        listPrice: l.price,
+        soldPrice: l.soldPrice || l.price,
+        category: l.category,
+        listedAt: l.listedAt?.toISOString(),
+        soldAt: l.soldAt?.toISOString()
+      }))
+    };
+
+    if (format === 'csv') {
+      // Generate CSV
+      const headers = ['ID', 'eBay ID', 'Title', 'List Price', 'Sold Price', 'Category', 'Listed At', 'Sold At'];
+      const rows = soldListings.map(l => [
+        l.id,
+        l.ebayId || '',
+        `"${(l.title || '').replace(/"/g, '""')}"`,
+        l.price,
+        l.soldPrice || l.price,
+        l.category || '',
+        l.listedAt?.toISOString() || '',
+        l.soldAt?.toISOString() || ''
+      ].join(','));
+
+      const csv = [headers.join(','), ...rows].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="sales-report-${range}.csv"`);
+      return res.send(csv);
+    }
+
+    res.json({
+      success: true,
+      data: exportData
+    });
+  } catch (error) {
+    console.error('Error exporting reports:', error);
+    res.status(500).json({ success: false, error: 'Failed to export reports' });
   }
 });
 

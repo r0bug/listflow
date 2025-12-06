@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
   Upload,
@@ -22,10 +22,45 @@ export const PhotoImport: React.FC = () => {
   const [itemGroups, setItemGroups] = useState<PhotoGroup[]>([]);
   const [selectedPhotos, setSelectedPhotos] = useState<Set<number>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setUngroupedPhotos((prev) => [...prev, ...acceptedFiles]);
   }, []);
+
+  const handleFolderImport = () => {
+    folderInputRef.current?.click();
+  };
+
+  const handleFolderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    // Filter for image files only
+    const imageFiles = Array.from(files).filter(file =>
+      file.type.startsWith('image/') &&
+      /\.(jpe?g|png|webp)$/i.test(file.name)
+    );
+
+    if (imageFiles.length > 0) {
+      setUngroupedPhotos(prev => [...prev, ...imageFiles]);
+    }
+
+    // Reset the input so the same folder can be selected again
+    e.target.value = '';
+  };
+
+  const createEmptyGroup = () => {
+    // If there are selected photos, use them; otherwise create empty group
+    if (selectedPhotos.size > 0) {
+      createNewGroup();
+    } else {
+      setItemGroups(prev => [
+        ...prev,
+        { id: `group-${Date.now()}`, photos: [] }
+      ]);
+    }
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -127,9 +162,25 @@ export const PhotoImport: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Hidden folder input */}
+      <input
+        ref={folderInputRef}
+        type="file"
+        /* @ts-expect-error webkitdirectory is not in standard types */
+        webkitdirectory=""
+        directory=""
+        multiple
+        onChange={handleFolderChange}
+        className="hidden"
+        accept="image/*"
+      />
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Import Photos</h1>
-        <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50">
+        <button
+          onClick={handleFolderImport}
+          className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+        >
           <FolderOpen size={18} />
           Import Folder
         </button>
@@ -286,7 +337,10 @@ export const PhotoImport: React.FC = () => {
       {itemGroups.length > 0 && (
         <div className="flex items-center justify-between bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center gap-4">
-            <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50">
+            <button
+              onClick={createEmptyGroup}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
               <Plus size={18} />
               New Item Group
             </button>

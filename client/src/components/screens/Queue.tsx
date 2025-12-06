@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Search, Filter, CheckSquare, DollarSign, List, Grid3X3, RefreshCw, Loader2 } from 'lucide-react';
+import { Search, Filter, CheckSquare, DollarSign, List, Grid3X3, Loader2, X, ChevronDown } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 interface ItemCardProps {
@@ -9,6 +9,7 @@ interface ItemCardProps {
   thumbnail?: string;
   confidence?: number;
   price?: number;
+  step?: string;
 }
 
 const ItemCard: React.FC<ItemCardProps> = ({ id, title, thumbnail, confidence, price }) => {
@@ -84,12 +85,37 @@ interface QueueCounts {
   ready: number;
 }
 
+interface FilterOptions {
+  step: string;
+  confidenceMin: number | null;
+  confidenceMax: number | null;
+  hasPrice: boolean | null;
+}
+
 export const Queue: React.FC = () => {
   useParams<{ step?: string }>();
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [showBulkPriceModal, setShowBulkPriceModal] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  const [filters, setFilters] = useState<FilterOptions>({
+    step: 'all',
+    confidenceMin: null,
+    confidenceMax: null,
+    hasPrice: null,
+  });
+
+  const [bulkPriceSettings, setBulkPriceSettings] = useState({
+    type: 'percentage' as 'percentage' | 'fixed',
+    value: 0,
+    fixedPrice: 0,
+  });
+
   const [queueItems, setQueueItems] = useState<QueueData>({
     identify: [],
     review: [],
@@ -122,12 +148,134 @@ export const Queue: React.FC = () => {
     loadQueueData();
   }, []);
 
-  // Filter items by search query
-  const filterItems = (items: ItemCardProps[]) => {
-    if (!searchQuery.trim()) return items;
-    const query = searchQuery.toLowerCase();
-    return items.filter(item => item.title.toLowerCase().includes(query));
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filter items by search query and filters
+  const filterItems = (items: ItemCardProps[], step?: string) => {
+    let filtered = items;
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(item => item.title.toLowerCase().includes(query));
+    }
+
+    // Step filter
+    if (filters.step !== 'all' && step) {
+      if (filters.step !== step) {
+        return [];
+      }
+    }
+
+    // Confidence filter
+    if (filters.confidenceMin !== null) {
+      filtered = filtered.filter(item =>
+        item.confidence !== undefined && item.confidence >= filters.confidenceMin!
+      );
+    }
+    if (filters.confidenceMax !== null) {
+      filtered = filtered.filter(item =>
+        item.confidence !== undefined && item.confidence <= filters.confidenceMax!
+      );
+    }
+
+    // Has price filter
+    if (filters.hasPrice === true) {
+      filtered = filtered.filter(item => item.price !== undefined);
+    } else if (filters.hasPrice === false) {
+      filtered = filtered.filter(item => item.price === undefined);
+    }
+
+    return filtered;
   };
+
+  const handleBulkReview = async () => {
+    if (selectedItems.length === 0) return;
+
+    setIsBulkProcessing(true);
+    try {
+      const response = await fetch('/api/dashboard/items/bulk-advance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemIds: selectedItems,
+          targetStage: 'REVIEW_EDIT'
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        setSelectedItems([]);
+        loadQueueData(); // Refresh the queue
+      } else {
+        console.error('Bulk review failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to bulk review:', error);
+    }
+    setIsBulkProcessing(false);
+  };
+
+  const handleBulkPrice = async () => {
+    if (selectedItems.length === 0) return;
+    setShowBulkPriceModal(true);
+  };
+
+  const handleBulkPriceSubmit = async () => {
+    setIsBulkProcessing(true);
+    try {
+      const priceAdjustment = bulkPriceSettings.type === 'percentage'
+        ? { type: 'percentage', value: bulkPriceSettings.value }
+        : { type: 'fixed', startingPrice: bulkPriceSettings.fixedPrice, buyNowPrice: bulkPriceSettings.fixedPrice };
+
+      const response = await fetch('/api/dashboard/items/bulk-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemIds: selectedItems,
+          priceAdjustment: bulkPriceSettings.value !== 0 || bulkPriceSettings.fixedPrice !== 0
+            ? priceAdjustment
+            : null
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        setSelectedItems([]);
+        setShowBulkPriceModal(false);
+        setBulkPriceSettings({ type: 'percentage', value: 0, fixedPrice: 0 });
+        loadQueueData(); // Refresh the queue
+      } else {
+        console.error('Bulk price failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to bulk price:', error);
+    }
+    setIsBulkProcessing(false);
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      step: 'all',
+      confidenceMin: null,
+      confidenceMax: null,
+      hasPrice: null,
+    });
+  };
+
+  const hasActiveFilters = filters.step !== 'all' ||
+    filters.confidenceMin !== null ||
+    filters.confidenceMax !== null ||
+    filters.hasPrice !== null;
 
   return (
     <div className="h-full flex flex-col">
@@ -145,9 +293,114 @@ export const Queue: React.FC = () => {
               className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <button className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50">
-            <Filter size={18} />
-          </button>
+
+          {/* Filter Dropdown */}
+          <div className="relative" ref={filterRef}>
+            <button
+              onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+              className={cn(
+                "p-2 border rounded-lg hover:bg-gray-50 flex items-center gap-1",
+                hasActiveFilters ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200"
+              )}
+            >
+              <Filter size={18} />
+              {hasActiveFilters && (
+                <span className="text-xs bg-blue-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                  !
+                </span>
+              )}
+              <ChevronDown size={14} />
+            </button>
+
+            {showFilterDropdown && (
+              <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-20">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-gray-900">Filters</h3>
+                  {hasActiveFilters && (
+                    <button
+                      onClick={resetFilters}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      Reset all
+                    </button>
+                  )}
+                </div>
+
+                {/* Step Filter */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Step</label>
+                  <select
+                    value={filters.step}
+                    onChange={(e) => setFilters({ ...filters, step: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  >
+                    <option value="all">All Steps</option>
+                    <option value="identify">Identify</option>
+                    <option value="review">Review</option>
+                    <option value="price">Price</option>
+                    <option value="ready">Ready</option>
+                  </select>
+                </div>
+
+                {/* Confidence Filter */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Confidence</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      value={filters.confidenceMin ?? ''}
+                      onChange={(e) => setFilters({
+                        ...filters,
+                        confidenceMin: e.target.value ? parseInt(e.target.value) : null
+                      })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                      min="0"
+                      max="100"
+                    />
+                    <span className="text-gray-400">-</span>
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      value={filters.confidenceMax ?? ''}
+                      onChange={(e) => setFilters({
+                        ...filters,
+                        confidenceMax: e.target.value ? parseInt(e.target.value) : null
+                      })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+                </div>
+
+                {/* Has Price Filter */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Pricing Status</label>
+                  <select
+                    value={filters.hasPrice === null ? 'all' : filters.hasPrice ? 'priced' : 'unpriced'}
+                    onChange={(e) => setFilters({
+                      ...filters,
+                      hasPrice: e.target.value === 'all' ? null : e.target.value === 'priced'
+                    })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  >
+                    <option value="all">All</option>
+                    <option value="priced">Has Price</option>
+                    <option value="unpriced">No Price</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={() => setShowFilterDropdown(false)}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="flex border border-gray-200 rounded-lg overflow-hidden">
             <button
               onClick={() => setViewMode('kanban')}
@@ -180,10 +433,10 @@ export const Queue: React.FC = () => {
             </div>
           ) : (
             <div className="flex gap-4 pb-4">
-              <Column title="IDENTIFY" count={counts.identify} items={filterItems(queueItems.identify)} />
-              <Column title="REVIEW" count={counts.review} items={filterItems(queueItems.review)} />
-              <Column title="PRICE" count={counts.price} items={filterItems(queueItems.price)} />
-              <Column title="READY" count={counts.ready} items={filterItems(queueItems.ready)} />
+              <Column title="IDENTIFY" count={counts.identify} items={filterItems(queueItems.identify, 'identify')} />
+              <Column title="REVIEW" count={counts.review} items={filterItems(queueItems.review, 'review')} />
+              <Column title="PRICE" count={counts.price} items={filterItems(queueItems.price, 'price')} />
+              <Column title="READY" count={counts.ready} items={filterItems(queueItems.ready, 'ready')} />
             </div>
           )}
         </div>
@@ -201,7 +454,10 @@ export const Queue: React.FC = () => {
                     className="rounded border-gray-300"
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedItems(Object.values(queueItems).flat().map((i) => i.id));
+                        const allItems = Object.entries(queueItems).flatMap(([step, items]) =>
+                          filterItems(items as ItemCardProps[], step).map(i => i.id)
+                        );
+                        setSelectedItems(allItems);
                       } else {
                         setSelectedItems([]);
                       }
@@ -224,7 +480,7 @@ export const Queue: React.FC = () => {
                   </td>
                 </tr>
               ) : Object.entries(queueItems).flatMap(([step, items]) =>
-                filterItems(items as ItemCardProps[]).map((item) => (
+                filterItems(items as ItemCardProps[], step).map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <input
@@ -294,12 +550,28 @@ export const Queue: React.FC = () => {
       {selectedItems.length > 0 && (
         <div className="fixed bottom-12 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-4">
           <span>{selectedItems.length} selected</span>
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 rounded hover:bg-blue-700">
-            <CheckSquare size={16} />
+          <button
+            onClick={handleBulkReview}
+            disabled={isBulkProcessing}
+            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+          >
+            {isBulkProcessing ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <CheckSquare size={16} />
+            )}
             Bulk Review
           </button>
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-green-600 rounded hover:bg-green-700">
-            <DollarSign size={16} />
+          <button
+            onClick={handleBulkPrice}
+            disabled={isBulkProcessing}
+            className="flex items-center gap-2 px-3 py-1.5 bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
+          >
+            {isBulkProcessing ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <DollarSign size={16} />
+            )}
             Bulk Price
           </button>
           <button
@@ -308,6 +580,122 @@ export const Queue: React.FC = () => {
           >
             Clear
           </button>
+        </div>
+      )}
+
+      {/* Bulk Price Modal */}
+      {showBulkPriceModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Bulk Pricing</h2>
+              <button
+                onClick={() => setShowBulkPriceModal(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Apply pricing changes to {selectedItems.length} selected items. Items will be moved to the Pricing stage.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Price Adjustment Type
+                </label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="priceType"
+                      checked={bulkPriceSettings.type === 'percentage'}
+                      onChange={() => setBulkPriceSettings({ ...bulkPriceSettings, type: 'percentage' })}
+                      className="rounded-full border-gray-300"
+                    />
+                    <span className="text-sm">Percentage</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="priceType"
+                      checked={bulkPriceSettings.type === 'fixed'}
+                      onChange={() => setBulkPriceSettings({ ...bulkPriceSettings, type: 'fixed' })}
+                      className="rounded-full border-gray-300"
+                    />
+                    <span className="text-sm">Fixed Price</span>
+                  </label>
+                </div>
+              </div>
+
+              {bulkPriceSettings.type === 'percentage' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Adjustment (%)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={bulkPriceSettings.value}
+                      onChange={(e) => setBulkPriceSettings({
+                        ...bulkPriceSettings,
+                        value: parseFloat(e.target.value) || 0
+                      })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                      placeholder="e.g., 10 for +10%, -10 for -10%"
+                    />
+                    <span className="text-gray-500">%</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Positive values increase price, negative decrease. Use 0 to just move items to pricing stage.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Fixed Price ($)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500">$</span>
+                    <input
+                      type="number"
+                      value={bulkPriceSettings.fixedPrice}
+                      onChange={(e) => setBulkPriceSettings({
+                        ...bulkPriceSettings,
+                        fixedPrice: parseFloat(e.target.value) || 0
+                      })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                      placeholder="Enter price"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    All selected items will be set to this price.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowBulkPriceModal(false)}
+                className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkPriceSubmit}
+                disabled={isBulkProcessing}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isBulkProcessing && <Loader2 size={16} className="animate-spin" />}
+                Apply to {selectedItems.length} Items
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -39,6 +39,7 @@ export const Reports: React.FC = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
   const [isLoading, setIsLoading] = useState(true);
   const [data, setData] = useState<ReportsData | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const loadReports = async () => {
     setIsLoading(true);
@@ -57,6 +58,41 @@ export const Reports: React.FC = () => {
   useEffect(() => {
     loadReports();
   }, [timeRange]);
+
+  const handleExport = async (format: 'json' | 'csv' = 'csv') => {
+    setIsExporting(true);
+    try {
+      const response = await fetch(`/api/dashboard/reports/export?range=${timeRange}&format=${format}`);
+
+      if (format === 'csv') {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `sales-report-${timeRange}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+      } else {
+        const result = await response.json();
+        if (result.success) {
+          const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `sales-report-${timeRange}.json`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          a.remove();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to export report:', error);
+    }
+    setIsExporting(false);
+  };
 
   const salesByDay = data?.salesByDay || [];
   const topCategories = data?.topCategories || [];
@@ -99,9 +135,17 @@ export const Reports: React.FC = () => {
             </select>
             <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50">
-            <Download size={20} />
-            Export
+          <button
+            onClick={() => handleExport('csv')}
+            disabled={isExporting}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          >
+            {isExporting ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : (
+              <Download size={20} />
+            )}
+            {isExporting ? 'Exporting...' : 'Export CSV'}
           </button>
         </div>
       </div>

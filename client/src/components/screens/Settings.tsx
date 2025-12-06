@@ -39,6 +39,18 @@ export const Settings: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState('');
 
+  // Appearance state
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
+
+  // Security state
+  const [pinForm, setPinForm] = useState({
+    currentPin: '',
+    newPin: '',
+    confirmPin: ''
+  });
+  const [pinError, setPinError] = useState('');
+  const [pinSuccess, setPinSuccess] = useState('');
+
   // Form states
   const [profileForm, setProfileForm] = useState({
     name: user?.name || '',
@@ -110,6 +122,58 @@ export const Settings: React.FC = () => {
     setIsSaving(false);
     setSavedMessage('Settings saved successfully!');
     setTimeout(() => setSavedMessage(''), 3000);
+  };
+
+  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
+    setTheme(newTheme);
+    // Apply theme
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else if (newTheme === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      // System preference
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+    localStorage.setItem('theme', newTheme);
+  };
+
+  const handleUpdatePin = async () => {
+    setPinError('');
+    setPinSuccess('');
+
+    // Validation
+    if (!pinForm.currentPin) {
+      setPinError('Current PIN is required');
+      return;
+    }
+    if (!pinForm.newPin) {
+      setPinError('New PIN is required');
+      return;
+    }
+    if (pinForm.newPin.length !== 4 || !/^\d{4}$/.test(pinForm.newPin)) {
+      setPinError('PIN must be exactly 4 digits');
+      return;
+    }
+    if (pinForm.newPin !== pinForm.confirmPin) {
+      setPinError('New PIN and confirmation do not match');
+      return;
+    }
+
+    // In real implementation, call API to update PIN
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setPinSuccess('PIN updated successfully!');
+      setPinForm({ currentPin: '', newPin: '', confirmPin: '' });
+      setTimeout(() => setPinSuccess(''), 3000);
+    } catch (error) {
+      setPinError('Failed to update PIN. Please try again.');
+    }
   };
 
   const renderContent = () => {
@@ -461,20 +525,21 @@ export const Settings: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Theme</label>
                 <div className="grid grid-cols-3 gap-4">
-                  {['light', 'dark', 'system'].map((theme) => (
+                  {(['light', 'dark', 'system'] as const).map((themeOption) => (
                     <button
-                      key={theme}
+                      key={themeOption}
+                      onClick={() => handleThemeChange(themeOption)}
                       className={cn(
                         'p-4 rounded-lg border-2 text-center transition-colors',
-                        theme === 'light' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                        theme === themeOption ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
                       )}
                     >
                       <div className={cn(
                         'w-8 h-8 rounded-full mx-auto mb-2',
-                        theme === 'light' ? 'bg-white border border-gray-200' :
-                        theme === 'dark' ? 'bg-gray-800' : 'bg-gradient-to-r from-white to-gray-800'
+                        themeOption === 'light' ? 'bg-white border border-gray-200' :
+                        themeOption === 'dark' ? 'bg-gray-800' : 'bg-gradient-to-r from-white to-gray-800'
                       )} />
-                      <span className="text-sm font-medium capitalize">{theme}</span>
+                      <span className="text-sm font-medium capitalize">{themeOption}</span>
                     </button>
                   ))}
                 </div>
@@ -502,22 +567,43 @@ export const Settings: React.FC = () => {
                   type="password"
                   placeholder="Current PIN"
                   maxLength={4}
+                  value={pinForm.currentPin}
+                  onChange={(e) => setPinForm({ ...pinForm, currentPin: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
                 />
                 <input
                   type="password"
                   placeholder="New PIN"
                   maxLength={4}
+                  value={pinForm.newPin}
+                  onChange={(e) => setPinForm({ ...pinForm, newPin: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
                 />
                 <input
                   type="password"
                   placeholder="Confirm New PIN"
                   maxLength={4}
+                  value={pinForm.confirmPin}
+                  onChange={(e) => setPinForm({ ...pinForm, confirmPin: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+              {pinError && (
+                <div className="flex items-center gap-2 text-red-600 text-sm">
+                  <AlertCircle size={16} />
+                  {pinError}
+                </div>
+              )}
+              {pinSuccess && (
+                <div className="flex items-center gap-2 text-green-600 text-sm">
+                  <Check size={16} />
+                  {pinSuccess}
+                </div>
+              )}
+              <button
+                onClick={handleUpdatePin}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
                 Update PIN
               </button>
             </div>

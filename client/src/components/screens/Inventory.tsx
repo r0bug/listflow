@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { MapPin, Package, Search, Filter, Grid, List, ChevronRight, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { MapPin, Package, Search, Filter, Grid, List, ChevronRight, Loader2, ChevronDown } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { useNavigate } from 'react-router-dom';
 
@@ -23,6 +23,11 @@ interface InventoryItem {
   thumbnail?: string;
 }
 
+interface FilterOptions {
+  stage: string;
+  sortBy: 'recent' | 'sku' | 'price_asc' | 'price_desc';
+}
+
 export const Inventory: React.FC = () => {
   const navigate = useNavigate();
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
@@ -31,6 +36,12 @@ export const Inventory: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [locations, setLocations] = useState<Location[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [filters, setFilters] = useState<FilterOptions>({
+    stage: 'all',
+    sortBy: 'recent'
+  });
+  const filterRef = useRef<HTMLDivElement>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -61,12 +72,48 @@ export const Inventory: React.FC = () => {
     loadData();
   }, [selectedLocation]);
 
-  const filteredItems = items.filter(item => {
-    const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         item.location.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredItems = items
+    .filter(item => {
+      const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           item.location.toLowerCase().includes(searchQuery.toLowerCase());
+      if (!matchesSearch) return false;
+
+      // Stage filter
+      if (filters.stage !== 'all' && item.stage !== filters.stage) return false;
+
+      return true;
+    })
+    .sort((a, b) => {
+      switch (filters.sortBy) {
+        case 'sku':
+          return a.sku.localeCompare(b.sku);
+        case 'price_asc':
+          return (a.price || 0) - (b.price || 0);
+        case 'price_desc':
+          return (b.price || 0) - (a.price || 0);
+        case 'recent':
+        default:
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+    });
+
+  const resetFilters = () => {
+    setFilters({ stage: 'all', sortBy: 'recent' });
+  };
+
+  const hasActiveFilters = filters.stage !== 'all' || filters.sortBy !== 'recent';
 
   const getStageColor = (stage: string) => {
     switch (stage) {
@@ -167,10 +214,82 @@ export const Inventory: React.FC = () => {
             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50">
-          <Filter size={20} />
-          Filters
-        </button>
+        {/* Filter Dropdown */}
+        <div className="relative" ref={filterRef}>
+          <button
+            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50",
+              hasActiveFilters ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200"
+            )}
+          >
+            <Filter size={20} />
+            Filters
+            {hasActiveFilters && (
+              <span className="text-xs bg-blue-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                !
+              </span>
+            )}
+            <ChevronDown size={16} />
+          </button>
+
+          {showFilterDropdown && (
+            <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-20">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-gray-900">Filters</h3>
+                {hasActiveFilters && (
+                  <button
+                    onClick={resetFilters}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    Reset all
+                  </button>
+                )}
+              </div>
+
+              {/* Stage Filter */}
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Stage</label>
+                <select
+                  value={filters.stage}
+                  onChange={(e) => setFilters({ ...filters, stage: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  <option value="all">All Stages</option>
+                  <option value="PHOTO_UPLOAD">Photo Upload</option>
+                  <option value="AI_PROCESSING">AI Processing</option>
+                  <option value="REVIEW_EDIT">Review Edit</option>
+                  <option value="PRICING">Pricing</option>
+                  <option value="FINAL_REVIEW">Final Review</option>
+                  <option value="PUBLISHED">Published</option>
+                  <option value="REJECTED">Rejected</option>
+                </select>
+              </div>
+
+              {/* Sort By */}
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+                <select
+                  value={filters.sortBy}
+                  onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as FilterOptions['sortBy'] })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  <option value="recent">Most Recent</option>
+                  <option value="sku">SKU (A-Z)</option>
+                  <option value="price_asc">Price: Low to High</option>
+                  <option value="price_desc">Price: High to Low</option>
+                </select>
+              </div>
+
+              <button
+                onClick={() => setShowFilterDropdown(false)}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              >
+                Apply Filters
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Items Table */}
