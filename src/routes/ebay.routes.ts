@@ -415,19 +415,52 @@ router.get('/search', async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('eBay Finding API error:', errorText);
-      return res.status(response.status).json({
-        success: false,
-        error: 'Failed to search eBay sold items'
-      });
+
+      // Try to parse error for better messaging
+      try {
+        const errorData = JSON.parse(errorText);
+        const errorMsg = errorData.errorMessage?.[0]?.error?.[0]?.message?.[0];
+        const errorDomain = errorData.errorMessage?.[0]?.error?.[0]?.subdomain?.[0];
+
+        if (errorDomain === 'RateLimiter') {
+          return res.status(429).json({
+            success: false,
+            error: 'eBay API rate limit reached. Please wait a moment and try again.',
+            isRateLimit: true
+          });
+        }
+
+        return res.status(response.status).json({
+          success: false,
+          error: errorMsg || 'Failed to search eBay sold items'
+        });
+      } catch {
+        return res.status(response.status).json({
+          success: false,
+          error: 'Failed to search eBay sold items'
+        });
+      }
     }
 
     const data = await response.json();
 
-    // Check for API errors
+    // Check for API errors in successful response
     const ack = data.findCompletedItemsResponse?.[0]?.ack?.[0];
     if (ack === 'Failure') {
-      const errorMsg = data.findCompletedItemsResponse?.[0]?.errorMessage?.[0]?.error?.[0]?.message?.[0];
+      const errorInfo = data.findCompletedItemsResponse?.[0]?.errorMessage?.[0]?.error?.[0];
+      const errorMsg = errorInfo?.message?.[0];
+      const errorDomain = errorInfo?.subdomain?.[0];
+
       console.error('eBay Finding API failure:', errorMsg);
+
+      if (errorDomain === 'RateLimiter') {
+        return res.status(429).json({
+          success: false,
+          error: 'eBay API rate limit reached. Please wait a moment and try again.',
+          isRateLimit: true
+        });
+      }
+
       return res.status(400).json({
         success: false,
         error: errorMsg || 'eBay search failed'
