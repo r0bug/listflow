@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Search, Filter, CheckSquare, DollarSign, List, Grid3X3 } from 'lucide-react';
+import { Search, Filter, CheckSquare, DollarSign, List, Grid3X3, RefreshCw, Loader2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 interface ItemCardProps {
@@ -70,33 +70,63 @@ const Column: React.FC<ColumnProps> = ({ title, count, items }) => (
   </div>
 );
 
+interface QueueData {
+  identify: ItemCardProps[];
+  review: ItemCardProps[];
+  price: ItemCardProps[];
+  ready: ItemCardProps[];
+}
+
+interface QueueCounts {
+  identify: number;
+  review: number;
+  price: number;
+  ready: number;
+}
+
 export const Queue: React.FC = () => {
   useParams<{ step?: string }>();
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [queueItems, setQueueItems] = useState<QueueData>({
+    identify: [],
+    review: [],
+    price: [],
+    ready: [],
+  });
+  const [counts, setCounts] = useState<QueueCounts>({
+    identify: 0,
+    review: 0,
+    price: 0,
+    ready: 0,
+  });
 
-  // Mock data
-  const mockItems = {
-    identify: [
-      { id: '1', title: 'PS5 Console', confidence: 94, step: 'identify' },
-      { id: '2', title: 'Xbox Series X', confidence: 91, step: 'identify' },
-      { id: '3', title: 'Vinyl Record', confidence: 65, step: 'identify' },
-    ],
-    review: [
-      { id: '4', title: 'Nintendo Switch', confidence: 87, step: 'review' },
-      { id: '5', title: 'iPad Pro', confidence: 78, step: 'review' },
-      { id: '6', title: 'Camera', confidence: 82, step: 'review' },
-    ],
-    price: [
-      { id: '7', title: 'iPhone 14', price: 299, step: 'price' },
-      { id: '8', title: 'Samsung TV', price: 149, step: 'price' },
-      { id: '9', title: 'Laptop', price: 450, step: 'price' },
-    ],
-    ready: [
-      { id: '10', title: 'MacBook Pro', price: 899, step: 'ready' },
-      { id: '11', title: 'Monitor', price: 199, step: 'ready' },
-    ],
+  const loadQueueData = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/dashboard/queue');
+      const data = await response.json();
+      if (data.success) {
+        setQueueItems(data.data);
+        setCounts(data.counts);
+      }
+    } catch (error) {
+      console.error('Failed to load queue data:', error);
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    loadQueueData();
+  }, []);
+
+  // Filter items by search query
+  const filterItems = (items: ItemCardProps[]) => {
+    if (!searchQuery.trim()) return items;
+    const query = searchQuery.toLowerCase();
+    return items.filter(item => item.title.toLowerCase().includes(query));
   };
 
   return (
@@ -144,12 +174,18 @@ export const Queue: React.FC = () => {
       {/* Kanban View */}
       {viewMode === 'kanban' && (
         <div className="flex-1 overflow-x-auto">
-          <div className="flex gap-4 pb-4">
-            <Column title="IDENTIFY" count={12} items={mockItems.identify} />
-            <Column title="REVIEW" count={18} items={mockItems.review} />
-            <Column title="PRICE" count={9} items={mockItems.price} />
-            <Column title="READY" count={8} items={mockItems.ready} />
-          </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            </div>
+          ) : (
+            <div className="flex gap-4 pb-4">
+              <Column title="IDENTIFY" count={counts.identify} items={filterItems(queueItems.identify)} />
+              <Column title="REVIEW" count={counts.review} items={filterItems(queueItems.review)} />
+              <Column title="PRICE" count={counts.price} items={filterItems(queueItems.price)} />
+              <Column title="READY" count={counts.ready} items={filterItems(queueItems.ready)} />
+            </div>
+          )}
         </div>
       )}
 
@@ -165,7 +201,7 @@ export const Queue: React.FC = () => {
                     className="rounded border-gray-300"
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedItems(Object.values(mockItems).flat().map((i) => i.id));
+                        setSelectedItems(Object.values(queueItems).flat().map((i) => i.id));
                       } else {
                         setSelectedItems([]);
                       }
@@ -181,8 +217,14 @@ export const Queue: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {Object.entries(mockItems).flatMap(([step, items]) =>
-                items.map((item) => (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+                  </td>
+                </tr>
+              ) : Object.entries(queueItems).flatMap(([step, items]) =>
+                filterItems(items as ItemCardProps[]).map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <input
@@ -199,7 +241,11 @@ export const Queue: React.FC = () => {
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="w-12 h-12 bg-gray-100 rounded" />
+                      {item.thumbnail ? (
+                        <img src={item.thumbnail} alt={item.title} className="w-12 h-12 object-cover rounded" />
+                      ) : (
+                        <div className="w-12 h-12 bg-gray-100 rounded" />
+                      )}
                     </td>
                     <td className="px-4 py-3 font-medium">{item.title}</td>
                     <td className="px-4 py-3">
@@ -208,7 +254,7 @@ export const Queue: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {'confidence' in item && item.confidence !== undefined && (
+                      {item.confidence !== undefined && (
                         <span
                           className={cn(
                             'px-2 py-1 rounded text-sm',
@@ -224,8 +270,8 @@ export const Queue: React.FC = () => {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {'price' in item && item.price !== undefined && (
-                        <span className="font-medium text-green-600">${item.price}</span>
+                      {item.price !== undefined && (
+                        <span className="font-medium text-green-600">${item.price.toFixed(2)}</span>
                       )}
                     </td>
                     <td className="px-4 py-3">

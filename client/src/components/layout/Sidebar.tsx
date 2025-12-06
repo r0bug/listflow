@@ -11,6 +11,8 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  Copy,
+  BarChart3,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { cn } from '../../utils/cn';
@@ -134,7 +136,11 @@ export const Sidebar: React.FC = () => {
 
         <NavItem to="/templates" icon={<FileText size={20} />} label="Templates" />
 
+        <NavItem to="/sell-similar" icon={<Copy size={20} />} label="Sell Similar" />
+
         <NavItem to="/research" icon={<Search size={20} />} label="Research" />
+
+        <NavItem to="/reports" icon={<BarChart3 size={20} />} label="Reports" />
 
         <div className="pt-4 border-t border-gray-200 mt-4">
           <NavItem to="/settings" icon={<Settings size={20} />} label="Settings" />

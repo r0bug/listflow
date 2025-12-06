@@ -92,11 +92,11 @@ export const PinLogin: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Mock recent users if none exist
+  // Mock recent users if none exist - IDs must match database
   const displayUsers = recentUsers.length > 0 ? recentUsers : [
-    { id: 'user-bob-1', name: 'Bob', displayName: 'Bob', role: 'ADMIN' as const, email: 'bob@alpha.com', domainId: 'loc1', isActive: true, isPlatformAdmin: false, itemsListedToday: 23, itemsListedWeek: 89, itemsListedMonth: 342, itemsListedAllTime: 1247, permissions: {} },
-    { id: 'user-alice-1', name: 'Alice', displayName: 'Alice', role: 'ADMIN' as const, email: 'alice@alpha.com', domainId: 'loc1', isActive: true, isPlatformAdmin: false, itemsListedToday: 15, itemsListedWeek: 127, itemsListedMonth: 450, itemsListedAllTime: 2341, permissions: {} },
-    { id: 'user-carol-1', name: 'Carol', displayName: 'Carol', role: 'ADMIN' as const, email: 'carol@alpha.com', domainId: 'loc1', isActive: true, isPlatformAdmin: false, itemsListedToday: 0, itemsListedWeek: 67, itemsListedMonth: 280, itemsListedAllTime: 987, permissions: {} },
+    { id: 'user_admin', name: 'Admin', displayName: 'Admin', role: 'ADMIN' as const, email: 'admin@listflow.local', domainId: 'loc_headquarters', isActive: true, isPlatformAdmin: false, itemsListedToday: 23, itemsListedWeek: 89, itemsListedMonth: 342, itemsListedAllTime: 1247, permissions: {} },
+    { id: 'user_processor', name: 'Processor', displayName: 'Processor', role: 'PROCESSOR' as const, email: 'processor@listflow.local', domainId: 'loc_headquarters', isActive: true, isPlatformAdmin: false, itemsListedToday: 15, itemsListedWeek: 127, itemsListedMonth: 450, itemsListedAllTime: 2341, permissions: {} },
+    { id: 'user_photographer', name: 'Photographer', displayName: 'Photographer', role: 'PHOTOGRAPHER' as const, email: 'photo@listflow.local', domainId: 'loc_headquarters', isActive: true, isPlatformAdmin: false, itemsListedToday: 0, itemsListedWeek: 67, itemsListedMonth: 280, itemsListedAllTime: 987, permissions: {} },
   ];
 
   const handlePinSubmit = async () => {

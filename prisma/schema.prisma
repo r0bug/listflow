@@ -349,3 +349,59 @@ model PriceResearch {
   @@index([searchQuery])
   @@index([expiresAt])
 }
+
+// Listing templates for quick item creation
+model ListingTemplate {
+  id                    String   @id @default(cuid())
+  name                  String
+  description           String?  @db.Text
+  tags                  String[]
+  sourceType            TemplateSourceType @default(MANUAL)
+  sourceEbayItemId      String?
+
+  // Listing content
+  titleTemplate         String?
+  categoryId            String?
+  categoryName          String?
+  categoryPath          String?
+  defaultCondition      String?
+  defaultConditionId    Int?
+  itemSpecifics         Json?    // Array of {name, value, required, locked}
+  descriptionTemplate   String?  @db.Text
+
+  // Pricing
+  suggestedPriceMin     Float?
+  suggestedPriceMax     Float?
+  defaultListingType    String?
+  defaultDuration       String?
+
+  // Shipping
+  defaultShippingProfileId String?
+  estimatedShippingCost Float?
+  estimatedWeight       Float?
+  packageDimensions     Json?    // {length, width, height}
+
+  // Metadata
+  referenceImageUrls    String[]
+  requiresPhotos        Boolean  @default(true)
+  minimumPhotos         Int      @default(1)
+  isActive              Boolean  @default(true)
+  isPublic              Boolean  @default(false)
+  timesUsed             Int      @default(0)
+  lastUsedAt            DateTime?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([name])
+  @@index([sourceType])
+  @@index([isActive])
+  @@index([timesUsed])
+}
+
+enum TemplateSourceType {
+  MANUAL
+  SELL_SIMILAR
+  AI_GENERATED
+  IMPORTED
+}

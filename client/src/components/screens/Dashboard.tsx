@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ListTodo,
@@ -9,6 +9,7 @@ import {
   Clock,
   ArrowRight,
   Play,
+  RefreshCw,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 
@@ -67,34 +68,35 @@ const QueuePreview: React.FC<QueuePreviewProps> = ({ identify, review, price }) 
 );
 
 export const Dashboard: React.FC = () => {
-  const { loadDashboardStats, loadRecentActivity } = useAppStore();
+  const { loadDashboardStats, loadRecentActivity, dashboardStats, recentActivity } = useAppStore();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadDashboardStats();
-    loadRecentActivity();
+    const loadData = async () => {
+      setIsLoading(true);
+      await Promise.all([loadDashboardStats(), loadRecentActivity()]);
+      setIsLoading(false);
+    };
+    loadData();
   }, [loadDashboardStats, loadRecentActivity]);
 
-  // Mock data for demo
-  const mockStats = {
-    queueTotal: 47,
-    queueCounts: { identify: 12, review: 18, price: 9 },
-    totalListed: 312,
-    soldToday: 8,
-    soldTodayValue: 342.50,
-    revenue30Days: 2847,
+  // Use real data from store, with fallback defaults
+  const stats = dashboardStats || {
+    queueTotal: 0,
+    queueCounts: { identify: 0, review: 0, price: 0, ready: 0 },
+    totalListed: 0,
+    soldToday: 0,
+    soldTodayValue: 0,
+    revenue30Days: 0,
     needsAttention: {
-      lowConfidence: 3,
-      stale: 5,
-      pendingSync: 4,
+      lowConfidence: 0,
+      stale: 0,
+      pendingSync: 0,
     },
   };
 
-  const mockActivity = [
-    { time: '10:32', action: 'Listed', item: 'Sony PlayStation 5 Console', price: 499.99 },
-    { time: '10:28', action: 'Sold', item: 'Nintendo Switch OLED', price: 289.00 },
-    { time: '10:15', action: 'Imported', item: '12 items from SD card', price: null },
-    { time: '09:45', action: 'AI identified', item: '8 items (94% avg confidence)', price: null },
-    { time: '09:30', action: 'Session started', item: null, price: null },
+  const activity = recentActivity.length > 0 ? recentActivity : [
+    { time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }), action: 'Session started', item: null, price: null },
   ];
 
   return (
@@ -116,16 +118,16 @@ export const Dashboard: React.FC = () => {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm text-gray-500">Queue</p>
-              <p className="text-2xl font-bold mt-1">{mockStats.queueTotal}</p>
+              <p className="text-2xl font-bold mt-1">{stats.queueTotal}</p>
             </div>
             <div className="p-3 rounded-lg bg-blue-100">
               <ListTodo size={20} className="text-blue-600" />
             </div>
           </div>
           <QueuePreview
-            identify={mockStats.queueCounts.identify}
-            review={mockStats.queueCounts.review}
-            price={mockStats.queueCounts.price}
+            identify={stats.queueCounts.identify}
+            review={stats.queueCounts.review}
+            price={stats.queueCounts.price}
           />
           <Link
             to="/queue"
@@ -138,7 +140,7 @@ export const Dashboard: React.FC = () => {
 
         <StatCard
           title="Listed"
-          value={mockStats.totalListed}
+          value={stats.totalListed}
           subtitle="Active items on eBay"
           icon={<Package size={20} className="text-green-600" />}
           color="bg-green-100"
@@ -147,8 +149,8 @@ export const Dashboard: React.FC = () => {
 
         <StatCard
           title="Sold Today"
-          value={mockStats.soldToday}
-          subtitle={`$${mockStats.soldTodayValue.toFixed(2)} total`}
+          value={stats.soldToday}
+          subtitle={`$${stats.soldTodayValue.toFixed(2)} total`}
           icon={<DollarSign size={20} className="text-purple-600" />}
           color="bg-purple-100"
           action={{ label: 'View Orders', to: '/listings/sold' }}
@@ -156,7 +158,7 @@ export const Dashboard: React.FC = () => {
 
         <StatCard
           title="Revenue (30 days)"
-          value={`$${mockStats.revenue30Days.toLocaleString()}`}
+          value={`$${stats.revenue30Days.toLocaleString()}`}
           icon={<TrendingUp size={20} className="text-orange-600" />}
           color="bg-orange-100"
           action={{ label: 'Report', to: '/reports' }}
@@ -170,16 +172,16 @@ export const Dashboard: React.FC = () => {
             <h2 className="font-semibold text-gray-900">Recent Activity</h2>
           </div>
           <div className="divide-y divide-gray-100">
-            {mockActivity.map((activity, index) => (
+            {activity.map((item: any, index: number) => (
               <div key={index} className="px-4 py-3 flex items-center gap-4">
-                <span className="text-sm text-gray-500 w-12">{activity.time}</span>
+                <span className="text-sm text-gray-500 w-12">{item.time}</span>
                 <div className="flex-1">
-                  <span className="font-medium">{activity.action}</span>
-                  {activity.item && (
-                    <span className="text-gray-600"> "{activity.item}"</span>
+                  <span className="font-medium">{item.action}</span>
+                  {item.item && (
+                    <span className="text-gray-600"> "{item.item}"</span>
                   )}
-                  {activity.price && (
-                    <span className="text-green-600"> → ${activity.price.toFixed(2)}</span>
+                  {item.price && (
+                    <span className="text-green-600"> → ${item.price.toFixed(2)}</span>
                   )}
                 </div>
               </div>
@@ -193,27 +195,32 @@ export const Dashboard: React.FC = () => {
             <h2 className="font-semibold text-gray-900">Needs Attention</h2>
           </div>
           <div className="p-4 space-y-3">
-            {mockStats.needsAttention.lowConfidence > 0 && (
+            {stats.needsAttention.lowConfidence > 0 && (
               <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg text-yellow-800">
                 <AlertCircle size={20} />
                 <span>
-                  {mockStats.needsAttention.lowConfidence} items with low AI confidence (&lt;70%)
+                  {stats.needsAttention.lowConfidence} items with low AI confidence (&lt;70%)
                   need manual review
                 </span>
               </div>
             )}
-            {mockStats.needsAttention.stale > 0 && (
+            {stats.needsAttention.stale > 0 && (
               <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg text-yellow-800">
                 <Clock size={20} />
                 <span>
-                  {mockStats.needsAttention.stale} items waiting &gt;24 hours in queue
+                  {stats.needsAttention.stale} items waiting &gt;24 hours in queue
                 </span>
               </div>
             )}
-            {mockStats.needsAttention.pendingSync > 0 && (
+            {stats.needsAttention.pendingSync > 0 && (
               <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg text-blue-800">
                 <Package size={20} />
-                <span>Sync pending: {mockStats.needsAttention.pendingSync} items to upload</span>
+                <span>Sync pending: {stats.needsAttention.pendingSync} items to upload</span>
+              </div>
+            )}
+            {stats.needsAttention.lowConfidence === 0 && stats.needsAttention.stale === 0 && stats.needsAttention.pendingSync === 0 && (
+              <div className="text-center text-gray-500 py-4">
+                All caught up! No items need attention.
               </div>
             )}
           </div>

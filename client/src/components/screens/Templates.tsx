@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -7,49 +7,9 @@ import {
   Copy,
   MoreVertical,
   FileText,
+  Loader2,
 } from 'lucide-react';
 import type { ListingTemplate, TemplateSourceType } from '../../types';
-
-// Mock data
-const mockTemplates: Partial<ListingTemplate>[] = [
-  {
-    id: '1',
-    name: 'PS5 Console Template',
-    tags: ['gaming', 'console', 'sony'],
-    categoryName: 'Video Games > Consoles',
-    sourceType: 'SELL_SIMILAR',
-    sourceEbayItemId: '123456789',
-    timesUsed: 47,
-    isActive: true,
-  },
-  {
-    id: '2',
-    name: 'iPhone 14 Pro Template',
-    tags: ['phone', 'apple', 'iphone'],
-    categoryName: 'Cell Phones & Smartphones',
-    sourceType: 'MANUAL',
-    timesUsed: 32,
-    isActive: true,
-  },
-  {
-    id: '3',
-    name: 'Vinyl Record Template',
-    tags: ['vinyl', 'records', 'music'],
-    categoryName: 'Music > Records',
-    sourceType: 'MANUAL',
-    timesUsed: 89,
-    isActive: true,
-  },
-  {
-    id: '4',
-    name: 'Nintendo Switch Game Template',
-    tags: ['gaming', 'nintendo', 'switch'],
-    categoryName: 'Video Games > Games',
-    sourceType: 'AI_GENERATED',
-    timesUsed: 156,
-    isActive: true,
-  },
-];
 
 const sourceLabels: Record<TemplateSourceType, string> = {
   MANUAL: 'Manual',
@@ -63,9 +23,10 @@ interface TemplateCardProps {
   onEdit: (id: string) => void;
   onUse: (id: string) => void;
   onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
 }
 
-const TemplateCard: React.FC<TemplateCardProps> = ({ template, onEdit, onUse, onDelete }) => {
+const TemplateCard: React.FC<TemplateCardProps> = ({ template, onEdit, onUse, onDelete, onDuplicate }) => {
   const [showMenu, setShowMenu] = useState(false);
 
   return (
@@ -79,19 +40,19 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onEdit, onUse, on
             <div>
               <h3 className="font-semibold text-gray-900">{template.name}</h3>
               <p className="text-sm text-gray-500 mt-1">
-                Tags: {template.tags?.join(', ')}
+                Tags: {template.tags?.join(', ') || 'None'}
               </p>
             </div>
             <span className="text-sm text-gray-500">
-              Used: {template.timesUsed}x
+              Used: {template.timesUsed || 0}x
             </span>
           </div>
           <p className="text-sm text-gray-600 mt-1">
-            Category: {template.categoryName}
+            Category: {template.categoryName || 'Uncategorized'}
           </p>
           <div className="flex items-center justify-between mt-3">
             <span className="text-xs text-gray-500">
-              Source: {sourceLabels[template.sourceType as TemplateSourceType]}
+              Source: {sourceLabels[template.sourceType as TemplateSourceType] || 'Manual'}
               {template.sourceEbayItemId && ` (eBay #${template.sourceEbayItemId})`}
             </span>
             <div className="flex items-center gap-2">
@@ -119,7 +80,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onEdit, onUse, on
                     <button
                       onClick={() => {
                         setShowMenu(false);
-                        // Duplicate logic
+                        onDuplicate(template.id!);
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
                     >
@@ -151,17 +112,69 @@ export const Templates: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [sortBy, setSortBy] = useState('recent');
+  const [templates, setTemplates] = useState<Partial<ListingTemplate>[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredTemplates = mockTemplates.filter((template) => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        template.name?.toLowerCase().includes(query) ||
-        template.tags?.some((tag) => tag.toLowerCase().includes(query))
-      );
+  const loadTemplates = async () => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('search', searchQuery);
+      if (sortBy) params.append('sort', sortBy);
+
+      const response = await fetch(`/api/dashboard/templates?${params}`);
+      const result = await response.json();
+      if (result.success) {
+        setTemplates(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to load templates:', error);
     }
-    return true;
-  });
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    loadTemplates();
+  }, [sortBy]);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadTemplates();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleDelete = async (id: string) => {
+    try {
+      const response = await fetch(`/api/dashboard/templates/${id}`, {
+        method: 'DELETE'
+      });
+      const result = await response.json();
+      if (result.success) {
+        setTemplates(templates.filter(t => t.id !== id));
+      }
+    } catch (error) {
+      console.error('Failed to delete template:', error);
+    }
+  };
+
+  const handleDuplicate = async (id: string) => {
+    try {
+      const response = await fetch(`/api/dashboard/templates/${id}/duplicate`, {
+        method: 'POST'
+      });
+      const result = await response.json();
+      if (result.success) {
+        loadTemplates(); // Reload to show new template
+      }
+    } catch (error) {
+      console.error('Failed to duplicate template:', error);
+    }
+  };
+
+  const filteredTemplates = templates;
 
   return (
     <div className="space-y-6">
@@ -198,7 +211,11 @@ export const Templates: React.FC = () => {
           <option value="phones">Phones</option>
           <option value="music">Music</option>
         </select>
-        <select className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
           <option value="recent">Sort: Recent</option>
           <option value="used">Sort: Most Used</option>
           <option value="name">Sort: Name</option>
@@ -206,22 +223,26 @@ export const Templates: React.FC = () => {
       </div>
 
       {/* Templates Grid */}
-      <div className="space-y-4">
-        {filteredTemplates.map((template) => (
-          <TemplateCard
-            key={template.id}
-            template={template}
-            onEdit={(id) => navigate(`/templates/${id}/edit`)}
-            onUse={(id) => navigate(`/templates/${id}/use`)}
-            onDelete={(id) => {
-              // Delete logic
-              console.log('Delete template:', id);
-            }}
-          />
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredTemplates.map((template) => (
+            <TemplateCard
+              key={template.id}
+              template={template}
+              onEdit={(id) => navigate(`/templates/${id}/edit`)}
+              onUse={(id) => navigate(`/templates/${id}/use`)}
+              onDelete={handleDelete}
+              onDuplicate={handleDuplicate}
+            />
+          ))}
+        </div>
+      )}
 
-      {filteredTemplates.length === 0 && (
+      {!isLoading && filteredTemplates.length === 0 && (
         <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
           <FileText size={48} className="mx-auto text-gray-300 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No templates found</h3>
@@ -237,9 +258,11 @@ export const Templates: React.FC = () => {
         </div>
       )}
 
-      <p className="text-sm text-gray-500 text-center">
-        Showing {filteredTemplates.length} of {mockTemplates.length} templates
-      </p>
+      {!isLoading && filteredTemplates.length > 0 && (
+        <p className="text-sm text-gray-500 text-center">
+          Showing {filteredTemplates.length} templates
+        </p>
+      )}
     </div>
   );
 };

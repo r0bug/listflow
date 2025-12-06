@@ -7,6 +7,8 @@ import listingRoutes from './routes/listing.routes';
 import uploadRoutes from './routes/upload.routes';
 import workflowRoutes from './routes/workflow.routes';
 import soldDataRoutes from './routes/soldData.routes';
+import ebayRoutes from './routes/ebay.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 import { generalLimiter } from './middleware/rateLimit.middleware';
 
 dotenv.config();
@@ -24,6 +26,8 @@ app.use(generalLimiter);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/ebay', ebayRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/listings', listingRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/workflow', workflowRoutes);

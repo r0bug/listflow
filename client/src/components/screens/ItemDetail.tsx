@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft,
@@ -8,57 +8,76 @@ import {
   Plus,
   Trash2,
   Camera,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
-// Mock item data
-const mockItem = {
-  id: '847',
-  displayId: 'ALPHA-2024-000847',
-  currentStep: 'REVIEW',
-  title: 'Sony PlayStation 5 Console Disc Edition 825GB White CFI-1215A',
-  category: 'Video Games > Consoles',
-  categoryId: '139971',
-  condition: 'Used - Like New',
-  conditionId: 3000,
-  brand: 'Sony',
-  model: 'CFI-1215A',
-  itemSpecifics: [
-    { name: 'Brand', value: 'Sony' },
-    { name: 'Model', value: 'CFI-1215A' },
-    { name: 'Storage', value: '825GB' },
-    { name: 'Color', value: 'White' },
-  ],
-  description: `<p>Sony PlayStation 5 Console in excellent condition. This is the disc edition with 825GB storage.</p>
-<p>Includes:</p>
-<ul>
-<li>PlayStation 5 Console</li>
-<li>DualSense Controller</li>
-<li>Power Cable</li>
-<li>HDMI Cable</li>
-</ul>
-<p>Ships within 1 business day. See our other listings!</p>`,
+interface ItemData {
+  id: string;
+  displayId: string;
+  currentStep: string;
+  title: string;
+  category: string;
+  categoryId: string | null;
+  condition: string;
+  conditionId: number;
+  brand: string;
+  model: string;
+  itemSpecifics: { name: string; value: string }[];
+  description: string;
   aiAnalysis: {
-    confidence: 94,
-    model: 'llava-v1.6',
-    justification: `I identified this as a Sony PlayStation 5 based on the distinctive white curved design and visible model number CFI-1215A on the back label. This is the disc edition based on the disc drive slot.`,
-  },
-  suggestedPrice: 449.99,
-  photos: [
-    { id: '1', url: '/placeholder.jpg', isPrimary: true },
-    { id: '2', url: '/placeholder.jpg', isPrimary: false },
-    { id: '3', url: '/placeholder.jpg', isPrimary: false },
-    { id: '4', url: '/placeholder.jpg', isPrimary: false },
-  ],
-};
+    confidence: number;
+    model: string;
+    justification: string;
+  };
+  suggestedPrice: number;
+  photos: { id: string; url: string; isPrimary: boolean }[];
+  location: string;
+  locationCode: string;
+  createdBy: string;
+  createdAt: string;
+}
 
 export const ItemDetail: React.FC = () => {
-  useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [item, setItem] = useState(mockItem);
+  const [item, setItem] = useState<ItemData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [redoContext, setRedoContext] = useState('');
   const [showRedoInput, setShowRedoInput] = useState(false);
+
+  useEffect(() => {
+    const loadItem = async () => {
+      if (!id) {
+        setError('No item ID provided');
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(`/api/dashboard/item/${id}`);
+        const data = await response.json();
+
+        if (data.success) {
+          setItem(data.data);
+        } else {
+          setError(data.error || 'Failed to load item');
+        }
+      } catch (err) {
+        console.error('Error loading item:', err);
+        setError('Failed to connect to server');
+      }
+
+      setIsLoading(false);
+    };
+
+    loadItem();
+  }, [id]);
 
   const handleAccept = () => {
     // Move to next step
@@ -78,6 +97,28 @@ export const ItemDetail: React.FC = () => {
     navigate('/queue');
   };
 
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (error || !item) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center">
+        <p className="text-red-600 mb-4">{error || 'Item not found'}</p>
+        <button
+          onClick={() => navigate(-1)}
+          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -87,7 +128,7 @@ export const ItemDetail: React.FC = () => {
             ITEM: {item.displayId}
           </h1>
           <p className="text-sm text-gray-500">
-            Step: {item.currentStep} | 2 of 18
+            Step: {item.currentStep}
           </p>
         </div>
         <div className="flex items-center gap-2">

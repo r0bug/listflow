@@ -9,6 +9,13 @@ import {
   Templates,
   ItemDetail,
   PinLogin,
+  Inventory,
+  Research,
+  Settings,
+  Listings,
+  SellSimilar,
+  Reports,
+  EbayCallback,
 } from './components/screens';
 import { useAuthStore } from './stores/authStore';
 import './index.css';
@@ -87,12 +94,13 @@ function AppRoutes() {
         <Route path="item/:id" element={<ItemDetail />} />
 
         {/* Listings */}
-        <Route path="listings" element={<Placeholder name="Listings" />} />
-        <Route path="listings/active" element={<Placeholder name="Active Listings" />} />
-        <Route path="listings/sold" element={<Placeholder name="Sold Listings" />} />
+        <Route path="listings" element={<Listings />} />
+        <Route path="listings/active" element={<Listings />} />
+        <Route path="listings/sold" element={<Listings />} />
+        <Route path="listings/:type" element={<Listings />} />
 
         {/* Inventory */}
-        <Route path="inventory" element={<Placeholder name="Inventory" />} />
+        <Route path="inventory" element={<Inventory />} />
 
         {/* Templates */}
         <Route path="templates" element={<Templates />} />
@@ -101,17 +109,18 @@ function AppRoutes() {
         <Route path="templates/:id/use" element={<Placeholder name="Use Template" />} />
 
         {/* Sell Similar */}
-        <Route path="sell-similar" element={<Placeholder name="Sell Similar" />} />
+        <Route path="sell-similar" element={<SellSimilar />} />
 
         {/* Research */}
-        <Route path="research" element={<Placeholder name="Price Research" />} />
+        <Route path="research" element={<Research />} />
 
         {/* Reports */}
-        <Route path="reports" element={<Placeholder name="Reports" />} />
-        <Route path="performance" element={<Placeholder name="Performance" />} />
+        <Route path="reports" element={<Reports />} />
+        <Route path="performance" element={<Reports />} />
 
         {/* Settings */}
-        <Route path="settings" element={<Placeholder name="Settings" />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="settings/ebay/callback" element={<EbayCallback />} />
 
         {/* Catch all */}
         <Route path="*" element={<Navigate to="/" replace />} />
