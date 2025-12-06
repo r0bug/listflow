@@ -22,6 +22,15 @@ interface PriceStats {
   price75th: number;
 }
 
+interface SearchResponse {
+  success: boolean;
+  items: any[];
+  stats?: any;
+  listingType?: 'sold' | 'active';
+  notice?: string;
+  error?: string;
+}
+
 export const Research: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -29,22 +38,29 @@ export const Research: React.FC = () => {
   const [soldItems, setSoldItems] = useState<SoldItem[]>([]);
   const [stats, setStats] = useState<PriceStats | null>(null);
   const [error, setError] = useState('');
+  const [listingType, setListingType] = useState<'sold' | 'active'>('sold');
+  const [notice, setNotice] = useState('');
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
 
     setIsSearching(true);
     setError('');
+    setNotice('');
 
     try {
       const response = await fetch(`/api/v1/ebay/search?q=${encodeURIComponent(searchQuery)}&limit=20`);
-      const data = await response.json();
+      const data: SearchResponse = await response.json();
 
       if (!data.success) {
         setError(data.error || 'Failed to search eBay');
         setSoldItems([]);
         setStats(null);
       } else {
+        // Set listing type and notice
+        setListingType(data.listingType || 'sold');
+        setNotice(data.notice || '');
+
         // Transform API response to match our interface
         const items: SoldItem[] = data.items.map((item: any, index: number) => ({
           id: item.itemId || String(index),
@@ -139,6 +155,13 @@ export const Research: React.FC = () => {
         </div>
       )}
 
+      {/* Notice Display (e.g., when showing active instead of sold) */}
+      {notice && (
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800">
+          <strong>Note:</strong> {notice}
+        </div>
+      )}
+
       {/* Results */}
       {hasSearched && !error && (
         <>
@@ -210,10 +233,18 @@ export const Research: React.FC = () => {
             </div>
           )}
 
-          {/* Sold Items List */}
+          {/* Items List */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-              <h3 className="font-medium text-gray-900">Recent Sold Listings</h3>
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+              <h3 className="font-medium text-gray-900">
+                {listingType === 'sold' ? 'Recent Sold Listings' : 'Current Active Listings'}
+              </h3>
+              <span className={cn(
+                'px-2 py-1 rounded-full text-xs font-medium',
+                listingType === 'sold' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+              )}>
+                {listingType === 'sold' ? 'Sold' : 'Active'}
+              </span>
             </div>
             <div className="divide-y divide-gray-100">
               {soldItems.length === 0 ? (
