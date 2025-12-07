@@ -35,7 +35,7 @@ const tabs: TabConfig[] = [
 
 export const Settings: React.FC = () => {
   const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('ebay');
   const [isSaving, setIsSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState('');
 
@@ -61,7 +61,7 @@ export const Settings: React.FC = () => {
     clientId: '',
     clientSecret: '',
     devId: '',
-    sandbox: false, // Default to production mode
+    sandbox: false, // Production mode
     accountConnected: false,
   });
 
@@ -90,9 +90,15 @@ export const Settings: React.FC = () => {
             ...data.status,
             loading: false,
           });
-          if (data.status.authenticated) {
-            setEbayForm(prev => ({ ...prev, accountConnected: true }));
-          }
+          // Populate form with credentials from backend
+          setEbayForm(prev => ({
+            ...prev,
+            clientId: data.status.clientId || '',
+            clientSecret: data.status.clientSecret || '',
+            devId: data.status.devId || '',
+            sandbox: data.status.sandbox || false,
+            accountConnected: data.status.authenticated || false,
+          }));
         }
       } catch (err) {
         console.error('Failed to check eBay status:', err);

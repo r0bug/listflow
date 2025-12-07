@@ -689,8 +689,9 @@ router.get('/status', async (req, res) => {
         configured: isConfigured,
         authenticated: hasUserToken,
         sandbox: isSandbox,
-        clientId: process.env.EBAY_CLIENT_ID ?
-          process.env.EBAY_CLIENT_ID.substring(0, 15) + '...' : null,
+        clientId: process.env.EBAY_CLIENT_ID || null,
+        clientSecret: process.env.EBAY_CLIENT_SECRET || null,
+        devId: process.env.EBAY_DEV_ID || null,
       }
     });
   } catch (error) {
