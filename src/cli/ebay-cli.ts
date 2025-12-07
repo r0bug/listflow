@@ -595,7 +595,8 @@ program
         data: {
           sku: answers.sku || undefined,
           stage: WorkflowStage.PHOTO_UPLOAD,
-          createdById: user.id
+          createdById: user.id,
+          locationId: user.locationId
         }
       });
       
