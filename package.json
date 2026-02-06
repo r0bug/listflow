@@ -13,7 +13,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "setup": "npm install && npx prisma generate && npx prisma migrate dev",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "bin": {
     "ebay-cli": "./dist/cli/ebay-cli.js"
@@ -26,9 +28,11 @@
     "@types/express": "^5.0.3",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.3.0",
+    "@vitest/coverage-v8": "^1.6.1",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^1.6.1"
   },
   "dependencies": {
     "@hendt/ebay-api": "^6.0.1",

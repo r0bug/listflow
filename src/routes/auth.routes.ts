@@ -1,48 +1,51 @@
-import { Router } from 'express';
-import { PrismaClient } from '../generated/prisma';
+import { Router, Request, Response } from 'express';
+import { prisma } from '../config/database';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { validate } from '../middleware/validate.middleware';
+import { loginSchema, pinLoginSchema, refreshTokenSchema } from '../schemas/auth.schema';
 
 const router = Router();
-const prisma = new PrismaClient();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const getJwtSecret = (): string => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret && process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET must be set in production environment');
+  }
+  if (!secret) {
+    console.warn('WARNING: Using default JWT secret. Set JWT_SECRET in .env for security.');
+    return 'dev-secret-change-in-production';
+  }
+  return secret;
+};
+
+const JWT_SECRET = getJwtSecret();
 
 // POST /api/v1/auth/login - Email/password login
-router.post('/login', async (req, res) => {
+router.post('/login', validate(loginSchema), async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ success: false, error: 'Email and password required' });
-    }
-
-    // Find user
     const user = await prisma.user.findUnique({
       where: { email },
-      include: {
-        location: true,
-      },
+      include: { location: true },
     });
 
     if (!user) {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
-    // Verify password
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
-    // Generate token
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    // Update last active
     await prisma.user.update({
       where: { id: user.id },
       data: { lastActive: new Date(), isOnline: true },
@@ -60,7 +63,7 @@ router.post('/login', async (req, res) => {
           domain: user.location,
         },
         token,
-        refreshToken: token, // For now, same as token
+        refreshToken: token,
       },
     });
   } catch (error) {
@@ -70,46 +73,30 @@ router.post('/login', async (req, res) => {
 });
 
 // POST /api/v1/auth/pin-login - PIN login
-router.post('/pin-login', async (req, res) => {
+router.post('/pin-login', validate(pinLoginSchema), async (req: Request, res: Response) => {
   try {
     const { userId, pin } = req.body;
-    console.log('PIN login attempt:', { userId, pinLength: pin?.length });
 
-    if (!userId || !pin) {
-      console.log('Missing userId or pin');
-      return res.status(400).json({ success: false, error: 'User ID and PIN required' });
-    }
-
-    // Find user
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        location: true,
-      },
+      include: { location: true },
     });
 
     if (!user) {
-      console.log('User not found:', userId);
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    console.log('Found user:', user.id, user.email);
-
-    // Verify PIN (stored as bcrypt hash in password field)
     const validPin = await bcrypt.compare(pin, user.password);
-    console.log('PIN validation result:', validPin);
     if (!validPin) {
       return res.status(401).json({ success: false, error: 'Invalid PIN' });
     }
 
-    // Generate token
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    // Update last active
     await prisma.user.update({
       where: { id: user.id },
       data: { lastActive: new Date(), isOnline: true },
@@ -136,21 +123,19 @@ router.post('/pin-login', async (req, res) => {
 });
 
 // POST /api/v1/auth/logout
-router.post('/logout', async (req, res) => {
+router.post('/logout', async (req: Request, res: Response) => {
   try {
     const authHeader = req.headers.authorization;
 
     if (authHeader) {
       const token = authHeader.replace('Bearer ', '');
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
-
-        // Update user online status
+        const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
         await prisma.user.update({
           where: { id: decoded.userId },
           data: { isOnline: false },
         });
-      } catch (err) {
+      } catch {
         // Token invalid, that's ok for logout
       }
     }
@@ -163,7 +148,7 @@ router.post('/logout', async (req, res) => {
 });
 
 // GET /api/v1/auth/me - Get current user
-router.get('/me', async (req, res) => {
+router.get('/me', async (req: Request, res: Response) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -172,13 +157,11 @@ router.get('/me', async (req, res) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      include: {
-        location: true,
-      },
+      include: { location: true },
     });
 
     if (!user) {

@@ -1,4 +1,5 @@
 import { PrismaClient, WorkflowStage, UserRole, ItemStatus } from '../../src/generated/prisma';
+import { prisma as sharedPrisma } from '../config/database';
 import { aiService } from './ai.service';
 
 interface WorkflowTransition {
@@ -109,7 +110,7 @@ export class WorkflowService {
     userId: string,
     itemId: string,
     notes?: string,
-    changes?: any
+    changes?: Record<string, unknown>
   ) {
     const item = await this.prisma.item.findUnique({
       where: { id: itemId },
@@ -239,7 +240,7 @@ export class WorkflowService {
   }
 
   async getItemsForStage(stage: WorkflowStage, userId?: string) {
-    const where: any = { stage };
+    const where: { stage: WorkflowStage; createdById?: string } = { stage };
     
     if (userId) {
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -379,5 +380,5 @@ export class WorkflowService {
 }
 
 export const workflowService = new WorkflowService(
-  new PrismaClient()
+  sharedPrisma
 );

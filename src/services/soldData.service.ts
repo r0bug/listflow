@@ -1,7 +1,5 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
-import { PrismaClient } from '../generated/prisma';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/database';
 
 export interface SoldItemData {
   ebayItemId: string;
@@ -591,7 +589,7 @@ class SoldDataService {
   } = {}): Promise<SoldItemData[]> {
     const { query, limit = 50, minPrice, maxPrice } = options;
 
-    const where: any = {};
+    const where: Record<string, unknown> = {};
 
     if (query) {
       where.OR = [
@@ -601,9 +599,10 @@ class SoldDataService {
     }
 
     if (minPrice !== undefined || maxPrice !== undefined) {
-      where.soldPrice = {};
-      if (minPrice !== undefined) where.soldPrice.gte = minPrice;
-      if (maxPrice !== undefined) where.soldPrice.lte = maxPrice;
+      const priceFilter: { gte?: number; lte?: number } = {};
+      if (minPrice !== undefined) priceFilter.gte = minPrice;
+      if (maxPrice !== undefined) priceFilter.lte = maxPrice;
+      where.soldPrice = priceFilter;
     }
 
     const items = await prisma.soldItem.findMany({

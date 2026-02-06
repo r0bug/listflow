@@ -30,11 +30,11 @@ router.post('/search', scraperLimiter, async (req: Request, res: Response) => {
         items
       }
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error searching sold items:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to search sold items'
+      error: error instanceof Error ? error.message : 'Failed to search sold items'
     });
   }
 });
@@ -72,11 +72,11 @@ router.get('/price-stats', scraperLimiter, async (req: Request, res: Response) =
         sampleItems: stats.items.slice(0, 10)
       }
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error getting price stats:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to get price statistics'
+      error: error instanceof Error ? error.message : 'Failed to get price statistics'
     });
   }
 });
@@ -99,11 +99,11 @@ router.post('/suggest-price', scraperLimiter, async (req: Request, res: Response
       success: true,
       data: suggestion
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error getting price suggestion:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to get price suggestion'
+      error: error instanceof Error ? error.message : 'Failed to get price suggestion'
     });
   }
 });
@@ -132,11 +132,11 @@ router.get('/recent', async (req: Request, res: Response) => {
         items
       }
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error getting recent sold items:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to get recent sold items'
+      error: error instanceof Error ? error.message : 'Failed to get recent sold items'
     });
   }
 });
@@ -149,10 +149,10 @@ router.post('/cleanup', async (_req: Request, res: Response) => {
       success: true,
       message: 'Browser instance closed'
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : 'Failed to cleanup'
     });
   }
 });

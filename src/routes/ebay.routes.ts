@@ -1,8 +1,7 @@
-import { Router } from 'express';
-import { PrismaClient } from '../generated/prisma';
+import { Router, Request, Response } from 'express';
+import { prisma } from '../config/database';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // eBay OAuth configuration
 const EBAY_OAUTH_SCOPES = [
@@ -17,9 +16,14 @@ const EBAY_OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
 ].join(' ');
 
+function getRedirectUri(): string {
+  return process.env.EBAY_REDIRECT_URI ||
+    `${process.env.CLIENT_URL || 'http://localhost:5173'}/settings/ebay/callback`;
+}
+
 // Generate OAuth authorization URL
 // POST /api/v1/ebay/auth/url
-router.post('/auth/url', async (req, res) => {
+router.post('/auth/url', async (req: Request, res: Response) => {
   try {
     const { clientId, sandbox } = req.body;
 
@@ -27,11 +31,7 @@ router.post('/auth/url', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Client ID is required' });
     }
 
-    // Get the redirect URI from environment or use default
-    const redirectUri = process.env.EBAY_REDIRECT_URI ||
-      `${process.env.CLIENT_URL || 'http://localhost:5173'}/settings/ebay/callback`;
-
-    // Build the authorization URL
+    const redirectUri = getRedirectUri();
     const baseUrl = sandbox
       ? 'https://auth.sandbox.ebay.com/oauth2/authorize'
       : 'https://auth.ebay.com/oauth2/authorize';
@@ -60,7 +60,7 @@ router.post('/auth/url', async (req, res) => {
 
 // Exchange authorization code for tokens
 // POST /api/v1/ebay/auth/token
-router.post('/auth/token', async (req, res) => {
+router.post('/auth/token', async (req: Request, res: Response) => {
   try {
     const { code, clientId: reqClientId, clientSecret: reqClientSecret, sandbox: reqSandbox } = req.body;
 
@@ -68,12 +68,9 @@ router.post('/auth/token', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Authorization code is required' });
     }
 
-    // Use credentials from request or fall back to environment variables
     const clientId = reqClientId || process.env.EBAY_CLIENT_ID;
     const clientSecret = reqClientSecret || process.env.EBAY_CLIENT_SECRET;
-    const redirectUri = process.env.EBAY_REDIRECT_URI ||
-      `${process.env.CLIENT_URL || 'http://localhost:5176'}/settings/ebay/callback`;
-    // Use sandbox preference from request (if provided) or fall back to env
+    const redirectUri = getRedirectUri();
     const sandbox = reqSandbox !== undefined ? reqSandbox : (process.env.EBAY_SANDBOX === 'true');
 
     if (!clientId || !clientSecret) {
@@ -110,16 +107,25 @@ router.post('/auth/token', async (req, res) => {
       });
     }
 
-    // Store the tokens (in production, store these securely in database)
-    console.log('eBay OAuth successful. Tokens obtained.');
-    console.log('Access token expires in:', tokenData.expires_in, 'seconds');
+    // Store tokens in database
+    try {
+      const existingAccount = await prisma.ebayAccount.findFirst({
+        where: { appId: clientId }
+      });
 
-    // TODO: Store tokens in database
-    // For now, we'll just return success
-    // The tokens should be:
-    // - access_token: Use for API calls
-    // - refresh_token: Use to get new access tokens
-    // - expires_in: Seconds until access token expires
+      if (existingAccount) {
+        await prisma.ebayAccount.update({
+          where: { id: existingAccount.id },
+          data: {
+            authToken: tokenData.access_token,
+            refreshToken: tokenData.refresh_token || existingAccount.refreshToken,
+            lastSync: new Date(),
+          }
+        });
+      }
+    } catch (dbError) {
+      console.warn('Could not store eBay tokens in database:', dbError);
+    }
 
     res.json({
       success: true,
@@ -134,7 +140,7 @@ router.post('/auth/token', async (req, res) => {
 
 // Handle OAuth callback (browser redirect from eBay)
 // GET /api/v1/ebay/auth/callback
-router.get('/auth/callback', async (req, res) => {
+router.get('/auth/callback', async (req: Request, res: Response) => {
   try {
     const { code, error, error_description } = req.query;
 
@@ -147,11 +153,9 @@ router.get('/auth/callback', async (req, res) => {
       return res.redirect('/settings?ebay_error=No authorization code received');
     }
 
-    // Exchange the code for tokens
     const clientId = process.env.EBAY_CLIENT_ID;
     const clientSecret = process.env.EBAY_CLIENT_SECRET;
-    const redirectUri = process.env.EBAY_REDIRECT_URI ||
-      `${process.env.CLIENT_URL || 'http://localhost:5173'}/settings/ebay/callback`;
+    const redirectUri = getRedirectUri();
     const sandbox = process.env.EBAY_SANDBOX === 'true';
 
     if (!clientId || !clientSecret) {
@@ -182,14 +186,25 @@ router.get('/auth/callback', async (req, res) => {
       return res.redirect(`/settings?ebay_error=${encodeURIComponent(tokenData.error_description || 'Token exchange failed')}`);
     }
 
-    // Store the tokens (in production, store these securely in database)
-    // For now, we'll just redirect with success
-    // The tokens should be stored in the EbayAccount model
+    // Store tokens in database
+    try {
+      const existingAccount = await prisma.ebayAccount.findFirst({
+        where: { appId: clientId }
+      });
 
-    console.log('eBay OAuth successful. Access token obtained.');
-
-    // TODO: Store tokens in database
-    // await prisma.ebayAccount.upsert({...})
+      if (existingAccount) {
+        await prisma.ebayAccount.update({
+          where: { id: existingAccount.id },
+          data: {
+            authToken: tokenData.access_token,
+            refreshToken: tokenData.refresh_token || existingAccount.refreshToken,
+            lastSync: new Date(),
+          }
+        });
+      }
+    } catch (dbError) {
+      console.warn('Could not store eBay tokens in database:', dbError);
+    }
 
     res.redirect('/settings?ebay_success=true');
   } catch (error) {
@@ -198,9 +213,9 @@ router.get('/auth/callback', async (req, res) => {
   }
 });
 
-// Save eBay credentials (from Settings page)
+// Save eBay credentials
 // POST /api/v1/ebay/credentials
-router.post('/credentials', async (req, res) => {
+router.post('/credentials', async (req: Request, res: Response) => {
   try {
     const { clientId, clientSecret, devId, sandbox, locationId } = req.body;
 
@@ -211,8 +226,6 @@ router.post('/credentials', async (req, res) => {
       });
     }
 
-    // In production, store these encrypted in the database
-    // For now, we'll indicate they should go in .env
     res.json({
       success: true,
       message: 'Credentials received. For security, add these to your .env file:',
@@ -269,7 +282,7 @@ async function getApplicationToken(): Promise<string | null> {
 
 // Fetch listing details from eBay
 // GET /api/v1/ebay/listing/:itemId
-router.get('/listing/:itemId', async (req, res) => {
+router.get('/listing/:itemId', async (req: Request, res: Response) => {
   try {
     const { itemId } = req.params;
 
@@ -277,7 +290,6 @@ router.get('/listing/:itemId', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Item ID is required' });
     }
 
-    // Get application token for Browse API
     const accessToken = await getApplicationToken();
     if (!accessToken) {
       return res.status(500).json({ success: false, error: 'Failed to authenticate with eBay' });
@@ -292,12 +304,11 @@ router.get('/listing/:itemId', async (req, res) => {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-        'X-EBAY-C-ENDUSERCTX': 'affiliateCampaignId=<ePNCampaignId>,affiliateReferenceId=<referenceId>',
       },
     });
 
     if (!response.ok) {
-      // Try alternate format without legacy conversion
+      // Try alternate format
       const altApiUrl = sandbox
         ? `https://api.sandbox.ebay.com/buy/browse/v1/item/${itemId}`
         : `https://api.ebay.com/buy/browse/v1/item/${itemId}`;
@@ -314,61 +325,52 @@ router.get('/listing/:itemId', async (req, res) => {
         console.error('eBay API error:', errorData);
         return res.status(altResponse.status).json({
           success: false,
-          error: errorData.errors?.[0]?.message || 'Failed to fetch listing from eBay'
+          error: (errorData as { errors?: { message?: string }[] }).errors?.[0]?.message || 'Failed to fetch listing from eBay'
         });
       }
 
       const data = await altResponse.json();
-      return res.json({
-        success: true,
-        listing: {
-          itemId: data.itemId || itemId,
-          title: data.title,
-          description: data.description || data.shortDescription || '',
-          price: parseFloat(data.price?.value || '0'),
-          currency: data.price?.currency || 'USD',
-          condition: data.condition || 'Used',
-          category: data.categoryPath || '',
-          imageUrls: data.image?.imageUrl ? [data.image.imageUrl] : (data.additionalImages?.map((img: any) => img.imageUrl) || []),
-          specifics: data.localizedAspects?.reduce((acc: any, aspect: any) => {
-            acc[aspect.name] = aspect.value;
-            return acc;
-          }, {}) || {},
-          seller: data.seller?.username || '',
-          itemWebUrl: data.itemWebUrl,
-        }
-      });
+      return res.json({ success: true, listing: formatBrowseApiItem(data, itemId) });
     }
 
     const data = await response.json();
-    res.json({
-      success: true,
-      listing: {
-        itemId: data.itemId || itemId,
-        title: data.title,
-        description: data.description || data.shortDescription || '',
-        price: parseFloat(data.price?.value || '0'),
-        currency: data.price?.currency || 'USD',
-        condition: data.condition || 'Used',
-        category: data.categoryPath || '',
-        imageUrls: data.image?.imageUrl ? [data.image.imageUrl] : (data.additionalImages?.map((img: any) => img.imageUrl) || []),
-        specifics: data.localizedAspects?.reduce((acc: any, aspect: any) => {
-          acc[aspect.name] = aspect.value;
-          return acc;
-        }, {}) || {},
-        seller: data.seller?.username || '',
-        itemWebUrl: data.itemWebUrl,
-      }
-    });
+    res.json({ success: true, listing: formatBrowseApiItem(data, itemId) });
   } catch (error) {
     console.error('Error fetching eBay listing:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch listing' });
   }
 });
 
-// Search eBay for items (tries sold listings first, falls back to active)
+function formatBrowseApiItem(data: Record<string, unknown>, itemId: string) {
+  const price = data.price as { value?: string; currency?: string } | undefined;
+  const image = data.image as { imageUrl?: string } | undefined;
+  const additionalImages = data.additionalImages as { imageUrl?: string }[] | undefined;
+  const localizedAspects = data.localizedAspects as { name: string; value: string }[] | undefined;
+  const seller = data.seller as { username?: string } | undefined;
+
+  return {
+    itemId: (data.itemId as string) || itemId,
+    title: data.title,
+    description: data.description || data.shortDescription || '',
+    price: parseFloat(price?.value || '0'),
+    currency: price?.currency || 'USD',
+    condition: data.condition || 'Used',
+    category: data.categoryPath || '',
+    imageUrls: image?.imageUrl
+      ? [image.imageUrl]
+      : (additionalImages?.map(img => img.imageUrl).filter(Boolean) || []),
+    specifics: localizedAspects?.reduce((acc: Record<string, string>, aspect) => {
+      acc[aspect.name] = aspect.value;
+      return acc;
+    }, {}) || {},
+    seller: seller?.username || '',
+    itemWebUrl: data.itemWebUrl,
+  };
+}
+
+// Search eBay for items
 // GET /api/v1/ebay/search
-router.get('/search', async (req, res) => {
+router.get('/search', async (req: Request, res: Response) => {
   try {
     const { q, limit = 20, type = 'sold' } = req.query;
 
@@ -386,18 +388,15 @@ router.get('/search', async (req, res) => {
 
     const sandbox = process.env.EBAY_SANDBOX === 'true';
 
-    // Try Finding API for sold items first
     if (type === 'sold') {
-      const findingResult = await searchWithFindingAPI(clientId, q as string, Number(limit), sandbox);
+      const findingResult = await searchWithFindingAPI(clientId, q, Number(limit), sandbox);
       if (findingResult.success) {
         return res.json(findingResult);
       }
-      // If Finding API fails, log and fall through to Browse API
       console.log('Finding API unavailable, falling back to Browse API:', findingResult.error);
     }
 
-    // Use Browse API as fallback (shows active listings)
-    const browseResult = await searchWithBrowseAPI(q as string, Number(limit), sandbox);
+    const browseResult = await searchWithBrowseAPI(q, Number(limit), sandbox);
     return res.json(browseResult);
 
   } catch (error) {
@@ -432,7 +431,6 @@ async function searchWithFindingAPI(clientId: string, query: string, limit: numb
 
     const data = await response.json();
 
-    // Check for errors
     if (data.errorMessage) {
       const errorMsg = data.errorMessage?.[0]?.error?.[0]?.message?.[0];
       return { success: false, error: errorMsg || 'Finding API error' };
@@ -444,28 +442,28 @@ async function searchWithFindingAPI(clientId: string, query: string, limit: numb
       return { success: false, error: errorMsg || 'Finding API failed' };
     }
 
-    // Extract items
     const searchResult = data.findCompletedItemsResponse?.[0]?.searchResult?.[0];
     const rawItems = searchResult?.item || [];
 
-    const items = rawItems.map((item: any) => {
-      const sellingStatus = item.sellingStatus?.[0];
+    const items = rawItems.map((item: Record<string, unknown[]>) => {
+      const sellingStatus = (item.sellingStatus as Record<string, unknown[]>[])?.[0];
+      const currentPrice = (sellingStatus?.currentPrice as Record<string, string>[])?.[0];
       return {
-        itemId: item.itemId?.[0],
-        title: item.title?.[0],
-        price: parseFloat(sellingStatus?.currentPrice?.[0]?.__value__ || '0'),
-        currency: sellingStatus?.currentPrice?.[0]?.['@currencyId'] || 'USD',
-        condition: item.condition?.[0]?.conditionDisplayName?.[0] || 'Unknown',
-        imageUrl: item.galleryURL?.[0],
-        itemWebUrl: item.viewItemURL?.[0],
-        seller: item.sellerInfo?.[0]?.sellerUserName?.[0],
-        location: item.location?.[0],
-        endTime: item.listingInfo?.[0]?.endTime?.[0],
+        itemId: (item.itemId as string[])?.[0],
+        title: (item.title as string[])?.[0],
+        price: parseFloat(currentPrice?.__value__ || '0'),
+        currency: currentPrice?.['@currencyId'] || 'USD',
+        condition: ((item.condition as Record<string, string[]>[])?.[0]?.conditionDisplayName)?.[0] || 'Unknown',
+        imageUrl: (item.galleryURL as string[])?.[0],
+        itemWebUrl: (item.viewItemURL as string[])?.[0],
+        seller: ((item.sellerInfo as Record<string, string[]>[])?.[0]?.sellerUserName)?.[0],
+        location: (item.location as string[])?.[0],
+        endTime: ((item.listingInfo as Record<string, string[]>[])?.[0]?.endTime)?.[0],
         isSold: true,
       };
     });
 
-    const prices = items.map((item: any) => item.price).filter((p: number) => p > 0);
+    const prices = items.map((item: { price: number }) => item.price).filter((p: number) => p > 0);
     const sortedPrices = [...prices].sort((a: number, b: number) => a - b);
     const stats = prices.length > 0 ? {
       count: prices.length,
@@ -483,7 +481,7 @@ async function searchWithFindingAPI(clientId: string, query: string, limit: numb
       stats,
       listingType: 'sold',
     };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Finding API request failed' };
   }
 }
@@ -516,13 +514,25 @@ async function searchWithBrowseAPI(query: string, limit: number, sandbox: boolea
       const errorData = await response.json().catch(() => ({}));
       return {
         success: false,
-        error: errorData.errors?.[0]?.message || 'Browse API failed'
+        error: (errorData as { errors?: { message?: string }[] }).errors?.[0]?.message || 'Browse API failed'
       };
     }
 
     const data = await response.json();
 
-    const items = (data.itemSummaries || []).map((item: any) => ({
+    interface BrowseApiItem {
+      itemId: string;
+      title: string;
+      price?: { value?: string; currency?: string };
+      condition?: string;
+      image?: { imageUrl?: string };
+      thumbnailImages?: { imageUrl?: string }[];
+      itemWebUrl?: string;
+      seller?: { username?: string };
+      itemLocation?: { postalCode?: string; city?: string };
+    }
+
+    const items = ((data as { itemSummaries?: BrowseApiItem[] }).itemSummaries || []).map((item: BrowseApiItem) => ({
       itemId: item.itemId,
       title: item.title,
       price: parseFloat(item.price?.value || '0'),
@@ -535,7 +545,7 @@ async function searchWithBrowseAPI(query: string, limit: number, sandbox: boolea
       isSold: false,
     }));
 
-    const prices = items.map((item: any) => item.price).filter((p: number) => p > 0);
+    const prices = items.map((item: { price: number }) => item.price).filter((p: number) => p > 0);
     const sortedPrices = [...prices].sort((a: number, b: number) => a - b);
     const stats = prices.length > 0 ? {
       count: prices.length,
@@ -548,20 +558,20 @@ async function searchWithBrowseAPI(query: string, limit: number, sandbox: boolea
     return {
       success: true,
       query,
-      total: data.total || items.length,
+      total: (data as { total?: number }).total || items.length,
       items,
       stats,
       listingType: 'active',
       notice: 'Showing active listings (sold listings unavailable - enable Finding API in eBay Developer Portal)',
     };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Browse API request failed' };
   }
 }
 
 // Create Item from eBay listing (Sell Similar)
 // POST /api/v1/ebay/create-item
-router.post('/create-item', async (req, res) => {
+router.post('/create-item', async (req: Request, res: Response) => {
   try {
     const {
       title,
@@ -571,16 +581,15 @@ router.post('/create-item', async (req, res) => {
       category,
       imageUrls,
       specifics,
-      sourceEbayId,  // Original eBay item ID for reference
-      userId,        // User creating the item (from auth)
-      locationId,    // Location for the item
+      sourceEbayId,
+      userId,
+      locationId,
     } = req.body;
 
     if (!title) {
       return res.status(400).json({ success: false, error: 'Title is required' });
     }
 
-    // Get default location if not provided
     let location = locationId ? await prisma.location.findUnique({ where: { id: locationId } }) : null;
     if (!location) {
       location = await prisma.location.findFirst({ where: { isActive: true } });
@@ -593,7 +602,6 @@ router.post('/create-item', async (req, res) => {
       });
     }
 
-    // Get default user if not provided (find first admin or manager)
     let user = userId ? await prisma.user.findUnique({ where: { id: userId } }) : null;
     if (!user) {
       user = await prisma.user.findFirst({
@@ -608,12 +616,10 @@ router.post('/create-item', async (req, res) => {
       });
     }
 
-    // Generate a SKU
     const timestamp = Date.now().toString(36).toUpperCase();
     const random = Math.random().toString(36).substring(2, 5).toUpperCase();
-    const sku = `SS-${timestamp}-${random}`; // SS = Sell Similar
+    const sku = `SS-${timestamp}-${random}`;
 
-    // Create the item in REVIEW_EDIT stage since it already has title/description
     const item = await prisma.item.create({
       data: {
         sku,
@@ -640,7 +646,6 @@ router.post('/create-item', async (req, res) => {
       }
     });
 
-    // Create a workflow action to track this import
     await prisma.workflowAction.create({
       data: {
         itemId: item.id,
@@ -670,9 +675,9 @@ router.post('/create-item', async (req, res) => {
   }
 });
 
-// Check eBay connection status
+// Check eBay connection status - FIXED: No longer leaks credentials
 // GET /api/v1/ebay/status
-router.get('/status', async (req, res) => {
+router.get('/status', async (req: Request, res: Response) => {
   try {
     const isConfigured = !!(
       process.env.EBAY_CLIENT_ID &&
@@ -689,9 +694,6 @@ router.get('/status', async (req, res) => {
         configured: isConfigured,
         authenticated: hasUserToken,
         sandbox: isSandbox,
-        clientId: process.env.EBAY_CLIENT_ID || null,
-        clientSecret: process.env.EBAY_CLIENT_SECRET || null,
-        devId: process.env.EBAY_DEV_ID || null,
       }
     });
   } catch (error) {

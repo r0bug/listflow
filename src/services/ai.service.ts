@@ -4,8 +4,21 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+interface ImageAnalysis {
+  itemType: string;
+  brand: string;
+  condition: string;
+  features: string[];
+  category: string;
+  estimatedValue: string;
+  rawAnalysis: string;
+  model?: string;
+  specifics?: Record<string, string>;
+  [key: string]: unknown;
+}
+
 interface ListingOptions {
-  imageAnalysis: any;
+  imageAnalysis: ImageAnalysis;
   category?: string;
   condition?: string;
 }
@@ -28,7 +41,7 @@ class AIService {
     if (process.env.SEGMIND_API_KEY) {
       this.segmindConfig = {
         apiKey: process.env.SEGMIND_API_KEY,
-        model: (process.env.SEGMIND_MODEL as any) || 'llava-v1.6',
+        model: (process.env.SEGMIND_MODEL as SegmindConfig['model']) || 'llava-v1.6',
         baseUrl: process.env.SEGMIND_BASE_URL || 'https://api.segmind.com/v1'
       };
     }
@@ -57,7 +70,7 @@ Be specific and detailed in your analysis.`;
 
       const endpoint = this.modelEndpoints[this.segmindConfig.model];
       
-      let requestPayload: any;
+      let requestPayload: Record<string, unknown>;
       
       // Different payload formats for different models
       if (this.segmindConfig.model === 'llava-v1.6') {
@@ -148,7 +161,7 @@ Format the response clearly with labeled sections.`;
 
       const endpoint = this.modelEndpoints[this.segmindConfig.model];
       
-      let requestPayload: any;
+      let requestPayload: Record<string, unknown>;
       
       if (this.segmindConfig.model === 'llava-v1.6') {
         requestPayload = {

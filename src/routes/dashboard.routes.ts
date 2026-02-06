@@ -1,8 +1,9 @@
-import { Router } from 'express';
-import { PrismaClient } from '../generated/prisma';
+import { Router, Request, Response } from 'express';
+import { prisma } from '../config/database';
+import { WorkflowStage, TemplateSourceType } from '../../src/generated/prisma';
+import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // GET /api/dashboard/stats - Get dashboard statistics
 router.get('/stats', async (req, res) => {
@@ -268,11 +269,11 @@ router.get('/queue', async (req, res) => {
     ]);
 
     // Transform to queue format
-    const transformItem = (item: any, step: string) => ({
+    const transformItem = (item: { id: string; title: string | null; photos?: { thumbnailPath: string | null }[]; aiAnalysis?: unknown; buyNowPrice?: number | null; startingPrice?: number | null }, step: string) => ({
       id: item.id,
       title: item.title || 'Untitled Item',
       thumbnail: item.photos?.[0]?.thumbnailPath || null,
-      confidence: item.aiAnalysis?.confidence || undefined,
+      confidence: (item.aiAnalysis as Record<string, unknown>)?.confidence || undefined,
       price: item.buyNowPrice || item.startingPrice || undefined,
       step,
     });
@@ -486,7 +487,7 @@ router.get('/item/:id', async (req, res) => {
     }
 
     // Parse AI analysis
-    const aiAnalysis = item.aiAnalysis as any || {};
+    const aiAnalysis = (item.aiAnalysis as Record<string, unknown>) || {};
 
     // Format item specifics from AI analysis or features
     const itemSpecifics = [];
@@ -563,7 +564,7 @@ router.put('/item/:id', async (req, res) => {
     } = req.body;
 
     // Build update data
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
     if (category !== undefined) updateData.category = category;
@@ -578,13 +579,13 @@ router.put('/item/:id', async (req, res) => {
         where: { id },
         select: { aiAnalysis: true }
       });
-      const existingAnalysis = (existingItem?.aiAnalysis as any) || {};
+      const existingAnalysis = (existingItem?.aiAnalysis as Record<string, unknown>) || {};
       updateData.aiAnalysis = {
         ...existingAnalysis,
-        specifics: itemSpecifics.reduce((acc: any, spec: { name: string; value: string }) => {
+        specifics: itemSpecifics.reduce((acc: Record<string, string>, spec: { name: string; value: string }) => {
           acc[spec.name] = spec.value;
           return acc;
-        }, {})
+        }, {} as Record<string, string>)
       };
     }
 
@@ -598,8 +599,8 @@ router.put('/item/:id', async (req, res) => {
       data: item,
       message: 'Item updated successfully'
     });
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as { code: string }).code === 'P2025') {
       return res.status(404).json({ success: false, error: 'Item not found' });
     }
     console.error('Error updating item:', error);
@@ -608,10 +609,11 @@ router.put('/item/:id', async (req, res) => {
 });
 
 // POST /api/dashboard/item/:id/advance - Advance item to next workflow stage
-router.post('/item/:id/advance', async (req, res) => {
+router.post('/item/:id/advance', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { notes } = req.body;
+    const userId = req.user?.id;
 
     const item = await prisma.item.findUnique({
       where: { id },
@@ -622,7 +624,6 @@ router.post('/item/:id/advance', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Item not found' });
     }
 
-    // Define stage progression
     const stageOrder = [
       'PHOTO_UPLOAD',
       'AI_PROCESSING',
@@ -640,20 +641,19 @@ router.post('/item/:id/advance', async (req, res) => {
       });
     }
 
-    const nextStage = stageOrder[currentIndex + 1] as any;
+    const nextStage = stageOrder[currentIndex + 1] as string;
 
-    // Update item and create workflow action
     const [updatedItem] = await prisma.$transaction([
       prisma.item.update({
         where: { id },
-        data: { stage: nextStage }
+        data: { stage: nextStage as 'PHOTO_UPLOAD' | 'AI_PROCESSING' | 'REVIEW_EDIT' | 'PRICING' | 'FINAL_REVIEW' | 'PUBLISHED' }
       }),
       prisma.workflowAction.create({
         data: {
           itemId: id,
-          userId: 'system', // TODO: Get from auth context
+          userId: userId!,
           fromStage: item.stage,
-          toStage: nextStage,
+          toStage: nextStage as 'PHOTO_UPLOAD' | 'AI_PROCESSING' | 'REVIEW_EDIT' | 'PRICING' | 'FINAL_REVIEW' | 'PUBLISHED',
           action: 'advance',
           notes: notes || null
         }
@@ -675,10 +675,11 @@ router.post('/item/:id/advance', async (req, res) => {
 });
 
 // POST /api/dashboard/item/:id/reject - Reject item
-router.post('/item/:id/reject', async (req, res) => {
+router.post('/item/:id/reject', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
+    const userId = req.user?.id;
 
     const item = await prisma.item.findUnique({
       where: { id },
@@ -689,7 +690,6 @@ router.post('/item/:id/reject', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Item not found' });
     }
 
-    // Update item and create workflow action
     const [updatedItem] = await prisma.$transaction([
       prisma.item.update({
         where: { id },
@@ -698,7 +698,7 @@ router.post('/item/:id/reject', async (req, res) => {
       prisma.workflowAction.create({
         data: {
           itemId: id,
-          userId: 'system', // TODO: Get from auth context
+          userId: userId!,
           fromStage: item.stage,
           toStage: 'REJECTED',
           action: 'reject',
@@ -871,8 +871,8 @@ router.get('/listings/active', async (req, res) => {
       price: listing.buyNowPrice || listing.price,
       status: 'active' as const,
       imageUrl: listing.imageUrls?.[0] || listing.item?.photos?.[0]?.thumbnailPath || null,
-      views: (listing.metadata as any)?.views || 0,
-      watchers: (listing.metadata as any)?.watchers || 0,
+      views: (listing.metadata as Record<string, unknown>)?.views || 0,
+      watchers: (listing.metadata as Record<string, unknown>)?.watchers || 0,
       listedAt: listing.listedAt.toISOString().split('T')[0],
     }));
 
@@ -921,12 +921,12 @@ router.get('/listings/sold', async (req, res) => {
       soldPrice: listing.soldPrice || listing.price,
       status: 'sold' as const,
       imageUrl: listing.imageUrls?.[0] || listing.item?.photos?.[0]?.thumbnailPath || null,
-      views: (listing.metadata as any)?.views || 0,
-      watchers: (listing.metadata as any)?.watchers || 0,
+      views: (listing.metadata as Record<string, unknown>)?.views || 0,
+      watchers: (listing.metadata as Record<string, unknown>)?.watchers || 0,
       listedAt: listing.listedAt.toISOString().split('T')[0],
       soldAt: listing.soldAt?.toISOString().split('T')[0] || null,
-      buyer: (listing.metadata as any)?.buyer || null,
-      shippingCost: (listing.metadata as any)?.shippingCost || null,
+      buyer: (listing.metadata as Record<string, unknown>)?.buyer || null,
+      shippingCost: (listing.metadata as Record<string, unknown>)?.shippingCost || null,
     }));
 
     res.json({
@@ -985,12 +985,12 @@ router.get('/templates', async (req, res) => {
   try {
     const { search, sourceType, sort = 'recent' } = req.query;
 
-    const whereClause: any = {
+    const whereClause: { isActive: boolean; sourceType?: TemplateSourceType } = {
       isActive: true
     };
 
     if (sourceType && sourceType !== 'all') {
-      whereClause.sourceType = sourceType;
+      whereClause.sourceType = sourceType as TemplateSourceType;
     }
 
     const templates = await prisma.listingTemplate.findMany({
@@ -1140,8 +1140,8 @@ router.put('/templates/:id', async (req, res) => {
       success: true,
       data: template
     });
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as { code: string }).code === 'P2025') {
       return res.status(404).json({ success: false, error: 'Template not found' });
     }
     console.error('Error updating template:', error);
@@ -1164,8 +1164,8 @@ router.delete('/templates/:id', async (req, res) => {
       success: true,
       message: 'Template deleted successfully'
     });
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as { code: string }).code === 'P2025') {
       return res.status(404).json({ success: false, error: 'Template not found' });
     }
     console.error('Error deleting template:', error);
@@ -1245,8 +1245,8 @@ router.post('/templates/:id/use', async (req, res) => {
       success: true,
       data: template
     });
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as { code: string }).code === 'P2025') {
       return res.status(404).json({ success: false, error: 'Template not found' });
     }
     console.error('Error using template:', error);
@@ -1259,7 +1259,7 @@ router.post('/templates/:id/use', async (req, res) => {
 // ============================================================================
 
 // POST /api/dashboard/items/bulk-advance - Advance multiple items to next stage
-router.post('/items/bulk-advance', async (req, res) => {
+router.post('/items/bulk-advance', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { itemIds, targetStage } = req.body;
 
@@ -1309,14 +1309,14 @@ router.post('/items/bulk-advance', async (req, res) => {
         await prisma.$transaction([
           prisma.item.update({
             where: { id: item.id },
-            data: { stage: nextStage as any }
+            data: { stage: nextStage as WorkflowStage }
           }),
           prisma.workflowAction.create({
             data: {
               itemId: item.id,
-              userId: 'system',
+              userId: (req as AuthRequest).user?.id || 'system',
               fromStage: item.stage,
-              toStage: nextStage as any,
+              toStage: nextStage as WorkflowStage,
               action: 'bulk_advance',
               notes: `Bulk advanced to ${nextStage}`
             }
@@ -1341,7 +1341,7 @@ router.post('/items/bulk-advance', async (req, res) => {
 });
 
 // POST /api/dashboard/items/bulk-price - Set prices for multiple items
-router.post('/items/bulk-price', async (req, res) => {
+router.post('/items/bulk-price', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { itemIds, priceAdjustment } = req.body;
 
@@ -1362,7 +1362,7 @@ router.post('/items/bulk-price', async (req, res) => {
 
     for (const item of items) {
       try {
-        const updateData: any = {};
+        const updateData: Record<string, unknown> = {};
 
         if (priceAdjustment) {
           // Apply price adjustment (percentage or fixed)
@@ -1393,9 +1393,9 @@ router.post('/items/bulk-price', async (req, res) => {
           prisma.workflowAction.create({
             data: {
               itemId: item.id,
-              userId: 'system',
+              userId: (req as AuthRequest).user?.id || 'system',
               fromStage: item.stage,
-              toStage: updateData.stage || item.stage,
+              toStage: (updateData.stage as WorkflowStage) || item.stage,
               action: 'bulk_price',
               notes: priceAdjustment ? `Bulk pricing applied` : 'Moved to pricing stage'
             }
@@ -1425,7 +1425,7 @@ router.put('/listings/:id', async (req, res) => {
     const { id } = req.params;
     const { title, price, buyNowPrice, status } = req.body;
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (title !== undefined) updateData.title = title;
     if (price !== undefined) updateData.price = price;
     if (buyNowPrice !== undefined) updateData.buyNowPrice = buyNowPrice;
@@ -1441,8 +1441,8 @@ router.put('/listings/:id', async (req, res) => {
       data: listing,
       message: 'Listing updated successfully'
     });
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as { code: string }).code === 'P2025') {
       return res.status(404).json({ success: false, error: 'Listing not found' });
     }
     console.error('Error updating listing:', error);
@@ -1468,8 +1468,8 @@ router.post('/listings/:id/end', async (req, res) => {
       data: listing,
       message: 'Listing ended successfully'
     });
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as { code: string }).code === 'P2025') {
       return res.status(404).json({ success: false, error: 'Listing not found' });
     }
     console.error('Error ending listing:', error);

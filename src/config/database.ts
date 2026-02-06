@@ -1,11 +1,11 @@
 import { PrismaClient } from '../../src/generated/prisma';
 
-let prisma: PrismaClient | null = null;
-
-if (process.env.DATABASE_URL) {
-  prisma = new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  });
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL environment variable is required');
 }
+
+const prisma = new PrismaClient({
+  log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+});
 
 export { prisma };

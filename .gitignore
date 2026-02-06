@@ -20,7 +20,7 @@ temp/
 # Database
 *.db
 *.sqlite
-prisma/migrations/
+# prisma/migrations/ - migrations should be tracked in git
 
 # Logs
 logs/
