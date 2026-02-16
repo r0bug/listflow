@@ -45,7 +45,8 @@ A comprehensive, AI-powered eBay listing workflow system that automates the list
 - **State Management**: Zustand
 - **Routing**: React Router 7
 - **eBay Integration**: @hendt/ebay-api
-- **Image Processing**: Sharp, Puppeteer (sold data scraping)
+- **Image Processing**: Sharp
+- **Price Research**: Playwright (Firefox) for eBay sold data scraping
 
 ## Prerequisites
 
@@ -189,6 +190,8 @@ listflow/
 │   │   ├── stores/               # Zustand state
 │   │   ├── types/                # TypeScript definitions
 │   │   └── App.tsx               # Main app with routing
+├── scripts/
+│   └── ebay-sold-lookup.ts      # Playwright eBay sold price lookup tool
 ├── prisma/
 │   ├── schema.prisma             # Current schema
 │   └── schema.v2.prisma          # V2 multi-tenant schema
@@ -284,6 +287,28 @@ npm run prisma:studio
 # Run CLI
 npm run cli
 ```
+
+## Scripts
+
+### eBay Sold Price Lookup
+
+Standalone Playwright-based tool that scrapes eBay sold/completed listings for price research.
+
+```bash
+# Basic search
+npx ts-node scripts/ebay-sold-lookup.ts "Nintendo 64 console"
+
+# Limit results
+npx ts-node scripts/ebay-sold-lookup.ts "vintage leather jacket" --limit 20
+
+# JSON output (for programmatic use)
+npx ts-node scripts/ebay-sold-lookup.ts "iPhone 15 Pro" --json
+
+# Debug with visible browser
+npx ts-node scripts/ebay-sold-lookup.ts "rare coin" --show-browser
+```
+
+Returns per-item title, price, shipping, condition, date sold, and URL, plus aggregate stats (average, median, price range).
 
 ## Documentation
 
