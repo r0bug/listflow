@@ -132,19 +132,19 @@ export const SellSimilar: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Sell Similar</h1>
-        <p className="text-gray-500">Create a new listing from an existing eBay item</p>
+        <h1 className="text-2xl font-bold text-slate-900">Sell Similar</h1>
+        <p className="text-slate-500 mt-1">Create a new listing from an existing eBay item</p>
       </div>
 
       {/* URL Input */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Enter eBay Listing</h2>
+      <div className="card p-6">
+        <h2 className="text-lg font-medium text-slate-900 mb-4">Enter eBay Listing</h2>
         <div className="flex gap-4">
           <div className="flex-1 relative">
-            <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Paste eBay URL or Item ID (e.g., https://www.ebay.com/itm/123456789 or 123456789)"
@@ -153,13 +153,13 @@ export const SellSimilar: React.FC = () => {
                 setEbayUrl(e.target.value);
                 setError('');
               }}
-              className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input pl-12"
             />
           </div>
           <button
             onClick={handleFetch}
             disabled={isFetching}
-            className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+            className="btn-primary px-6 disabled:opacity-50"
           >
             {isFetching ? (
               <>
@@ -175,7 +175,7 @@ export const SellSimilar: React.FC = () => {
           </button>
         </div>
         {error && (
-          <div className="mt-3 flex items-center gap-2 text-red-600">
+          <div className="mt-3 flex items-center gap-2 text-coral-600">
             <AlertCircle size={16} />
             <span className="text-sm">{error}</span>
           </div>
@@ -186,10 +186,10 @@ export const SellSimilar: React.FC = () => {
       {fetchedListing && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Original Listing */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="card p-6">
             <div className="flex items-center gap-2 mb-4">
-              <Package size={20} className="text-gray-400" />
-              <h2 className="text-lg font-medium text-gray-900">Original Listing</h2>
+              <Package size={20} className="text-slate-400" />
+              <h2 className="text-lg font-medium text-slate-900">Original Listing</h2>
             </div>
 
             {/* Images */}
@@ -197,34 +197,34 @@ export const SellSimilar: React.FC = () => {
               {fetchedListing.imageUrls.map((_, index) => (
                 <div
                   key={index}
-                  className="w-20 h-20 bg-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center"
+                  className="w-20 h-20 bg-slate-100 rounded-lg flex-shrink-0 flex items-center justify-center"
                 >
-                  <Image size={24} className="text-gray-400" />
+                  <Image size={24} className="text-slate-400" />
                 </div>
               ))}
             </div>
 
-            <h3 className="font-medium text-gray-900 mb-2">{fetchedListing.title}</h3>
+            <h3 className="font-medium text-slate-900 mb-2">{fetchedListing.title}</h3>
 
             <div className="flex items-center gap-4 mb-4">
-              <span className="text-xl font-bold text-gray-900">${fetchedListing.price.toFixed(2)}</span>
-              <span className="px-2 py-1 bg-gray-100 text-gray-600 text-sm rounded-full">
+              <span className="text-xl font-bold text-slate-900 text-display">${fetchedListing.price.toFixed(2)}</span>
+              <span className="badge bg-slate-100 text-slate-600">
                 {fetchedListing.condition}
               </span>
             </div>
 
-            <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+            <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
               <Tag size={14} />
               {fetchedListing.category}
             </div>
 
-            <div className="border-t border-gray-100 pt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Item Specifics</h4>
+            <div className="border-t border-slate-100 pt-4">
+              <h4 className="text-sm font-medium text-slate-700 mb-2">Item Specifics</h4>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 {Object.entries(fetchedListing.specifics).map(([key, value]) => (
                   <div key={key}>
-                    <span className="text-gray-500">{key}:</span>{' '}
-                    <span className="text-gray-900">{value}</span>
+                    <span className="text-slate-500">{key}:</span>{' '}
+                    <span className="text-slate-900">{value}</span>
                   </div>
                 ))}
               </div>
@@ -232,24 +232,24 @@ export const SellSimilar: React.FC = () => {
           </div>
 
           {/* New Listing Form */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="card p-6">
             <div className="flex items-center gap-2 mb-4">
-              <FileText size={20} className="text-blue-600" />
-              <h2 className="text-lg font-medium text-gray-900">Your New Listing</h2>
+              <FileText size={20} className="text-ink-600" />
+              <h2 className="text-lg font-medium text-slate-900">Your New Listing</h2>
             </div>
 
             {created ? (
               <div className="text-center py-8">
-                <CheckCircle size={48} className="mx-auto text-green-500 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Item Added to Queue!</h3>
+                <CheckCircle size={48} className="mx-auto text-sage-500 mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-2">Item Added to Queue!</h3>
                 {createdItem && (
-                  <p className="text-sm text-gray-600 mb-2">SKU: <span className="font-mono font-medium">{createdItem.sku}</span></p>
+                  <p className="text-sm text-slate-600 mb-2">SKU: <span className="font-mono font-medium">{createdItem.sku}</span></p>
                 )}
-                <p className="text-gray-500 mb-4">Your item is now in the Review queue for processing</p>
+                <p className="text-slate-500 mb-4">Your item is now in the Review queue for processing</p>
                 <div className="flex gap-3 justify-center">
                   <a
                     href="/queue/review"
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                    className="btn-secondary"
                   >
                     View Queue
                   </a>
@@ -260,7 +260,7 @@ export const SellSimilar: React.FC = () => {
                       setCreated(false);
                       setCreatedItem(null);
                     }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    className="btn-primary"
                   >
                     Create Another
                   </button>
@@ -269,44 +269,44 @@ export const SellSimilar: React.FC = () => {
             ) : (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
                   <input
                     type="text"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     rows={6}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="input resize-none"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Price</label>
                     <div className="relative">
-                      <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
                         value={formData.price}
                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                        className="w-full pl-8 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input pl-8"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Condition</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Condition</label>
                     <select
                       value={formData.condition}
                       onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="input"
                     >
                       <option value="New">New</option>
                       <option value="Open Box">Open Box</option>
@@ -316,11 +316,11 @@ export const SellSimilar: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-100">
+                <div className="pt-4 border-t border-slate-100">
                   <button
                     onClick={handleCreate}
                     disabled={isCreating}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 disabled:opacity-50"
+                    className="w-full btn-primary py-3 disabled:opacity-50"
                   >
                     {isCreating ? (
                       <>
@@ -344,9 +344,11 @@ export const SellSimilar: React.FC = () => {
       {/* Empty State */}
       {!fetchedListing && !isFetching && (
         <div className="text-center py-16">
-          <Copy size={48} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Find an eBay listing to copy</h3>
-          <p className="text-gray-500 max-w-md mx-auto">
+          <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Copy size={28} className="text-slate-400" />
+          </div>
+          <h3 className="text-lg font-medium text-slate-800 mb-1.5">Find an eBay listing to copy</h3>
+          <p className="text-slate-500 max-w-md mx-auto text-sm">
             Enter an eBay URL or item ID above to fetch listing details and create a similar item in your inventory.
           </p>
         </div>

@@ -9,60 +9,61 @@ export const StatusBar: React.FC = () => {
   const { syncStatus, isSyncing, sync } = useAppStore();
 
   return (
-    <footer className="bg-gray-100 border-t border-gray-200 h-8 flex items-center justify-between px-4 text-xs text-gray-600 flex-shrink-0">
-      <div className="flex items-center gap-4">
+    <footer className="bg-slate-900 h-8 flex items-center justify-between px-5 text-xs flex-shrink-0">
+      <div className="flex items-center gap-3 text-slate-400">
         <span>
-          Domain: <strong>{user?.domain?.name || 'Not connected'}</strong>
+          <span className="text-slate-500">Domain:</span>{' '}
+          <span className="text-slate-300 font-medium">{user?.domain?.name || 'Local'}</span>
         </span>
-        <span className="hidden sm:inline">|</span>
+        <span className="text-slate-600 hidden sm:inline">|</span>
         <span className="hidden sm:inline">
-          Account: <strong>Main Store</strong>
+          <span className="text-slate-500">Account:</span>{' '}
+          <span className="text-slate-300 font-medium">Main Store</span>
         </span>
-        <span className="hidden sm:inline">|</span>
-        <span className="hidden sm:inline">
-          User: <strong>{user?.email || 'Not logged in'}</strong>
+        <span className="text-slate-600 hidden sm:inline">|</span>
+        <span className="hidden sm:inline text-slate-400">
+          {user?.email || 'Not logged in'}
         </span>
       </div>
 
-      <div className="flex items-center gap-4">
-        {/* Sync Status */}
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5">
           {syncStatus.isConnected ? (
             <>
-              <Wifi size={14} className="text-green-500" />
-              <span className="text-green-600">Connected</span>
+              <Wifi size={12} className="text-sage-400" />
+              <span className="text-sage-400">Connected</span>
             </>
           ) : (
             <>
-              <WifiOff size={14} className="text-red-500" />
-              <span className="text-red-600">Offline</span>
+              <WifiOff size={12} className="text-coral-400" />
+              <span className="text-coral-400">Offline</span>
             </>
           )}
         </div>
 
         {syncStatus.lastSyncAt && (
-          <span className="hidden sm:inline">
-            Last sync: {formatDistanceToNow(new Date(syncStatus.lastSyncAt), { addSuffix: true })}
+          <span className="hidden sm:inline text-slate-500">
+            {formatDistanceToNow(new Date(syncStatus.lastSyncAt), { addSuffix: true })}
           </span>
         )}
 
         {syncStatus.pendingChanges > 0 && (
-          <span className="flex items-center gap-1 text-orange-600">
-            <AlertCircle size={14} />
-            {syncStatus.pendingChanges} pending
+          <span className="flex items-center gap-1 text-amber-400">
+            <AlertCircle size={12} />
+            {syncStatus.pendingChanges}
           </span>
         )}
 
         <button
           onClick={sync}
           disabled={isSyncing}
-          className="flex items-center gap-1 hover:text-blue-600 disabled:opacity-50"
+          className="flex items-center gap-1 text-slate-400 hover:text-slate-200 disabled:opacity-50 transition-colors"
         >
-          <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
-          {isSyncing ? 'Syncing...' : 'Sync'}
+          <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+          {isSyncing ? 'Syncing' : 'Sync'}
         </button>
 
-        <span className="text-gray-400">v2.0.0</span>
+        <span className="text-slate-600">v2.0</span>
       </div>
     </footer>
   );

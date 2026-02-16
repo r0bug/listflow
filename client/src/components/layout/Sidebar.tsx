@@ -34,16 +34,16 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, children }) =
       <div>
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center justify-between px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          className="w-full flex items-center justify-between px-3 py-2 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-lg transition-colors"
         >
           <div className="flex items-center gap-3">
             {icon}
-            <span className="font-medium">{label}</span>
+            <span className="text-sm font-medium">{label}</span>
           </div>
-          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
         {expanded && (
-          <div className="ml-9 mt-1 space-y-1">
+          <div className="ml-9 mt-0.5 space-y-0.5 animate-fade-in">
             {children.map((child) => (
               <NavLink
                 key={child.to}
@@ -52,14 +52,14 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, children }) =
                   cn(
                     'flex items-center justify-between px-3 py-1.5 rounded-lg text-sm transition-colors',
                     isActive
-                      ? 'bg-blue-100 text-blue-700 font-medium'
-                      : 'text-gray-600 hover:bg-gray-100'
+                      ? 'bg-ink-50 text-ink-700 font-medium'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                   )
                 }
               >
                 <span>{child.label}</span>
                 {child.badge !== undefined && child.badge > 0 && (
-                  <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">
+                  <span className="bg-amber-500 text-white text-xs font-medium px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
                     {child.badge}
                   </span>
                 )}
@@ -78,17 +78,17 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, children }) =
         cn(
           'flex items-center justify-between px-3 py-2 rounded-lg transition-colors',
           isActive
-            ? 'bg-blue-100 text-blue-700 font-medium'
-            : 'text-gray-600 hover:bg-gray-100'
+            ? 'bg-ink-50 text-ink-700 font-medium'
+            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
         )
       }
     >
       <div className="flex items-center gap-3">
         {icon}
-        <span className="font-medium">{label}</span>
+        <span className="text-sm font-medium">{label}</span>
       </div>
       {badge !== undefined && badge > 0 && (
-        <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">
+        <span className="bg-amber-500 text-white text-xs font-medium px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
           {badge}
         </span>
       )}
@@ -104,15 +104,14 @@ export const Sidebar: React.FC = () => {
   }
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        <NavItem to="/" icon={<LayoutDashboard size={20} />} label="Dashboard" />
-
-        <NavItem to="/import" icon={<Upload size={20} />} label="Import" />
+    <aside className="w-60 bg-white border-r border-slate-200 flex flex-col h-full">
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <NavItem to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" />
+        <NavItem to="/import" icon={<Upload size={18} />} label="Import" />
 
         <NavItem
           to="/queue"
-          icon={<ListTodo size={20} />}
+          icon={<ListTodo size={18} />}
           label="Queue"
           children={[
             { to: '/queue/identify', label: 'Identify', badge: 12 },
@@ -124,7 +123,7 @@ export const Sidebar: React.FC = () => {
 
         <NavItem
           to="/listings"
-          icon={<Package size={20} />}
+          icon={<Package size={18} />}
           label="Listings"
           children={[
             { to: '/listings/active', label: 'Active' },
@@ -132,18 +131,14 @@ export const Sidebar: React.FC = () => {
           ]}
         />
 
-        <NavItem to="/inventory" icon={<Warehouse size={20} />} label="Inventory" />
+        <NavItem to="/inventory" icon={<Warehouse size={18} />} label="Inventory" />
+        <NavItem to="/templates" icon={<FileText size={18} />} label="Templates" />
+        <NavItem to="/sell-similar" icon={<Copy size={18} />} label="Sell Similar" />
+        <NavItem to="/research" icon={<Search size={18} />} label="Research" />
+        <NavItem to="/reports" icon={<BarChart3 size={18} />} label="Reports" />
 
-        <NavItem to="/templates" icon={<FileText size={20} />} label="Templates" />
-
-        <NavItem to="/sell-similar" icon={<Copy size={20} />} label="Sell Similar" />
-
-        <NavItem to="/research" icon={<Search size={20} />} label="Research" />
-
-        <NavItem to="/reports" icon={<BarChart3 size={20} />} label="Reports" />
-
-        <div className="pt-4 border-t border-gray-200 mt-4">
-          <NavItem to="/settings" icon={<Settings size={20} />} label="Settings" />
+        <div className="pt-3 mt-3 border-t border-slate-100">
+          <NavItem to="/settings" icon={<Settings size={18} />} label="Settings" />
         </div>
       </nav>
     </aside>

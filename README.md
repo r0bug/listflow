@@ -20,7 +20,16 @@ A comprehensive, AI-powered eBay listing workflow system that automates the list
 - **Queue/Kanban View** - Visual workflow management
 - **Item Detail/Review** - Full listing editor with AI assistance
 - **Template Manager** - Reusable listing blueprints with placeholders
+- **Reports** - Sales analytics with charts and team performance
+- **Sell Similar** - Create listings from existing eBay items
+- **Price Research** - Sold data lookup with statistics
 - **PIN Authentication** - Quick user switching on shared workstations
+
+### Design System ("Warm Industrial")
+- **Typography**: DM Sans (body) + Fraunces (display/headings)
+- **Color Palette**: Slate (neutrals), Ink (primary blue), Amber (warm accent), Sage (success), Coral (error), Plum (tags/badges)
+- **Component Library**: Cards, buttons, badges, stat cards, inputs, and table styles via CSS custom properties
+- **Built on**: Tailwind CSS v4 with `@theme` directive for design tokens
 
 ### Workflow Steps
 1. `INGEST` - Photos/identifiers enter system

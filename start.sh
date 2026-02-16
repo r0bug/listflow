@@ -27,8 +27,15 @@ fi
 
 # Check if node_modules exists
 if [ ! -d "$SCRIPT_DIR/node_modules" ]; then
-    echo -e "${YELLOW}Warning: Dependencies not installed. Run install.sh first.${NC}"
+    echo -e "${YELLOW}Warning: Backend dependencies not installed. Run install.sh first.${NC}"
     exit 1
+fi
+
+# Check if client node_modules exists, install if missing
+if [ ! -d "$SCRIPT_DIR/client/node_modules" ]; then
+    echo -e "${YELLOW}Installing frontend dependencies...${NC}"
+    cd "$SCRIPT_DIR/client" && npm install
+    cd "$SCRIPT_DIR"
 fi
 
 # Function to cleanup background processes
@@ -66,7 +73,7 @@ echo -e "${GREEN}║         ListFlow is running!             ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${CYAN}Backend API:${NC}  http://localhost:3001"
-echo -e "  ${CYAN}Frontend:${NC}     http://localhost:5173"
+echo -e "  ${CYAN}Frontend:${NC}     http://localhost:5176"
 echo ""
 echo -e "Press ${YELLOW}Ctrl+C${NC} to stop all services"
 echo ""
@@ -74,10 +81,10 @@ echo ""
 # Open browser (if available)
 if command -v xdg-open &> /dev/null; then
     sleep 2
-    xdg-open http://localhost:5173 2>/dev/null &
+    xdg-open http://localhost:5176 2>/dev/null &
 elif command -v open &> /dev/null; then
     sleep 2
-    open http://localhost:5173 2>/dev/null &
+    open http://localhost:5176 2>/dev/null &
 fi
 
 # Wait for processes

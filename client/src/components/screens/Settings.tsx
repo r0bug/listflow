@@ -188,44 +188,44 @@ export const Settings: React.FC = () => {
         return (
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Profile Information</h3>
+              <h3 className="text-lg font-medium text-slate-900 mb-4">Profile Information</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
                   <input
                     type="text"
                     value={profileForm.name}
                     onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
                   <input
                     type="email"
                     value={profileForm.email}
                     onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
                   <input
                     type="text"
                     value={user?.role || ''}
                     disabled
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500"
+                    className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-500"
                   />
                 </div>
               </div>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Location</h3>
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
-                <Building size={24} className="text-gray-400" />
+              <h3 className="text-lg font-medium text-slate-900 mb-4">Location</h3>
+              <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg">
+                <Building size={24} className="text-slate-400" />
                 <div>
-                  <p className="font-medium text-gray-900">{user?.domain?.name || 'No location assigned'}</p>
-                  <p className="text-sm text-gray-500">{user?.domain?.code || '-'}</p>
+                  <p className="font-medium text-slate-900">{user?.domain?.name || 'No location assigned'}</p>
+                  <p className="text-sm text-slate-500">{user?.domain?.code || '-'}</p>
                 </div>
               </div>
             </div>
@@ -237,31 +237,31 @@ export const Settings: React.FC = () => {
           <div className="space-y-6">
             {/* Connection Status Banner */}
             {ebayStatus.loading ? (
-              <div className="p-4 bg-gray-50 rounded-lg flex items-center gap-3">
-                <RefreshCw size={20} className="text-gray-400 animate-spin" />
-                <span className="text-gray-600">Checking eBay connection...</span>
+              <div className="p-4 bg-slate-50 rounded-lg flex items-center gap-3">
+                <RefreshCw size={20} className="text-slate-400 animate-spin" />
+                <span className="text-slate-600">Checking eBay connection...</span>
               </div>
             ) : ebayStatus.authenticated ? (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="p-4 bg-sage-50 border border-sage-200 rounded-lg">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                    <Check size={20} className="text-green-600" />
+                  <div className="w-10 h-10 bg-sage-100 rounded-full flex items-center justify-center">
+                    <Check size={20} className="text-sage-600" />
                   </div>
                   <div>
-                    <p className="font-medium text-green-900">Connected to eBay Production</p>
-                    <p className="text-sm text-green-700">
+                    <p className="font-medium text-sage-700">Connected to eBay Production</p>
+                    <p className="text-sm text-sage-600">
                       App ID: {ebayStatus.clientId} • Ready to list items
                     </p>
                   </div>
                 </div>
               </div>
             ) : ebayStatus.configured ? (
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                 <div className="flex items-center gap-3">
-                  <AlertCircle size={20} className="text-yellow-600" />
+                  <AlertCircle size={20} className="text-amber-600" />
                   <div>
-                    <p className="font-medium text-yellow-900">Credentials configured, but not authenticated</p>
-                    <p className="text-sm text-yellow-700">Get a user token from the eBay Developer Portal</p>
+                    <p className="font-medium text-amber-700">Credentials configured, but not authenticated</p>
+                    <p className="text-sm text-amber-600">Get a user token from the eBay Developer Portal</p>
                   </div>
                 </div>
               </div>
@@ -269,52 +269,52 @@ export const Settings: React.FC = () => {
 
             {/* Step 1: Developer Portal Credentials */}
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Step 1: Developer Portal Credentials</h3>
-              <p className="text-sm text-gray-500 mb-4">
+              <h3 className="text-lg font-medium text-slate-900 mb-2">Step 1: Developer Portal Credentials</h3>
+              <p className="text-sm text-slate-500 mb-4">
                 Get these from{' '}
-                <a href="https://developer.ebay.com/my/keys" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                <a href="https://developer.ebay.com/my/keys" target="_blank" rel="noopener noreferrer" className="text-ink-600 underline">
                   developer.ebay.com/my/keys
                 </a>
               </p>
-              <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+              <div className="space-y-4 p-4 bg-slate-50 rounded-lg">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">App ID (Client ID)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">App ID (Client ID)</label>
                   <input
                     type="text"
                     value={ebayForm.clientId}
                     onChange={(e) => setEbayForm({ ...ebayForm, clientId: e.target.value })}
                     placeholder="e.g., YourApp-PRD-abc123-456def"
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="input bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Cert ID (Client Secret)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Cert ID (Client Secret)</label>
                   <input
                     type="password"
                     value={ebayForm.clientSecret}
                     onChange={(e) => setEbayForm({ ...ebayForm, clientSecret: e.target.value })}
                     placeholder="PRD-abc123456-7890-abcd-efgh"
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="input bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Dev ID</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Dev ID</label>
                   <input
                     type="text"
                     value={ebayForm.devId || ''}
                     onChange={(e) => setEbayForm({ ...ebayForm, devId: e.target.value })}
                     placeholder="12345678-90ab-cdef-1234-567890abcdef"
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="input bg-white"
                   />
                 </div>
               </div>
             </div>
 
             {/* Environment Toggle */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
               <div>
-                <p className="font-medium text-gray-900">Environment</p>
-                <p className="text-sm text-gray-500">
+                <p className="font-medium text-slate-900">Environment</p>
+                <p className="text-sm text-slate-500">
                   {ebayForm.sandbox ? 'Testing with sandbox (no real listings)' : 'Production (real eBay listings)'}
                 </p>
               </div>
@@ -322,7 +322,7 @@ export const Settings: React.FC = () => {
                 onClick={() => setEbayForm({ ...ebayForm, sandbox: !ebayForm.sandbox })}
                 className={cn(
                   'relative w-12 h-6 rounded-full transition-colors',
-                  ebayForm.sandbox ? 'bg-yellow-500' : 'bg-green-500'
+                  ebayForm.sandbox ? 'bg-amber-500' : 'bg-sage-500'
                 )}
               >
                 <div
@@ -336,22 +336,22 @@ export const Settings: React.FC = () => {
 
             {/* Step 2: Account Authorization */}
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Step 2: Connect Your eBay Account</h3>
-              <p className="text-sm text-gray-500 mb-4">
+              <h3 className="text-lg font-medium text-slate-900 mb-2">Step 2: Connect Your eBay Account</h3>
+              <p className="text-sm text-slate-500 mb-4">
                 Authorize ListFlow to access your eBay seller account
               </p>
 
-              <div className="p-4 border border-gray-200 rounded-lg">
+              <div className="p-4 border border-slate-200 rounded-lg">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <p className="font-medium text-gray-900">eBay Account</p>
-                    <p className="text-sm text-gray-500">
+                    <p className="font-medium text-slate-900">eBay Account</p>
+                    <p className="text-sm text-slate-500">
                       {ebayForm.accountConnected ? 'Connected as seller123' : 'Not connected'}
                     </p>
                   </div>
                   <span className={cn(
                     'px-2 py-1 text-xs font-medium rounded-full',
-                    ebayForm.accountConnected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                    ebayForm.accountConnected ? 'badge-sage' : 'bg-slate-100 text-slate-600'
                   )}>
                     {ebayForm.accountConnected ? 'Connected' : 'Disconnected'}
                   </span>
@@ -391,21 +391,21 @@ export const Settings: React.FC = () => {
                       }
                     }}
                     disabled={!ebayForm.clientId || !ebayForm.clientSecret || !ebayForm.devId}
-                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="btn-primary w-full py-3"
                   >
                     Connect to {ebayForm.sandbox ? 'eBay Sandbox' : 'eBay Production'}
                   </button>
                 ) : (
                   <button
                     onClick={() => setEbayForm({ ...ebayForm, accountConnected: false })}
-                    className="w-full px-4 py-3 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100"
+                    className="w-full px-4 py-3 bg-coral-50 text-coral-600 rounded-lg font-medium hover:bg-coral-100"
                   >
                     Disconnect Account
                   </button>
                 )}
 
                 {(!ebayForm.clientId || !ebayForm.clientSecret || !ebayForm.devId) && (
-                  <p className="mt-2 text-xs text-yellow-600">
+                  <p className="mt-2 text-xs text-amber-600">
                     Enter all developer credentials above first (App ID, Cert ID, and Dev ID)
                   </p>
                 )}
@@ -413,9 +413,9 @@ export const Settings: React.FC = () => {
             </div>
 
             {/* Help Section */}
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-medium text-blue-900 mb-2">How eBay Authentication Works</h4>
-              <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+            <div className="p-4 bg-ink-50 border border-ink-200 rounded-lg">
+              <h4 className="font-medium text-ink-900 mb-2">How eBay Authentication Works</h4>
+              <ol className="text-sm text-ink-700 space-y-1 list-decimal list-inside">
                 <li>Create an app at developer.ebay.com to get API credentials</li>
                 <li>Enter the App ID, Cert ID, and Dev ID above</li>
                 <li>Click "Connect eBay Account" to authorize with your seller account</li>
@@ -429,10 +429,10 @@ export const Settings: React.FC = () => {
         return (
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">AI Configuration</h3>
+              <h3 className="text-lg font-medium text-slate-900 mb-4">AI Configuration</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     <Key size={16} className="inline mr-1" />
                     Segmind API Key
                   </label>
@@ -441,36 +441,36 @@ export const Settings: React.FC = () => {
                     value={aiForm.segmindApiKey}
                     onChange={(e) => setAiForm({ ...aiForm, segmindApiKey: e.target.value })}
                     placeholder="Enter your Segmind API key"
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-slate-500">
                     Get your API key from{' '}
-                    <a href="https://www.segmind.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                    <a href="https://www.segmind.com" target="_blank" rel="noopener noreferrer" className="text-ink-600 underline">
                       segmind.com
                     </a>
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Default Model</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Default Model</label>
                   <select
                     value={aiForm.defaultModel}
                     onChange={(e) => setAiForm({ ...aiForm, defaultModel: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input"
                   >
                     <option value="llava">LLaVA (Fast)</option>
                     <option value="claude">Claude (Accurate)</option>
                   </select>
                 </div>
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
                   <div>
-                    <p className="font-medium text-gray-900">Auto-Analyze Photos</p>
-                    <p className="text-sm text-gray-500">Automatically analyze photos on upload</p>
+                    <p className="font-medium text-slate-900">Auto-Analyze Photos</p>
+                    <p className="text-sm text-slate-500">Automatically analyze photos on upload</p>
                   </div>
                   <button
                     onClick={() => setAiForm({ ...aiForm, autoAnalyze: !aiForm.autoAnalyze })}
                     className={cn(
                       'relative w-12 h-6 rounded-full transition-colors',
-                      aiForm.autoAnalyze ? 'bg-blue-600' : 'bg-gray-200'
+                      aiForm.autoAnalyze ? 'bg-ink-600' : 'bg-slate-200'
                     )}
                   >
                     <div
@@ -489,17 +489,17 @@ export const Settings: React.FC = () => {
       case 'notifications':
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Notification Preferences</h3>
+            <h3 className="text-lg font-medium text-slate-900 mb-4">Notification Preferences</h3>
             {[
               { key: 'emailNotifications', label: 'Email Notifications', desc: 'Receive notifications via email' },
               { key: 'itemSold', label: 'Item Sold Alerts', desc: 'Get notified when an item sells' },
               { key: 'priceAlerts', label: 'Price Alerts', desc: 'Alerts when watched items change price' },
               { key: 'dailyDigest', label: 'Daily Digest', desc: 'Daily summary of activity' },
             ].map((setting) => (
-              <div key={setting.key} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div key={setting.key} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
                 <div>
-                  <p className="font-medium text-gray-900">{setting.label}</p>
-                  <p className="text-sm text-gray-500">{setting.desc}</p>
+                  <p className="font-medium text-slate-900">{setting.label}</p>
+                  <p className="text-sm text-slate-500">{setting.desc}</p>
                 </div>
                 <button
                   onClick={() => setNotificationSettings({
@@ -508,7 +508,7 @@ export const Settings: React.FC = () => {
                   })}
                   className={cn(
                     'relative w-12 h-6 rounded-full transition-colors',
-                    notificationSettings[setting.key as keyof typeof notificationSettings] ? 'bg-blue-600' : 'bg-gray-200'
+                    notificationSettings[setting.key as keyof typeof notificationSettings] ? 'bg-ink-600' : 'bg-slate-200'
                   )}
                 >
                   <div
@@ -526,10 +526,10 @@ export const Settings: React.FC = () => {
       case 'appearance':
         return (
           <div className="space-y-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Appearance Settings</h3>
+            <h3 className="text-lg font-medium text-slate-900 mb-4">Appearance Settings</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Theme</label>
+                <label className="block text-sm font-medium text-slate-700 mb-3">Theme</label>
                 <div className="grid grid-cols-3 gap-4">
                   {(['light', 'dark', 'system'] as const).map((themeOption) => (
                     <button
@@ -537,13 +537,13 @@ export const Settings: React.FC = () => {
                       onClick={() => handleThemeChange(themeOption)}
                       className={cn(
                         'p-4 rounded-lg border-2 text-center transition-colors',
-                        theme === themeOption ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                        theme === themeOption ? 'border-ink-500 bg-ink-50' : 'border-slate-200 hover:border-slate-300'
                       )}
                     >
                       <div className={cn(
                         'w-8 h-8 rounded-full mx-auto mb-2',
-                        themeOption === 'light' ? 'bg-white border border-gray-200' :
-                        themeOption === 'dark' ? 'bg-gray-800' : 'bg-gradient-to-r from-white to-gray-800'
+                        themeOption === 'light' ? 'bg-white border border-slate-200' :
+                        themeOption === 'dark' ? 'bg-slate-800' : 'bg-gradient-to-r from-white to-slate-800'
                       )} />
                       <span className="text-sm font-medium capitalize">{themeOption}</span>
                     </button>
@@ -551,8 +551,8 @@ export const Settings: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Default View</label>
-                <select className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <label className="block text-sm font-medium text-slate-700 mb-3">Default View</label>
+                <select className="input">
                   <option>Dashboard</option>
                   <option>Queue</option>
                   <option>Import</option>
@@ -565,17 +565,17 @@ export const Settings: React.FC = () => {
       case 'security':
         return (
           <div className="space-y-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Security Settings</h3>
+            <h3 className="text-lg font-medium text-slate-900 mb-4">Security Settings</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Change PIN</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Change PIN</label>
                 <input
                   type="password"
                   placeholder="Current PIN"
                   maxLength={4}
                   value={pinForm.currentPin}
                   onChange={(e) => setPinForm({ ...pinForm, currentPin: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+                  className="input mb-2"
                 />
                 <input
                   type="password"
@@ -583,7 +583,7 @@ export const Settings: React.FC = () => {
                   maxLength={4}
                   value={pinForm.newPin}
                   onChange={(e) => setPinForm({ ...pinForm, newPin: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+                  className="input mb-2"
                 />
                 <input
                   type="password"
@@ -591,37 +591,37 @@ export const Settings: React.FC = () => {
                   maxLength={4}
                   value={pinForm.confirmPin}
                   onChange={(e) => setPinForm({ ...pinForm, confirmPin: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input"
                 />
               </div>
               {pinError && (
-                <div className="flex items-center gap-2 text-red-600 text-sm">
+                <div className="flex items-center gap-2 text-coral-600 text-sm">
                   <AlertCircle size={16} />
                   {pinError}
                 </div>
               )}
               {pinSuccess && (
-                <div className="flex items-center gap-2 text-green-600 text-sm">
+                <div className="flex items-center gap-2 text-sage-600 text-sm">
                   <Check size={16} />
                   {pinSuccess}
                 </div>
               )}
               <button
                 onClick={handleUpdatePin}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="btn-primary"
               >
                 Update PIN
               </button>
             </div>
-            <div className="pt-6 border-t border-gray-200">
-              <h4 className="font-medium text-gray-900 mb-4">Active Sessions</h4>
-              <div className="p-4 bg-gray-50 rounded-lg">
+            <div className="pt-6 border-t border-slate-200">
+              <h4 className="font-medium text-slate-900 mb-4">Active Sessions</h4>
+              <div className="p-4 bg-slate-50 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-gray-900">Current Session</p>
-                    <p className="text-sm text-gray-500">Chrome on Linux</p>
+                    <p className="font-medium text-slate-900">Current Session</p>
+                    <p className="text-sm text-slate-500">Chrome on Linux</p>
                   </div>
-                  <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                  <span className="badge-sage">
                     Active
                   </span>
                 </div>
@@ -636,12 +636,12 @@ export const Settings: React.FC = () => {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-6 animate-fade-in">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-500">Manage your account and preferences</p>
+          <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+          <p className="text-slate-500">Manage your account and preferences</p>
         </div>
 
         <div className="flex gap-6">
@@ -655,8 +655,8 @@ export const Settings: React.FC = () => {
                   className={cn(
                     'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                     activeTab === tab.id
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-gray-600 hover:bg-gray-50'
+                      ? 'bg-ink-50 text-ink-600'
+                      : 'text-slate-600 hover:bg-slate-50'
                   )}
                 >
                   {tab.icon}
@@ -667,13 +667,13 @@ export const Settings: React.FC = () => {
           </div>
 
           {/* Content */}
-          <div className="flex-1 bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex-1 card p-6">
             {renderContent()}
 
             {/* Save Button */}
-            <div className="mt-8 pt-6 border-t border-gray-200 flex items-center justify-between">
+            <div className="mt-8 pt-6 border-t border-slate-200 flex items-center justify-between">
               {savedMessage && (
-                <div className="flex items-center gap-2 text-green-600">
+                <div className="flex items-center gap-2 text-sage-600">
                   <Check size={20} />
                   <span className="text-sm">{savedMessage}</span>
                 </div>
@@ -681,7 +681,7 @@ export const Settings: React.FC = () => {
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="ml-auto flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+                className="btn-primary ml-auto flex items-center gap-2"
               >
                 {isSaving ? (
                   <>

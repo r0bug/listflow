@@ -323,19 +323,19 @@ export const ItemDetail: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="h-full flex items-center justify-center animate-fade-in">
+        <Loader2 className="w-8 h-8 animate-spin text-ink-600" />
       </div>
     );
   }
 
   if (error || !item) {
     return (
-      <div className="h-full flex flex-col items-center justify-center">
-        <p className="text-red-600 mb-4">{error || 'Item not found'}</p>
+      <div className="h-full flex flex-col items-center justify-center animate-fade-in">
+        <p className="text-coral-600 mb-4">{error || 'Item not found'}</p>
         <button
           onClick={() => navigate(-1)}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+          className="btn-secondary"
         >
           Go Back
         </button>
@@ -344,16 +344,16 @@ export const ItemDetail: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">
+          <h1 className="text-xl font-bold text-slate-900">
             ITEM: {item.displayId}
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-slate-500">
             Step: {item.currentStep}
-            {hasChanges && <span className="ml-2 text-orange-500">• Unsaved changes</span>}
+            {hasChanges && <span className="ml-2 text-amber-600">• Unsaved changes</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -362,7 +362,7 @@ export const ItemDetail: React.FC = () => {
             <button
               onClick={saveChanges}
               disabled={isSaving}
-              className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="btn-primary disabled:opacity-50"
             >
               {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               Save
@@ -370,7 +370,7 @@ export const ItemDetail: React.FC = () => {
           )}
           {/* Success message */}
           {successMessage && (
-            <span className="flex items-center gap-1 text-green-600 text-sm">
+            <span className="flex items-center gap-1 text-sage-600 text-sm font-medium">
               <Check size={16} />
               {successMessage}
             </span>
@@ -379,7 +379,7 @@ export const ItemDetail: React.FC = () => {
           <button
             onClick={() => handleNavigate('prev')}
             disabled={!navigation.prevId}
-            className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-2 hover:bg-slate-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             title="Previous item"
           >
             <ChevronLeft size={20} />
@@ -387,7 +387,7 @@ export const ItemDetail: React.FC = () => {
           <button
             onClick={() => handleNavigate('next')}
             disabled={!navigation.nextId}
-            className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-2 hover:bg-slate-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             title="Next item"
           >
             <ChevronRight size={20} />
@@ -397,10 +397,10 @@ export const ItemDetail: React.FC = () => {
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-auto">
         {/* Left Column - Photos & AI Analysis */}
-        <div className="space-y-4">
+        <div className="space-y-4 animate-slide-up">
           {/* Photo Gallery */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="aspect-square bg-gray-100 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+          <div className="card p-4">
+            <div className="aspect-square bg-slate-100 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
               {item.photos[selectedPhotoIndex]?.url ? (
                 <img
                   src={item.photos[selectedPhotoIndex].url}
@@ -412,7 +412,7 @@ export const ItemDetail: React.FC = () => {
                   }}
                 />
               ) : (
-                <div className="flex flex-col items-center text-gray-400">
+                <div className="flex flex-col items-center text-slate-400">
                   <Camera size={48} />
                   <span className="mt-2">No image</span>
                 </div>
@@ -424,16 +424,16 @@ export const ItemDetail: React.FC = () => {
                   key={photo.id}
                   onClick={() => setSelectedPhotoIndex(index)}
                   className={cn(
-                    'w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center border-2 transition-colors overflow-hidden',
+                    'w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center border-2 transition-all overflow-hidden',
                     index === selectedPhotoIndex
-                      ? 'border-blue-500'
-                      : 'border-transparent hover:border-gray-300'
+                      ? 'border-ink-500 shadow-sm'
+                      : 'border-transparent hover:border-slate-300'
                   )}
                 >
                   {photo.url ? (
                     <img src={photo.url} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-xs text-gray-500">{index + 1}</span>
+                    <span className="text-xs text-slate-500">{index + 1}</span>
                   )}
                 </button>
               ))}
@@ -441,9 +441,9 @@ export const ItemDetail: React.FC = () => {
           </div>
 
           {/* AI Analysis */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <h3 className="font-semibold text-gray-900 mb-3">AI Analysis</h3>
-            <p className="text-sm text-gray-600 mb-4 italic">
+          <div className="card p-4">
+            <h3 className="font-semibold text-slate-900 mb-3">AI Analysis</h3>
+            <p className="text-sm text-slate-600 mb-4 italic">
               "{item.aiAnalysis.justification}"
             </p>
             <div className="flex items-center justify-between text-sm">
@@ -453,35 +453,35 @@ export const ItemDetail: React.FC = () => {
                   className={cn(
                     'font-medium',
                     item.aiAnalysis.confidence >= 90
-                      ? 'text-green-600'
+                      ? 'text-sage-600'
                       : item.aiAnalysis.confidence >= 70
-                        ? 'text-yellow-600'
-                        : 'text-red-600'
+                        ? 'text-amber-600'
+                        : 'text-coral-600'
                   )}
                 >
                   {item.aiAnalysis.confidence}%
                 </span>
               </span>
-              <span className="text-gray-500">
-                Model: {item.aiAnalysis.model}
+              <span className="badge-plum">
+                {item.aiAnalysis.model}
               </span>
             </div>
           </div>
         </div>
 
         {/* Right Column - Listing Details */}
-        <div className="space-y-4">
+        <div className="space-y-4 animate-slide-up">
           {/* Title */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-gray-900">Title</h3>
+              <h3 className="font-semibold text-slate-900">Title</h3>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">
-                  AI Confidence: {item.aiAnalysis.confidence}%
+                <span className="badge-ink">
+                  AI: {item.aiAnalysis.confidence}%
                 </span>
                 <button
                   onClick={() => setEditingTitle(!editingTitle)}
-                  className="text-blue-600 text-sm hover:text-blue-800 flex items-center gap-1"
+                  className="text-ink-600 text-sm hover:text-ink-800 flex items-center gap-1 transition-colors"
                 >
                   <Edit2 size={14} />
                   {editingTitle ? 'Done' : 'Edit'}
@@ -493,34 +493,34 @@ export const ItemDetail: React.FC = () => {
                 type="text"
                 value={item.title}
                 onChange={(e) => updateField('title', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input"
                 autoFocus
               />
             ) : (
-              <p className="text-gray-700">{item.title}</p>
+              <p className="text-slate-700">{item.title}</p>
             )}
           </div>
 
           {/* Category */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-gray-900">Category</h3>
+              <h3 className="font-semibold text-slate-900">Category</h3>
               <button
                 onClick={() => setShowCategoryModal(true)}
-                className="text-blue-600 text-sm hover:text-blue-800"
+                className="text-ink-600 text-sm hover:text-ink-800 transition-colors"
               >
                 Change Category
               </button>
             </div>
-            <p className="text-gray-700">{item.category}</p>
+            <p className="text-slate-700">{item.category}</p>
           </div>
 
           {/* Category Modal */}
           {showCategoryModal && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[80vh] overflow-auto">
-                <h3 className="font-semibold text-gray-900 mb-4">Select Category</h3>
-                <div className="space-y-2">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+              <div className="card p-6 w-full max-w-md max-h-[80vh] overflow-auto animate-slide-up">
+                <h3 className="font-semibold text-slate-900 mb-4">Select Category</h3>
+                <div className="space-y-1">
                   {COMMON_CATEGORIES.map((cat) => (
                     <button
                       key={cat}
@@ -529,8 +529,10 @@ export const ItemDetail: React.FC = () => {
                         setShowCategoryModal(false);
                       }}
                       className={cn(
-                        'w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50',
-                        item.category === cat ? 'bg-blue-100 text-blue-700' : 'text-gray-700'
+                        'w-full text-left px-3 py-2 rounded-lg transition-colors',
+                        item.category === cat
+                          ? 'bg-ink-100 text-ink-700 font-medium'
+                          : 'text-slate-700 hover:bg-ink-50'
                       )}
                     >
                       {cat}
@@ -541,7 +543,7 @@ export const ItemDetail: React.FC = () => {
                   <input
                     type="text"
                     placeholder="Or enter custom category..."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && e.currentTarget.value) {
                         updateField('category', e.currentTarget.value);
@@ -552,7 +554,7 @@ export const ItemDetail: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setShowCategoryModal(false)}
-                  className="mt-4 w-full px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+                  className="btn-secondary mt-4 w-full"
                 >
                   Cancel
                 </button>
@@ -561,12 +563,12 @@ export const ItemDetail: React.FC = () => {
           )}
 
           {/* Condition */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <h3 className="font-semibold text-gray-900 mb-2">Condition</h3>
+          <div className="card p-4">
+            <h3 className="font-semibold text-slate-900 mb-2">Condition</h3>
             <select
               value={item.condition}
               onChange={(e) => updateField('condition', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input"
             >
               <option value="New">New</option>
               <option value="Open Box">Open Box</option>
@@ -578,12 +580,12 @@ export const ItemDetail: React.FC = () => {
           </div>
 
           {/* Item Specifics */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="card p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-900">Item Specifics</h3>
+              <h3 className="font-semibold text-slate-900">Item Specifics</h3>
               <button
                 onClick={() => setShowAddSpecificModal(true)}
-                className="flex items-center gap-1 text-blue-600 text-sm hover:text-blue-800"
+                className="flex items-center gap-1 text-ink-600 text-sm hover:text-ink-800 transition-colors"
               >
                 <Plus size={14} />
                 Add Specific
@@ -591,22 +593,22 @@ export const ItemDetail: React.FC = () => {
             </div>
             <div className="space-y-2">
               {item.itemSpecifics.length === 0 ? (
-                <p className="text-gray-500 text-sm">No item specifics added</p>
+                <p className="text-slate-500 text-sm">No item specifics added</p>
               ) : (
                 item.itemSpecifics.map((specific, index) => (
                   <div key={index} className="flex items-center gap-2">
-                    <span className="text-gray-500 w-28 flex-shrink-0 text-sm">
+                    <span className="text-slate-500 w-28 flex-shrink-0 text-sm">
                       {specific.name}:
                     </span>
                     <input
                       type="text"
                       value={specific.value}
                       onChange={(e) => handleUpdateSpecific(index, e.target.value)}
-                      className="flex-1 px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="flex-1 px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-ink-500/20 focus:border-ink-500 transition-colors"
                     />
                     <button
                       onClick={() => handleRemoveSpecific(index)}
-                      className="text-gray-400 hover:text-red-500 p-1"
+                      className="text-slate-400 hover:text-coral-500 p-1 transition-colors"
                       title="Remove"
                     >
                       <Trash2 size={16} />
@@ -619,29 +621,29 @@ export const ItemDetail: React.FC = () => {
 
           {/* Add Specific Modal */}
           {showAddSpecificModal && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 w-full max-w-sm">
-                <h3 className="font-semibold text-gray-900 mb-4">Add Item Specific</h3>
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+              <div className="card p-6 w-full max-w-sm animate-slide-up">
+                <h3 className="font-semibold text-slate-900 mb-4">Add Item Specific</h3>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
                     <input
                       type="text"
                       value={newSpecific.name}
                       onChange={(e) => setNewSpecific({ ...newSpecific, name: e.target.value })}
                       placeholder="e.g., Brand, Color, Size"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="input"
                       autoFocus
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Value</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Value</label>
                     <input
                       type="text"
                       value={newSpecific.value}
                       onChange={(e) => setNewSpecific({ ...newSpecific, value: e.target.value })}
                       placeholder="e.g., Sony, Blue, Large"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="input"
                     />
                   </div>
                 </div>
@@ -651,14 +653,14 @@ export const ItemDetail: React.FC = () => {
                       setShowAddSpecificModal(false);
                       setNewSpecific({ name: '', value: '' });
                     }}
-                    className="flex-1 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+                    className="btn-secondary flex-1"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleAddSpecific}
                     disabled={!newSpecific.name.trim()}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    className="btn-primary flex-1 disabled:opacity-50"
                   >
                     Add
                   </button>
@@ -668,12 +670,12 @@ export const ItemDetail: React.FC = () => {
           )}
 
           {/* Description Preview */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-gray-900">Description</h3>
+              <h3 className="font-semibold text-slate-900">Description</h3>
               <button
                 onClick={() => setEditingDescription(!editingDescription)}
-                className="text-blue-600 text-sm hover:text-blue-800 flex items-center gap-1"
+                className="text-ink-600 text-sm hover:text-ink-800 flex items-center gap-1 transition-colors"
               >
                 <Edit2 size={14} />
                 {editingDescription ? 'Done' : 'Edit'}
@@ -683,11 +685,11 @@ export const ItemDetail: React.FC = () => {
               <textarea
                 value={item.description}
                 onChange={(e) => updateField('description', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[150px]"
+                className="input min-h-[150px]"
               />
             ) : (
               <div
-                className="prose prose-sm max-h-40 overflow-auto text-gray-600"
+                className="prose prose-sm max-h-40 overflow-auto text-slate-600"
                 dangerouslySetInnerHTML={{ __html: item.description || '<em>No description</em>' }}
               />
             )}
@@ -697,15 +699,15 @@ export const ItemDetail: React.FC = () => {
 
       {/* Redo Context Input */}
       {showRedoInput && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="card p-4 mt-4 animate-slide-up">
+          <label className="block text-sm font-medium text-slate-700 mb-2">
             Additional Context for AI (if redoing):
           </label>
           <textarea
             value={redoContext}
             onChange={(e) => setRedoContext(e.target.value)}
             placeholder="This is actually the digital edition, not the disc version..."
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input"
             rows={2}
           />
         </div>
@@ -713,17 +715,17 @@ export const ItemDetail: React.FC = () => {
 
       {/* Error message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg mt-4">
+        <div className="bg-coral-50 border border-coral-200 text-coral-700 px-4 py-2 rounded-lg mt-4 animate-fade-in">
           {error}
-          <button onClick={() => setError(null)} className="ml-2 text-red-500 hover:text-red-700">×</button>
+          <button onClick={() => setError(null)} className="ml-2 text-coral-500 hover:text-coral-700 transition-colors">×</button>
         </div>
       )}
 
       {/* Action Buttons */}
-      <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+      <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+          className="btn-secondary"
         >
           <ChevronLeft size={18} />
           Back to Queue
@@ -732,14 +734,14 @@ export const ItemDetail: React.FC = () => {
           <button
             onClick={handleReject}
             disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-coral-200 text-coral-600 font-medium rounded-lg hover:bg-coral-50 disabled:opacity-50 transition-colors"
           >
             <X size={18} />
             Reject
           </button>
           <button
             onClick={() => setShowRedoInput(!showRedoInput)}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+            className="btn-secondary"
           >
             <RotateCcw size={18} />
             Redo with Context
@@ -748,7 +750,7 @@ export const ItemDetail: React.FC = () => {
             <button
               onClick={handleRedo}
               disabled={isSaving}
-              className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+              className="btn-warm disabled:opacity-50"
             >
               {isSaving && <Loader2 size={16} className="animate-spin" />}
               Submit Redo
@@ -757,7 +759,7 @@ export const ItemDetail: React.FC = () => {
           <button
             onClick={handleAccept}
             disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-sage-600 text-white font-medium rounded-lg hover:bg-sage-700 hover:shadow-md disabled:opacity-50 transition-all duration-150"
           >
             {isSaving && <Loader2 size={16} className="animate-spin" />}
             Accept & Next

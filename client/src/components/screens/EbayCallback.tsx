@@ -77,37 +77,37 @@ export const EbayCallback: React.FC = () => {
   }, [searchParams, navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="card p-8 shadow-lg max-w-md w-full text-center animate-fade-in">
         {status === 'loading' && (
           <>
-            <Loader2 size={48} className="mx-auto mb-4 text-blue-600 animate-spin" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Connecting to eBay</h2>
-            <p className="text-gray-500">{message}</p>
+            <Loader2 size={48} className="mx-auto mb-4 text-ink-600 animate-spin" />
+            <h2 className="text-xl font-semibold text-slate-900 mb-2">Connecting to eBay</h2>
+            <p className="text-slate-500">{message}</p>
           </>
         )}
 
         {status === 'success' && (
           <>
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Check size={32} className="text-green-600" />
+            <div className="w-16 h-16 bg-sage-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Check size={32} className="text-sage-600" />
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Connected!</h2>
-            <p className="text-gray-500">{message}</p>
-            <p className="text-sm text-gray-400 mt-4">Redirecting to settings...</p>
+            <h2 className="text-xl font-semibold text-slate-900 mb-2">Connected!</h2>
+            <p className="text-slate-500">{message}</p>
+            <p className="text-sm text-slate-400 mt-4">Redirecting to settings...</p>
           </>
         )}
 
         {status === 'error' && (
           <>
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <X size={32} className="text-red-600" />
+            <div className="w-16 h-16 bg-coral-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <X size={32} className="text-coral-600" />
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Connection Failed</h2>
-            <p className="text-gray-500 mb-6">{message}</p>
+            <h2 className="text-xl font-semibold text-slate-900 mb-2">Connection Failed</h2>
+            <p className="text-slate-500 mb-6">{message}</p>
             <button
               onClick={() => navigate('/settings?tab=ebay')}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+              className="btn-primary"
             >
               Back to Settings
             </button>

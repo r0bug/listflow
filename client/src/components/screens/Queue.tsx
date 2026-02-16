@@ -15,36 +15,36 @@ interface ItemCardProps {
 const ItemCard: React.FC<ItemCardProps> = ({ id, title, thumbnail, confidence, price }) => {
   const confidenceColor =
     confidence === undefined
-      ? 'bg-gray-100'
+      ? 'bg-slate-100'
       : confidence >= 90
-        ? 'bg-green-100 text-green-800'
+        ? 'badge-sage'
         : confidence >= 70
-          ? 'bg-yellow-100 text-yellow-800'
-          : 'bg-red-100 text-red-800';
+          ? 'badge-amber'
+          : 'badge-coral';
 
   return (
     <Link
       to={`/item/${id}`}
-      className="block bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow"
+      className="block card-hover p-3"
     >
-      <div className="aspect-square bg-gray-100 rounded mb-2 overflow-hidden">
+      <div className="aspect-square bg-slate-100 rounded-lg mb-2 overflow-hidden">
         {thumbnail ? (
           <img src={thumbnail} alt={title} className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400">
+          <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">
             No image
           </div>
         )}
       </div>
-      <h3 className="font-medium text-sm text-gray-900 truncate">{title}</h3>
+      <h3 className="font-medium text-sm text-slate-900 truncate">{title}</h3>
       <div className="flex items-center justify-between mt-2">
         {confidence !== undefined && (
-          <span className={cn('text-xs px-2 py-0.5 rounded', confidenceColor)}>
+          <span className={cn('text-xs px-2 py-0.5 rounded-md', confidenceColor)}>
             {confidence}%
           </span>
         )}
         {price !== undefined && (
-          <span className="text-sm font-medium text-green-600">${price.toFixed(2)}</span>
+          <span className="text-sm font-semibold text-sage-600">${price.toFixed(2)}</span>
         )}
       </div>
     </Link>
@@ -59,14 +59,19 @@ interface ColumnProps {
 
 const Column: React.FC<ColumnProps> = ({ title, count, items }) => (
   <div className="flex flex-col min-w-[280px] max-w-[320px]">
-    <div className="flex items-center justify-between px-2 py-3 bg-gray-100 rounded-t-lg">
-      <h3 className="font-semibold text-gray-700">{title}</h3>
-      <span className="bg-gray-200 text-gray-600 text-sm px-2 py-0.5 rounded">{count}</span>
+    <div className="flex items-center justify-between px-3 py-3 bg-slate-100 rounded-t-xl border border-b-0 border-slate-200">
+      <h3 className="font-semibold text-slate-700 text-sm tracking-wide">{title}</h3>
+      <span className="badge text-xs">{count}</span>
     </div>
-    <div className="flex-1 bg-gray-50 rounded-b-lg p-2 space-y-2 overflow-y-auto max-h-[calc(100vh-300px)]">
+    <div className="flex-1 bg-slate-50 rounded-b-xl border border-t-0 border-slate-200 p-2.5 space-y-2.5 overflow-y-auto max-h-[calc(100vh-300px)]">
       {items.map((item) => (
         <ItemCard key={item.id} {...item} />
       ))}
+      {items.length === 0 && (
+        <div className="text-center py-8 text-slate-400 text-sm">
+          No items
+        </div>
+      )}
     </div>
   </div>
 );
@@ -278,19 +283,19 @@ export const Queue: React.FC = () => {
     filters.hasPrice !== null;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Queue</h1>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-slate-900">Queue</h1>
+        <div className="flex items-center gap-3">
           <div className="relative">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search..."
+              placeholder="Search items..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input pl-10 pr-4 py-2 w-64"
             />
           </div>
 
@@ -299,13 +304,15 @@ export const Queue: React.FC = () => {
             <button
               onClick={() => setShowFilterDropdown(!showFilterDropdown)}
               className={cn(
-                "p-2 border rounded-lg hover:bg-gray-50 flex items-center gap-1",
-                hasActiveFilters ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200"
+                "p-2 border rounded-lg transition-colors flex items-center gap-1",
+                hasActiveFilters
+                  ? "border-ink-300 bg-ink-50 text-ink-600"
+                  : "border-slate-200 hover:bg-slate-50 text-slate-600"
               )}
             >
               <Filter size={18} />
               {hasActiveFilters && (
-                <span className="text-xs bg-blue-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                <span className="text-xs bg-ink-600 text-white rounded-full w-4 h-4 flex items-center justify-center font-medium">
                   !
                 </span>
               )}
@@ -313,13 +320,13 @@ export const Queue: React.FC = () => {
             </button>
 
             {showFilterDropdown && (
-              <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-20">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold text-gray-900">Filters</h3>
+              <div className="absolute right-0 mt-2 w-72 card p-4 z-20 shadow-lg animate-slide-up">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-slate-900">Filters</h3>
                   {hasActiveFilters && (
                     <button
                       onClick={resetFilters}
-                      className="text-xs text-blue-600 hover:text-blue-800"
+                      className="text-xs text-ink-600 hover:text-ink-800 font-medium"
                     >
                       Reset all
                     </button>
@@ -327,12 +334,12 @@ export const Queue: React.FC = () => {
                 </div>
 
                 {/* Step Filter */}
-                <div className="mb-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Step</label>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Step</label>
                   <select
                     value={filters.step}
                     onChange={(e) => setFilters({ ...filters, step: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    className="input w-full text-sm"
                   >
                     <option value="all">All Steps</option>
                     <option value="identify">Identify</option>
@@ -343,8 +350,8 @@ export const Queue: React.FC = () => {
                 </div>
 
                 {/* Confidence Filter */}
-                <div className="mb-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Confidence</label>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Confidence</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
@@ -354,11 +361,11 @@ export const Queue: React.FC = () => {
                         ...filters,
                         confidenceMin: e.target.value ? parseInt(e.target.value) : null
                       })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                      className="input w-full text-sm"
                       min="0"
                       max="100"
                     />
-                    <span className="text-gray-400">-</span>
+                    <span className="text-slate-400 font-medium">-</span>
                     <input
                       type="number"
                       placeholder="Max"
@@ -367,7 +374,7 @@ export const Queue: React.FC = () => {
                         ...filters,
                         confidenceMax: e.target.value ? parseInt(e.target.value) : null
                       })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                      className="input w-full text-sm"
                       min="0"
                       max="100"
                     />
@@ -375,15 +382,15 @@ export const Queue: React.FC = () => {
                 </div>
 
                 {/* Has Price Filter */}
-                <div className="mb-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Pricing Status</label>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Pricing Status</label>
                   <select
                     value={filters.hasPrice === null ? 'all' : filters.hasPrice ? 'priced' : 'unpriced'}
                     onChange={(e) => setFilters({
                       ...filters,
                       hasPrice: e.target.value === 'all' ? null : e.target.value === 'priced'
                     })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    className="input w-full text-sm"
                   >
                     <option value="all">All</option>
                     <option value="priced">Has Price</option>
@@ -393,7 +400,7 @@ export const Queue: React.FC = () => {
 
                 <button
                   onClick={() => setShowFilterDropdown(false)}
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                  className="btn-primary w-full text-sm"
                 >
                   Apply Filters
                 </button>
@@ -401,12 +408,12 @@ export const Queue: React.FC = () => {
             )}
           </div>
 
-          <div className="flex border border-gray-200 rounded-lg overflow-hidden">
+          <div className="flex border border-slate-200 rounded-lg overflow-hidden">
             <button
               onClick={() => setViewMode('kanban')}
               className={cn(
-                'p-2',
-                viewMode === 'kanban' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-50'
+                'p-2 transition-colors',
+                viewMode === 'kanban' ? 'bg-ink-100 text-ink-600' : 'hover:bg-slate-50 text-slate-500'
               )}
             >
               <Grid3X3 size={18} />
@@ -414,8 +421,8 @@ export const Queue: React.FC = () => {
             <button
               onClick={() => setViewMode('list')}
               className={cn(
-                'p-2',
-                viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-50'
+                'p-2 transition-colors',
+                viewMode === 'list' ? 'bg-ink-100 text-ink-600' : 'hover:bg-slate-50 text-slate-500'
               )}
             >
               <List size={18} />
@@ -429,7 +436,7 @@ export const Queue: React.FC = () => {
         <div className="flex-1 overflow-x-auto">
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+              <Loader2 className="w-8 h-8 animate-spin text-ink-600" />
             </div>
           ) : (
             <div className="flex gap-4 pb-4">
@@ -444,14 +451,14 @@ export const Queue: React.FC = () => {
 
       {/* List View */}
       {viewMode === 'list' && (
-        <div className="flex-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="flex-1 card overflow-hidden">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
+            <thead>
+              <tr className="table-header">
+                <th className="px-4 py-3 text-left text-sm font-medium text-slate-500">
                   <input
                     type="checkbox"
-                    className="rounded border-gray-300"
+                    className="rounded border-slate-300 text-ink-600 focus:ring-ink-500"
                     onChange={(e) => {
                       if (e.target.checked) {
                         const allItems = Object.entries(queueItems).flatMap(([step, items]) =>
@@ -464,24 +471,24 @@ export const Queue: React.FC = () => {
                     }}
                   />
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Photo</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Title</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Step</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Confidence</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Price</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Actions</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-slate-500">Photo</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-slate-500">Title</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-slate-500">Step</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-slate-500">Confidence</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-slate-500">Price</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-slate-500">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+                    <Loader2 className="w-6 h-6 animate-spin text-ink-600 mx-auto" />
                   </td>
                 </tr>
               ) : Object.entries(queueItems).flatMap(([step, items]) =>
                 filterItems(items as ItemCardProps[], step).map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
+                  <tr key={item.id} className="table-row">
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
@@ -493,19 +500,19 @@ export const Queue: React.FC = () => {
                             setSelectedItems(selectedItems.filter((id) => id !== item.id));
                           }
                         }}
-                        className="rounded border-gray-300"
+                        className="rounded border-slate-300 text-ink-600 focus:ring-ink-500"
                       />
                     </td>
                     <td className="px-4 py-3">
                       {item.thumbnail ? (
-                        <img src={item.thumbnail} alt={item.title} className="w-12 h-12 object-cover rounded" />
+                        <img src={item.thumbnail} alt={item.title} className="w-12 h-12 object-cover rounded-lg" />
                       ) : (
-                        <div className="w-12 h-12 bg-gray-100 rounded" />
+                        <div className="w-12 h-12 bg-slate-100 rounded-lg" />
                       )}
                     </td>
-                    <td className="px-4 py-3 font-medium">{item.title}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900">{item.title}</td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-1 bg-gray-100 rounded text-sm capitalize">
+                      <span className="badge text-sm capitalize">
                         {step}
                       </span>
                     </td>
@@ -513,12 +520,12 @@ export const Queue: React.FC = () => {
                       {item.confidence !== undefined && (
                         <span
                           className={cn(
-                            'px-2 py-1 rounded text-sm',
+                            'px-2 py-1 rounded-md text-sm font-medium',
                             item.confidence >= 90
-                              ? 'bg-green-100 text-green-800'
+                              ? 'badge-sage'
                               : item.confidence >= 70
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-red-100 text-red-800'
+                                ? 'badge-amber'
+                                : 'badge-coral'
                           )}
                         >
                           {item.confidence}%
@@ -527,13 +534,13 @@ export const Queue: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">
                       {item.price !== undefined && (
-                        <span className="font-medium text-green-600">${item.price.toFixed(2)}</span>
+                        <span className="font-semibold text-sage-600">${item.price.toFixed(2)}</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <Link
                         to={`/item/${item.id}`}
-                        className="text-blue-600 hover:text-blue-800 text-sm"
+                        className="text-ink-600 hover:text-ink-800 text-sm font-medium transition-colors"
                       >
                         View
                       </Link>
@@ -548,12 +555,12 @@ export const Queue: React.FC = () => {
 
       {/* Bulk Actions */}
       {selectedItems.length > 0 && (
-        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-4">
-          <span>{selectedItems.length} selected</span>
+        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-xl shadow-xl flex items-center gap-4 animate-slide-up">
+          <span className="text-sm font-medium">{selectedItems.length} selected</span>
           <button
             onClick={handleBulkReview}
             disabled={isBulkProcessing}
-            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1.5 bg-ink-600 rounded-lg hover:bg-ink-700 transition-colors disabled:opacity-50 text-sm font-medium"
           >
             {isBulkProcessing ? (
               <Loader2 size={16} className="animate-spin" />
@@ -565,7 +572,7 @@ export const Queue: React.FC = () => {
           <button
             onClick={handleBulkPrice}
             disabled={isBulkProcessing}
-            className="flex items-center gap-2 px-3 py-1.5 bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1.5 bg-sage-600 rounded-lg hover:bg-sage-700 transition-colors disabled:opacity-50 text-sm font-medium"
           >
             {isBulkProcessing ? (
               <Loader2 size={16} className="animate-spin" />
@@ -576,7 +583,7 @@ export const Queue: React.FC = () => {
           </button>
           <button
             onClick={() => setSelectedItems([])}
-            className="text-gray-400 hover:text-white ml-2"
+            className="text-slate-400 hover:text-white transition-colors ml-2 text-sm"
           >
             Clear
           </button>
@@ -585,54 +592,54 @@ export const Queue: React.FC = () => {
 
       {/* Bulk Price Modal */}
       {showBulkPriceModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <div className="fixed inset-0 bg-slate-950/50 flex items-center justify-center z-50">
+          <div className="card shadow-xl w-full max-w-md p-6 animate-slide-up">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Bulk Pricing</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Bulk Pricing</h2>
               <button
                 onClick={() => setShowBulkPriceModal(false)}
-                className="p-1 hover:bg-gray-100 rounded"
+                className="p-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-500"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-slate-600 mb-5">
               Apply pricing changes to {selectedItems.length} selected items. Items will be moved to the Pricing stage.
             </p>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Price Adjustment Type
                 </label>
                 <div className="flex gap-4">
-                  <label className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="radio"
                       name="priceType"
                       checked={bulkPriceSettings.type === 'percentage'}
                       onChange={() => setBulkPriceSettings({ ...bulkPriceSettings, type: 'percentage' })}
-                      className="rounded-full border-gray-300"
+                      className="rounded-full border-slate-300 text-ink-600 focus:ring-ink-500"
                     />
-                    <span className="text-sm">Percentage</span>
+                    <span className="text-sm text-slate-700">Percentage</span>
                   </label>
-                  <label className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="radio"
                       name="priceType"
                       checked={bulkPriceSettings.type === 'fixed'}
                       onChange={() => setBulkPriceSettings({ ...bulkPriceSettings, type: 'fixed' })}
-                      className="rounded-full border-gray-300"
+                      className="rounded-full border-slate-300 text-ink-600 focus:ring-ink-500"
                     />
-                    <span className="text-sm">Fixed Price</span>
+                    <span className="text-sm text-slate-700">Fixed Price</span>
                   </label>
                 </div>
               </div>
 
               {bulkPriceSettings.type === 'percentage' ? (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
                     Adjustment (%)
                   </label>
                   <div className="flex items-center gap-2">
@@ -643,22 +650,22 @@ export const Queue: React.FC = () => {
                         ...bulkPriceSettings,
                         value: parseFloat(e.target.value) || 0
                       })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                      className="input w-full"
                       placeholder="e.g., 10 for +10%, -10 for -10%"
                     />
-                    <span className="text-gray-500">%</span>
+                    <span className="text-slate-500 font-medium">%</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-slate-500 mt-1.5">
                     Positive values increase price, negative decrease. Use 0 to just move items to pricing stage.
                   </p>
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
                     Fixed Price ($)
                   </label>
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-500">$</span>
+                    <span className="text-slate-500 font-medium">$</span>
                     <input
                       type="number"
                       value={bulkPriceSettings.fixedPrice}
@@ -666,13 +673,13 @@ export const Queue: React.FC = () => {
                         ...bulkPriceSettings,
                         fixedPrice: parseFloat(e.target.value) || 0
                       })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                      className="input w-full"
                       placeholder="Enter price"
                       min="0"
                       step="0.01"
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-slate-500 mt-1.5">
                     All selected items will be set to this price.
                   </p>
                 </div>
@@ -682,14 +689,14 @@ export const Queue: React.FC = () => {
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setShowBulkPriceModal(false)}
-                className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+                className="btn-secondary"
               >
                 Cancel
               </button>
               <button
                 onClick={handleBulkPriceSubmit}
                 disabled={isBulkProcessing}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                className="btn-primary disabled:opacity-50 flex items-center gap-2"
               >
                 {isBulkProcessing && <Loader2 size={16} className="animate-spin" />}
                 Apply to {selectedItems.length} Items

@@ -36,41 +36,41 @@ const PinPad: React.FC<PinPadProps> = ({ pin, onPinChange, onSubmit, maxLength =
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* PIN Display */}
-      <div className="flex justify-center gap-3">
+      <div className="flex justify-center gap-4">
         {Array.from({ length: maxLength }).map((_, i) => (
           <div
             key={i}
             className={cn(
-              'w-4 h-4 rounded-full border-2 transition-colors',
+              'w-3.5 h-3.5 rounded-full transition-all duration-200',
               i < pin.length
-                ? 'bg-blue-600 border-blue-600'
-                : 'bg-white border-gray-300'
+                ? 'bg-ink-600 scale-110'
+                : 'bg-slate-200'
             )}
           />
         ))}
       </div>
 
       {/* Keypad */}
-      <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto">
+      <div className="grid grid-cols-3 gap-2.5 max-w-[260px] mx-auto">
         {buttons.flat().map((value) => (
           <button
             key={value}
             onClick={() => handlePress(value)}
             className={cn(
-              'h-16 rounded-lg text-xl font-medium transition-colors',
+              'h-14 rounded-xl text-lg font-medium transition-all duration-100 active:scale-95',
               value === 'back'
-                ? 'text-gray-500 hover:bg-gray-100'
+                ? 'text-slate-400 hover:bg-slate-100'
                 : value === 'submit'
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-gray-100 hover:bg-gray-200'
+                  ? 'bg-ink-600 text-white hover:bg-ink-700 shadow-sm'
+                  : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
             )}
           >
             {value === 'back' ? (
-              <Delete size={24} className="mx-auto" />
+              <Delete size={20} className="mx-auto" />
             ) : value === 'submit' ? (
-              '✓'
+              <span className="text-xl">&#10003;</span>
             ) : (
               value
             )}
@@ -79,6 +79,12 @@ const PinPad: React.FC<PinPadProps> = ({ pin, onPinChange, onSubmit, maxLength =
       </div>
     </div>
   );
+};
+
+const roleColors: Record<string, string> = {
+  ADMIN: 'bg-amber-100 text-amber-700',
+  PROCESSOR: 'bg-ink-100 text-ink-700',
+  PHOTOGRAPHER: 'bg-sage-100 text-sage-700',
 };
 
 export const PinLogin: React.FC = () => {
@@ -92,7 +98,6 @@ export const PinLogin: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Mock recent users if none exist - IDs must match database
   const displayUsers = recentUsers.length > 0 ? recentUsers : [
     { id: 'user_admin', name: 'Admin', displayName: 'Admin', role: 'ADMIN' as const, email: 'admin@listflow.local', domainId: 'loc_headquarters', isActive: true, isPlatformAdmin: false, itemsListedToday: 23, itemsListedWeek: 89, itemsListedMonth: 342, itemsListedAllTime: 1247, permissions: {} },
     { id: 'user_processor', name: 'Processor', displayName: 'Processor', role: 'PROCESSOR' as const, email: 'processor@listflow.local', domainId: 'loc_headquarters', isActive: true, isPlatformAdmin: false, itemsListedToday: 15, itemsListedWeek: 127, itemsListedMonth: 450, itemsListedAllTime: 2341, permissions: {} },
@@ -101,10 +106,8 @@ export const PinLogin: React.FC = () => {
 
   const handlePinSubmit = async () => {
     if (!selectedUser || pin.length < 4) return;
-
     setIsLoading(true);
     setError('');
-
     try {
       await loginWithPin(selectedUser.id, pin);
       navigate('/');
@@ -120,7 +123,6 @@ export const PinLogin: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-
     try {
       await login(email, password);
       navigate('/');
@@ -133,46 +135,47 @@ export const PinLogin: React.FC = () => {
 
   if (showEmailLogin) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
-          <h1 className="text-2xl font-bold text-center mb-6">Sign In</h1>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-200/60 p-8 w-full max-w-sm animate-fade-in">
+          <div className="text-center mb-8">
+            <div className="w-12 h-12 rounded-xl bg-ink-600 flex items-center justify-center mx-auto mb-4">
+              <span className="text-white font-bold text-lg">LF</span>
+            </div>
+            <h1 className="text-xl text-slate-900">Sign In</h1>
+          </div>
 
           <form onSubmit={handleEmailLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-slate-600 mb-1.5">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input"
                 placeholder="you@example.com"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-slate-600 mb-1.5">Password</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="••••••••"
+                className="input"
+                placeholder="Enter password"
                 required
               />
             </div>
 
             {error && (
-              <p className="text-red-600 text-sm text-center">{error}</p>
+              <p className="text-coral-600 text-sm text-center">{error}</p>
             )}
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="w-full btn-primary py-3"
             >
               {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
@@ -180,7 +183,7 @@ export const PinLogin: React.FC = () => {
 
           <button
             onClick={() => setShowEmailLogin(false)}
-            className="w-full mt-4 text-sm text-gray-500 hover:text-gray-700"
+            className="w-full mt-5 text-sm text-slate-400 hover:text-slate-600 transition-colors"
           >
             Back to PIN login
           </button>
@@ -190,48 +193,56 @@ export const PinLogin: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
-        <div className="text-center mb-6">
-          <h1 className="text-sm text-gray-500 mb-2">Listing Station 1</h1>
-          <h2 className="text-2xl font-bold">
-            {selectedUser ? `Enter PIN for ${selectedUser.displayName || selectedUser.name}` : "Who's working?"}
-          </h2>
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-200/60 p-8 w-full max-w-md animate-fade-in">
+        <div className="text-center mb-8">
+          <div className="w-12 h-12 rounded-xl bg-ink-600 flex items-center justify-center mx-auto mb-4">
+            <span className="text-white font-bold text-lg">LF</span>
+          </div>
+          <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-2">Listing Station 1</p>
+          <h1 className="text-xl text-slate-900">
+            {selectedUser ? `Enter PIN` : "Who's working?"}
+          </h1>
+          {selectedUser && (
+            <p className="text-sm text-slate-500 mt-1">{selectedUser.displayName || selectedUser.name}</p>
+          )}
         </div>
 
         {!selectedUser ? (
           <>
-            {/* User Selection */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-3 gap-3 mb-4">
               {displayUsers.map((user) => (
                 <button
                   key={user.id}
                   onClick={() => setSelectedUser(user)}
-                  className="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                  className="flex flex-col items-center p-4 rounded-xl border border-slate-200 hover:border-ink-300 hover:bg-ink-50/50 transition-all duration-150 group"
                 >
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-2">
-                    <User size={32} className="text-blue-600" />
+                  <div className="w-14 h-14 bg-slate-100 group-hover:bg-ink-100 rounded-full flex items-center justify-center mb-2.5 transition-colors">
+                    <span className="text-lg font-semibold text-slate-600 group-hover:text-ink-600 transition-colors">
+                      {(user.displayName || user.name).charAt(0)}
+                    </span>
                   </div>
-                  <span className="font-medium text-gray-900">
+                  <span className="font-medium text-sm text-slate-800">
                     {user.displayName || user.name}
                   </span>
-                  <span className="text-xs text-gray-500">{user.role}</span>
+                  <span className={cn('text-xs mt-1 px-2 py-0.5 rounded-full font-medium', roleColors[user.role] || 'bg-slate-100 text-slate-600')}>
+                    {user.role}
+                  </span>
                 </button>
               ))}
               <button
                 onClick={() => setShowEmailLogin(true)}
-                className="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors"
+                className="flex flex-col items-center p-4 rounded-xl border border-dashed border-slate-200 hover:border-slate-400 transition-colors"
               >
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-2">
-                  <Plus size={32} className="text-gray-400" />
+                <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center mb-2.5">
+                  <Plus size={24} className="text-slate-300" />
                 </div>
-                <span className="text-sm text-gray-500">Other User...</span>
+                <span className="text-xs text-slate-400">Other</span>
               </button>
             </div>
           </>
         ) : (
           <>
-            {/* PIN Entry */}
             <PinPad
               pin={pin}
               onPinChange={setPin}
@@ -239,7 +250,7 @@ export const PinLogin: React.FC = () => {
             />
 
             {error && (
-              <p className="text-red-600 text-sm text-center mt-4">{error}</p>
+              <p className="text-coral-600 text-sm text-center mt-4">{error}</p>
             )}
 
             <button
@@ -248,7 +259,7 @@ export const PinLogin: React.FC = () => {
                 setPin('');
                 setError('');
               }}
-              className="w-full mt-6 text-sm text-gray-500 hover:text-gray-700"
+              className="w-full mt-6 text-sm text-slate-400 hover:text-slate-600 transition-colors"
             >
               Cancel
             </button>

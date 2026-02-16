@@ -50,29 +50,17 @@ export const Inventory: React.FC = () => {
         fetch('/api/dashboard/inventory/locations'),
         fetch(`/api/dashboard/inventory/items${selectedLocation ? `?location=${selectedLocation}` : ''}`)
       ]);
-
-      const [locData, itemsData] = await Promise.all([
-        locRes.json(),
-        itemsRes.json()
-      ]);
-
-      if (locData.success) {
-        setLocations(locData.data);
-      }
-      if (itemsData.success) {
-        setItems(itemsData.data);
-      }
+      const [locData, itemsData] = await Promise.all([locRes.json(), itemsRes.json()]);
+      if (locData.success) setLocations(locData.data);
+      if (itemsData.success) setItems(itemsData.data);
     } catch (error) {
       console.error('Failed to load inventory data:', error);
     }
     setIsLoading(false);
   };
 
-  useEffect(() => {
-    loadData();
-  }, [selectedLocation]);
+  useEffect(() => { loadData(); }, [selectedLocation]);
 
-  // Close filter dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
@@ -89,79 +77,68 @@ export const Inventory: React.FC = () => {
                            item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            item.location.toLowerCase().includes(searchQuery.toLowerCase());
       if (!matchesSearch) return false;
-
-      // Stage filter
       if (filters.stage !== 'all' && item.stage !== filters.stage) return false;
-
       return true;
     })
     .sort((a, b) => {
       switch (filters.sortBy) {
-        case 'sku':
-          return a.sku.localeCompare(b.sku);
-        case 'price_asc':
-          return (a.price || 0) - (b.price || 0);
-        case 'price_desc':
-          return (b.price || 0) - (a.price || 0);
-        case 'recent':
-        default:
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'sku': return a.sku.localeCompare(b.sku);
+        case 'price_asc': return (a.price || 0) - (b.price || 0);
+        case 'price_desc': return (b.price || 0) - (a.price || 0);
+        default: return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
     });
 
-  const resetFilters = () => {
-    setFilters({ stage: 'all', sortBy: 'recent' });
-  };
-
+  const resetFilters = () => setFilters({ stage: 'all', sortBy: 'recent' });
   const hasActiveFilters = filters.stage !== 'all' || filters.sortBy !== 'recent';
 
   const getStageColor = (stage: string) => {
     switch (stage) {
-      case 'PUBLISHED': return 'bg-green-100 text-green-800';
-      case 'FINAL_REVIEW': return 'bg-emerald-100 text-emerald-800';
-      case 'REVIEW_EDIT': return 'bg-yellow-100 text-yellow-800';
-      case 'PRICING': return 'bg-blue-100 text-blue-800';
-      case 'AI_PROCESSING': return 'bg-indigo-100 text-indigo-800';
-      case 'PHOTO_UPLOAD': return 'bg-purple-100 text-purple-800';
-      case 'REJECTED': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'PUBLISHED': return 'badge-sage';
+      case 'FINAL_REVIEW': return 'badge-sage';
+      case 'REVIEW_EDIT': return 'badge-amber';
+      case 'PRICING': return 'badge-ink';
+      case 'AI_PROCESSING': return 'badge-plum';
+      case 'PHOTO_UPLOAD': return 'badge-plum';
+      case 'REJECTED': return 'badge-coral';
+      default: return 'bg-slate-100 text-slate-700';
     }
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
-          <p className="text-gray-500">Manage items by location</p>
+          <h1 className="text-2xl font-bold text-slate-900">Inventory</h1>
+          <p className="text-slate-500 mt-1">Manage items by location</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
           <button
             onClick={() => setViewMode('grid')}
             className={cn(
-              'p-2 rounded-lg transition-colors',
-              viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'
+              'p-1.5 rounded-md transition-colors',
+              viewMode === 'grid' ? 'bg-white text-ink-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
             )}
           >
-            <Grid size={20} />
+            <Grid size={18} />
           </button>
           <button
             onClick={() => setViewMode('list')}
             className={cn(
-              'p-2 rounded-lg transition-colors',
-              viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'
+              'p-1.5 rounded-md transition-colors',
+              viewMode === 'list' ? 'bg-white text-ink-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
             )}
           >
-            <List size={20} />
+            <List size={18} />
           </button>
         </div>
       </div>
 
       {/* Location Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {locations.length === 0 && !isLoading && (
-          <div className="col-span-full text-center py-8 text-gray-500">
+          <div className="col-span-full text-center py-8 text-slate-500">
             No locations configured. Add locations in Settings.
           </div>
         )}
@@ -172,29 +149,32 @@ export const Inventory: React.FC = () => {
             className={cn(
               'p-4 rounded-xl border-2 text-left transition-all',
               selectedLocation === location.code
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-200 bg-white hover:border-gray-300'
+                ? 'border-ink-500 bg-ink-50'
+                : 'border-slate-200 bg-white hover:border-slate-300'
             )}
           >
             <div className="flex items-start justify-between">
-              <div className="p-2 rounded-lg bg-gray-100">
-                <MapPin size={20} className="text-gray-600" />
+              <div className={cn(
+                'p-2 rounded-lg',
+                selectedLocation === location.code ? 'bg-ink-100' : 'bg-slate-100'
+              )}>
+                <MapPin size={18} className={selectedLocation === location.code ? 'text-ink-600' : 'text-slate-500'} />
               </div>
-              <ChevronRight size={20} className="text-gray-400" />
+              <ChevronRight size={16} className="text-slate-400" />
             </div>
-            <h3 className="font-semibold text-gray-900 mt-3">{location.name}</h3>
-            <p className="text-sm text-gray-500">{location.code}</p>
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-2xl font-bold text-gray-900">{location.itemCount}</span>
+            <h3 className="font-semibold text-slate-800 mt-3 text-sm">{location.name}</h3>
+            <p className="text-xs text-slate-400">{location.code}</p>
+            <div className="mt-3 flex items-baseline gap-1">
+              <span className="text-2xl font-semibold text-slate-900 text-display">{location.itemCount}</span>
               {location.capacity && (
-                <span className="text-sm text-gray-500">/ {location.capacity}</span>
+                <span className="text-xs text-slate-400">/ {location.capacity}</span>
               )}
             </div>
             {location.capacity && (
-              <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-blue-500 rounded-full"
-                  style={{ width: `${(location.itemCount / location.capacity) * 100}%` }}
+                  className="h-full bg-ink-500 rounded-full transition-all"
+                  style={{ width: `${Math.min((location.itemCount / location.capacity) * 100, 100)}%` }}
                 />
               </div>
             )}
@@ -203,57 +183,47 @@ export const Inventory: React.FC = () => {
       </div>
 
       {/* Search & Filter */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <div className="flex-1 relative">
-          <Search size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             placeholder="Search by SKU, title, or location..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input pl-10"
           />
         </div>
-        {/* Filter Dropdown */}
         <div className="relative" ref={filterRef}>
           <button
             onClick={() => setShowFilterDropdown(!showFilterDropdown)}
             className={cn(
-              "flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50",
-              hasActiveFilters ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200"
+              "btn-secondary",
+              hasActiveFilters && "border-ink-500 bg-ink-50 text-ink-600"
             )}
           >
-            <Filter size={20} />
+            <Filter size={16} />
             Filters
             {hasActiveFilters && (
-              <span className="text-xs bg-blue-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
-                !
-              </span>
+              <span className="text-xs bg-ink-600 text-white rounded-full w-4 h-4 flex items-center justify-center">!</span>
             )}
-            <ChevronDown size={16} />
+            <ChevronDown size={14} />
           </button>
 
           {showFilterDropdown && (
-            <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-20">
+            <div className="absolute right-0 mt-2 w-72 card p-4 z-20 shadow-lg animate-fade-in">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-gray-900">Filters</h3>
+                <h3 className="font-semibold text-slate-800 text-sm">Filters</h3>
                 {hasActiveFilters && (
-                  <button
-                    onClick={resetFilters}
-                    className="text-xs text-blue-600 hover:text-blue-800"
-                  >
-                    Reset all
-                  </button>
+                  <button onClick={resetFilters} className="text-xs text-ink-600 hover:text-ink-800">Reset all</button>
                 )}
               </div>
-
-              {/* Stage Filter */}
               <div className="mb-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Stage</label>
+                <label className="block text-sm font-medium text-slate-600 mb-1">Stage</label>
                 <select
                   value={filters.stage}
                   onChange={(e) => setFilters({ ...filters, stage: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="input text-sm"
                 >
                   <option value="all">All Stages</option>
                   <option value="PHOTO_UPLOAD">Photo Upload</option>
@@ -265,14 +235,12 @@ export const Inventory: React.FC = () => {
                   <option value="REJECTED">Rejected</option>
                 </select>
               </div>
-
-              {/* Sort By */}
               <div className="mb-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+                <label className="block text-sm font-medium text-slate-600 mb-1">Sort By</label>
                 <select
                   value={filters.sortBy}
                   onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as FilterOptions['sortBy'] })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="input text-sm"
                 >
                   <option value="recent">Most Recent</option>
                   <option value="sku">SKU (A-Z)</option>
@@ -280,10 +248,9 @@ export const Inventory: React.FC = () => {
                   <option value="price_desc">Price: High to Low</option>
                 </select>
               </div>
-
               <button
                 onClick={() => setShowFilterDropdown(false)}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                className="w-full btn-primary text-sm"
               >
                 Apply Filters
               </button>
@@ -293,30 +260,30 @@ export const Inventory: React.FC = () => {
       </div>
 
       {/* Items Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="card overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-slate-50/80 border-b border-slate-100">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">SKU</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Title</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Location</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Stage</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Price</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Created</th>
+              <th className="px-4 py-3 text-left table-header">SKU</th>
+              <th className="px-4 py-3 text-left table-header">Title</th>
+              <th className="px-4 py-3 text-left table-header">Location</th>
+              <th className="px-4 py-3 text-left table-header">Stage</th>
+              <th className="px-4 py-3 text-left table-header">Price</th>
+              <th className="px-4 py-3 text-left table-header">Created</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
+                  <Loader2 className="w-6 h-6 animate-spin text-ink-600 mx-auto" />
                 </td>
               </tr>
             ) : filteredItems.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                  <Package size={40} className="mx-auto mb-2 text-gray-300" />
-                  No items found
+                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                  <Package size={36} className="mx-auto mb-2 text-slate-300" />
+                  <p className="text-sm">No items found</p>
                 </td>
               </tr>
             ) : (
@@ -324,20 +291,20 @@ export const Inventory: React.FC = () => {
                 <tr
                   key={item.id}
                   onClick={() => navigate(`/item/${item.id}`)}
-                  className="hover:bg-gray-50 cursor-pointer"
+                  className="table-row cursor-pointer"
                 >
-                  <td className="px-4 py-3 text-sm font-mono text-gray-600">{item.sku}</td>
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.title}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{item.location}</td>
+                  <td className="px-4 py-3 text-sm font-mono text-slate-500">{item.sku}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-slate-800">{item.title}</td>
+                  <td className="px-4 py-3 text-sm text-slate-500">{item.location}</td>
                   <td className="px-4 py-3">
-                    <span className={cn('px-2 py-1 text-xs font-medium rounded-full', getStageColor(item.stage))}>
+                    <span className={cn('badge', getStageColor(item.stage))}>
                       {item.stage.replace('_', ' ')}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900">
+                  <td className="px-4 py-3 text-sm text-slate-800">
                     {item.price ? `$${item.price.toFixed(2)}` : '-'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{item.createdAt}</td>
+                  <td className="px-4 py-3 text-sm text-slate-400">{item.createdAt}</td>
                 </tr>
               ))
             )}
