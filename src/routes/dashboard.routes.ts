@@ -928,7 +928,7 @@ router.delete('/item/:id/photos/:photoId', async (req: Request, res: Response) =
 router.post('/item/:id/photos/:photoId/edit', async (req: Request, res: Response) => {
   try {
     const { id, photoId } = req.params;
-    const { crop, brightness, contrast, rotation } = req.body;
+    const { crop, brightness, contrast, rotation, maxSize } = req.body;
 
     const photo = await prisma.photo.findFirst({
       where: { id: photoId, itemId: id }
@@ -944,22 +944,33 @@ router.post('/item/:id/photos/:photoId/edit', async (req: Request, res: Response
       return res.status(400).json({ success: false, error: 'Source image file not found' });
     }
 
+    // Get actual image dimensions
+    const metadata = await sharp(fullSourcePath).metadata();
+    const imgWidth = metadata.width || 0;
+    const imgHeight = metadata.height || 0;
+
     // Build sharp pipeline
+    // Order: crop → rotate → brightness → contrast
+    // react-easy-crop returns coordinates in the ORIGINAL (unrotated) image's pixel space
     let pipeline = sharp(fullSourcePath);
 
-    // 1. Rotate
-    if (rotation && rotation !== 0) {
-      pipeline = pipeline.rotate(rotation);
+    // 1. Crop (extract) first - coordinates are in original image space
+    if (crop && crop.width > 0 && crop.height > 0) {
+      const left = Math.max(0, Math.min(Math.round(crop.x), imgWidth - 1));
+      const top = Math.max(0, Math.min(Math.round(crop.y), imgHeight - 1));
+      const width = Math.min(Math.round(crop.width), imgWidth - left);
+      const height = Math.min(Math.round(crop.height), imgHeight - top);
+
+      // Only apply crop if it's actually cropping (not the full image)
+      const isFullImage = left === 0 && top === 0 && width >= imgWidth - 1 && height >= imgHeight - 1;
+      if (!isFullImage && width > 0 && height > 0) {
+        pipeline = pipeline.extract({ left, top, width, height });
+      }
     }
 
-    // 2. Crop (extract)
-    if (crop && crop.width > 0 && crop.height > 0) {
-      pipeline = pipeline.extract({
-        left: Math.round(crop.x),
-        top: Math.round(crop.y),
-        width: Math.round(crop.width),
-        height: Math.round(crop.height)
-      });
+    // 2. Rotate after crop
+    if (rotation && rotation !== 0) {
+      pipeline = pipeline.rotate(rotation);
     }
 
     // 3. Brightness
@@ -973,8 +984,9 @@ router.post('/item/:id/photos/:photoId/edit', async (req: Request, res: Response
     }
 
     // 5. Resize to max dimensions and output as JPEG
+    const resizeMax = (maxSize && maxSize > 0) ? maxSize : 1600;
     pipeline = pipeline
-      .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+      .resize(resizeMax, resizeMax, { fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 85 });
 
     // Save edited file

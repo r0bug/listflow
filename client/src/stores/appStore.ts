@@ -57,7 +57,7 @@ export const useAppStore = create<AppState>((set) => ({
     try {
       const response = await api.getSyncStatus();
       if (response.success) {
-        set({ syncStatus: response.data });
+        set({ syncStatus: response.data as unknown as SyncStatus });
       }
     } catch (error) {
       console.error('Sync failed:', error);
@@ -70,7 +70,7 @@ export const useAppStore = create<AppState>((set) => ({
     try {
       const response = await api.getDashboardStats();
       if (response.success) {
-        set({ dashboardStats: response.data });
+        set({ dashboardStats: response.data as DashboardStats });
       }
     } catch (error) {
       console.error('Failed to load dashboard stats:', error);
@@ -92,7 +92,7 @@ export const useAppStore = create<AppState>((set) => ({
     try {
       const response = await api.getEbayAccounts();
       if (response.success) {
-        set({ ebayAccounts: response.data });
+        set({ ebayAccounts: response.data as EbayAccount[] });
       }
     } catch (error) {
       console.error('Failed to load eBay accounts:', error);
@@ -103,7 +103,7 @@ export const useAppStore = create<AppState>((set) => ({
     try {
       const response = await api.getWarehouses();
       if (response.success) {
-        set({ warehouses: response.data });
+        set({ warehouses: response.data as Warehouse[] });
       }
     } catch (error) {
       console.error('Failed to load warehouses:', error);

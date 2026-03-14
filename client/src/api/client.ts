@@ -24,7 +24,7 @@ class ApiClient {
     });
 
     // Request interceptor to add auth token
-    const addAuth = (config: Parameters<Parameters<typeof this.client.interceptors.request.use>[0]>[0]) => {
+    const addAuth = (config: any) => {
       if (this.token) {
         config.headers.Authorization = `Bearer ${this.token}`;
       }
@@ -272,7 +272,7 @@ class ApiClient {
     return response.data;
   }
 
-  async getWarehouseLocations(warehouseId: string) {
+  async getWarehouseLocations(_warehouseId: string) {
     const response = await this.client.get<ApiResponse<unknown[]>>(`/inventory/locations`);
     return response.data;
   }
@@ -382,7 +382,7 @@ class ApiClient {
     return response.data;
   }
 
-  async editPhoto(itemId: string, photoId: string, edits: { crop?: { x: number; y: number; width: number; height: number }; brightness?: number; contrast?: number; rotation?: number }) {
+  async editPhoto(itemId: string, photoId: string, edits: { crop?: { x: number; y: number; width: number; height: number }; brightness?: number; contrast?: number; rotation?: number; maxSize?: number }) {
     const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${itemId}/photos/${photoId}/edit`, edits);
     return response.data;
   }
@@ -464,7 +464,7 @@ class ApiClient {
     return response.data;
   }
 
-  async getEbayAccount(id: string) {
+  async getEbayAccount(_id: string) {
     const response = await this.client.get<ApiResponse<unknown>>(`/ebay/status`);
     return response.data;
   }
@@ -579,7 +579,7 @@ class ApiClient {
     return { success: true, data: { pushed: changes.length } };
   }
 
-  async pullChanges(since?: string) {
+  async pullChanges(_since?: string) {
     return { success: true, data: { changes: [] } };
   }
 }

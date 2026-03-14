@@ -14,7 +14,6 @@ import {
   Edit2,
   Download,
   DollarSign,
-  Package,
   ExternalLink,
   Pencil,
 } from 'lucide-react';
@@ -605,13 +604,13 @@ export const ItemDetail: React.FC = () => {
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
-                  {/* Edit button overlay */}
+                  {/* Edit button */}
                   <button
                     onClick={() => handleEditPhoto(item.photos[selectedPhotoIndex].id)}
-                    className="absolute bottom-3 right-3 p-2 bg-slate-800/70 hover:bg-slate-800/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Edit photo"
+                    className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/80 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors"
                   >
-                    <Pencil size={16} />
+                    <Pencil size={14} />
+                    Edit
                   </button>
                 </>
               ) : (
@@ -643,6 +642,7 @@ export const ItemDetail: React.FC = () => {
                 photoUrl={editingPhoto.fullUrl || editingPhoto.url}
                 photoId={editingPhotoId}
                 itemId={item.id}
+                allPhotos={item.photos}
                 onSave={handlePhotoEditSaved}
                 onClose={() => setEditingPhotoId(null)}
               />

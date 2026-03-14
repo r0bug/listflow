@@ -38,11 +38,11 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await api.login(email, password);
           if (response.success) {
-            const { user, token, refreshToken } = response.data;
+            const { user, token, refreshToken } = response.data as { user: User; token: string; refreshToken: string };
             api.setToken(token);
             set({
               user,
-              domain: user.domain,
+              domain: (user as any).domain,
               token,
               refreshToken,
               isAuthenticated: true,
@@ -61,11 +61,11 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await api.loginWithPin(userId, pin);
           if (response.success) {
-            const { user, token } = response.data;
+            const { user, token } = response.data as { user: User; token: string };
             api.setToken(token);
             set({
               user,
-              domain: user.domain,
+              domain: (user as any).domain,
               token,
               isAuthenticated: true,
               isLoading: false,
@@ -116,7 +116,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await api.getMe();
           if (response.success) {
-            set({ user: response.data, isAuthenticated: true });
+            set({ user: response.data as User, isAuthenticated: true });
             return true;
           }
         } catch {

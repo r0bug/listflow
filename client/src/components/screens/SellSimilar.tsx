@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Search, Copy, ArrowRight, Package, DollarSign, Tag, FileText, Image, AlertCircle, CheckCircle } from 'lucide-react';
-import { cn } from '../../utils/cn';
 
 interface FetchedListing {
   ebayItemId: string;

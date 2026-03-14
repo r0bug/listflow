@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Plus, Delete, Loader2 } from 'lucide-react';
+import { Plus, Delete } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { cn } from '../../utils/cn';
 
@@ -98,7 +98,7 @@ export const PinLogin: React.FC = () => {
   const [password, setPassword] = useState('');
 
   const [fetchedUsers, setFetchedUsers] = useState<{ id: string; name: string; role: string; email: string }[]>([]);
-  const [usersLoading, setUsersLoading] = useState(true);
+  const [_usersLoading, setUsersLoading] = useState(true);
 
   useEffect(() => {
     const fetchUsers = async () => {

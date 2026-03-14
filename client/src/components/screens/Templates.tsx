@@ -9,7 +9,6 @@ import {
   FileText,
   Loader2,
 } from 'lucide-react';
-import { cn } from '../../utils/cn';
 import type { ListingTemplate, TemplateSourceType } from '../../types';
 
 const sourceLabels: Record<TemplateSourceType, string> = {

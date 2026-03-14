@@ -91,6 +91,8 @@ The following must ONLY exist in `.env` files and NEVER in committed code:
 - [x] Delete individual photos with file cleanup
 - [x] Mobile-friendly touch controls (pinch-to-zoom, arrow reorder)
 - [x] Edited images preferred in CSV export and image hosting
+- [x] Apply brightness/contrast to all photos in group
+- [x] Output scale selector (Original/1600/1200/800/600px)
 
 ### Product Identifiers & CSV Fix (Completed)
 - [x] UPC and ISBN fields on Item model (AI-detected + manual entry)

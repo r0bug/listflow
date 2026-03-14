@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Bell, User, LogOut } from 'lucide-react';
+import { Menu, Bell, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 
 interface HeaderProps {

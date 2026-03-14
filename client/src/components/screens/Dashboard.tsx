@@ -9,7 +9,6 @@ import {
   Clock,
   ArrowRight,
   Play,
-  RefreshCw,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 
@@ -69,7 +68,7 @@ const QueuePreview: React.FC<QueuePreviewProps> = ({ identify, review, price }) 
 
 export const Dashboard: React.FC = () => {
   const { loadDashboardStats, loadRecentActivity, dashboardStats, recentActivity } = useAppStore();
-  const [isLoading, setIsLoading] = useState(true);
+  const [_isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
@@ -81,7 +80,7 @@ export const Dashboard: React.FC = () => {
   }, [loadDashboardStats, loadRecentActivity]);
 
   // Use real data from store, with fallback defaults
-  const stats = dashboardStats || {
+  const stats: any = dashboardStats || {
     queueTotal: 0,
     queueCounts: { identify: 0, review: 0, price: 0, ready: 0 },
     totalListed: 0,
