@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Plus, Delete } from 'lucide-react';
+import { User, Plus, Delete, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { cn } from '../../utils/cn';
 
@@ -83,8 +83,7 @@ const PinPad: React.FC<PinPadProps> = ({ pin, onPinChange, onSubmit, maxLength =
 
 const roleColors: Record<string, string> = {
   ADMIN: 'bg-amber-100 text-amber-700',
-  PROCESSOR: 'bg-ink-100 text-ink-700',
-  PHOTOGRAPHER: 'bg-sage-100 text-sage-700',
+  USER: 'bg-ink-100 text-ink-700',
 };
 
 export const PinLogin: React.FC = () => {
@@ -98,11 +97,40 @@ export const PinLogin: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const displayUsers = recentUsers.length > 0 ? recentUsers : [
-    { id: 'user_admin', name: 'Admin', displayName: 'Admin', role: 'ADMIN' as const, email: 'admin@listflow.local', domainId: 'loc_headquarters', isActive: true, isPlatformAdmin: false, itemsListedToday: 23, itemsListedWeek: 89, itemsListedMonth: 342, itemsListedAllTime: 1247, permissions: {} },
-    { id: 'user_processor', name: 'Processor', displayName: 'Processor', role: 'PROCESSOR' as const, email: 'processor@listflow.local', domainId: 'loc_headquarters', isActive: true, isPlatformAdmin: false, itemsListedToday: 15, itemsListedWeek: 127, itemsListedMonth: 450, itemsListedAllTime: 2341, permissions: {} },
-    { id: 'user_photographer', name: 'Photographer', displayName: 'Photographer', role: 'PHOTOGRAPHER' as const, email: 'photo@listflow.local', domainId: 'loc_headquarters', isActive: true, isPlatformAdmin: false, itemsListedToday: 0, itemsListedWeek: 67, itemsListedMonth: 280, itemsListedAllTime: 987, permissions: {} },
-  ];
+  const [fetchedUsers, setFetchedUsers] = useState<{ id: string; name: string; role: string; email: string }[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch('/api/v1/auth/pin-users');
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          setFetchedUsers(data.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch users:', err);
+      }
+      setUsersLoading(false);
+    };
+    fetchUsers();
+  }, []);
+
+  const displayUsers = fetchedUsers.length > 0 ? fetchedUsers.map(u => ({
+    id: u.id,
+    name: u.name,
+    displayName: u.name,
+    role: u.role as any,
+    email: u.email,
+    domainId: '',
+    isActive: true,
+    isPlatformAdmin: false,
+    itemsListedToday: 0,
+    itemsListedWeek: 0,
+    itemsListedMonth: 0,
+    itemsListedAllTime: 0,
+    permissions: {},
+  })) : recentUsers;
 
   const handlePinSubmit = async () => {
     if (!selectedUser || pin.length < 4) return;

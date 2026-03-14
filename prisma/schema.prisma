@@ -22,9 +22,10 @@ model Location {
   timezone    String   @default("UTC")
   isActive    Boolean  @default(true)
   serverUrl   String?  // API endpoint for this location
+  settings    Json?    // Listing defaults and other location settings
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   // Relations
   users       User[]
   items       Item[]
@@ -95,7 +96,8 @@ model User {
   itemsCreated     Item[]     @relation("ItemCreator")
   workflowActions  WorkflowAction[]
   sessions         UserSession[]
-  
+  pooledPhotos     PooledPhoto[]
+
   @@index([email])
   @@index([role])
   @@index([locationId])
@@ -132,11 +134,34 @@ model Item {
   startingPrice Float?
   buyNowPrice   Float?
   shippingCost  Float?
-  
+
+  // Shipping
+  shippingService   String?   @default("USPSPriority")
+  shippingType      String?   @default("Flat")
+  weight            Float?    // weight in oz
+  packageDimensions Json?     // {length, width, height} in inches
+  handlingTime      Int?      @default(3)
+
+  // Listing options
+  listingFormat     String?   @default("FixedPrice")
+  listingDuration   String?   @default("GTC")
+  returnPolicy      Json?     // {returnsAccepted, refundType, returnDays, shippingCostPaidBy}
+  quantity          Int?      @default(1)
+  postalCode        String?
+
+  // AI price suggestion
+  aiPriceSuggestion Json?     // {min, max, confidence, reasoning}
+
   // eBay Integration (Stage 5)
   ebayId       String?  @unique
   publishedAt  DateTime?
-  
+
+  // AI cost tracking (cumulative across all AI calls for this item)
+  aiCost       Float    @default(0)
+
+  // CSV Export tracking
+  exportedAt   DateTime?
+
   // Metadata
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -181,10 +206,13 @@ model Photo {
   // AI Analysis results for this specific photo
   analysis     Json?
   processedAt  DateTime?
-  
+
+  // Public URL for hosted images (used in CSV export)
+  publicUrl    String?
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  
+
   @@index([itemId])
   @@index([isPrimary])
 }
@@ -211,11 +239,7 @@ model WorkflowAction {
 
 enum UserRole {
   ADMIN
-  PHOTOGRAPHER     // Stage 1: Upload photos
-  PROCESSOR        // Stage 2-3: Review AI results
-  PRICER          // Stage 4: Set prices
-  PUBLISHER       // Stage 5: Final review & publish
-  MANAGER         // Can access all stages
+  USER
 }
 
 enum WorkflowStage {
@@ -234,6 +258,29 @@ enum ItemStatus {
   COMPLETED
   ARCHIVED
   ERROR
+}
+
+// Pooled photos - uploaded but not yet assigned to an item
+model PooledPhoto {
+  id            String   @id @default(cuid())
+  originalPath  String
+  thumbnailPath String?
+  filename      String
+  mimeType      String
+  fileSize      Int
+
+  // Optional group tag for organizing before creating items
+  groupTag      String?
+
+  uploadedBy    User?    @relation(fields: [uploadedById], references: [id])
+  uploadedById  String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([uploadedById])
+  @@index([groupTag])
+  @@index([createdAt])
 }
 
 // eBay Listing record for tracking created listings

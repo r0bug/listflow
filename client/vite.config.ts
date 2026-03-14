@@ -13,4 +13,7 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    allowedHosts: ['listflow.robug.com', 'list.robug.com'],
+  },
 })

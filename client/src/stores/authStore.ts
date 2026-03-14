@@ -126,7 +126,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'consoleebay-auth',
+      name: 'listflow-auth-v2',
       partialize: (state) => ({
         token: state.token,
         refreshToken: state.refreshToken,

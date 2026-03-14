@@ -13,6 +13,8 @@ import itemRoutes from './routes/item.routes';
 import templateRoutes from './routes/template.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import sellSimilarRoutes from './routes/sellSimilar.routes';
+import exportRoutes from './routes/export.routes';
+import poolRoutes from './routes/pool.routes';
 import { generalLimiter } from './middleware/rateLimit.middleware';
 
 dotenv.config();
@@ -82,6 +84,10 @@ app.use(generalLimiter);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Serve public images for eBay CSV exports
+const publicImagesDir = process.env.PUBLIC_IMAGES_DIR || 'public-images';
+app.use('/listflow', express.static(path.join(__dirname, '..', publicImagesDir, 'listflow')));
+
 // Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/ebay', ebayRoutes);
@@ -89,11 +95,13 @@ app.use('/api/v1/items', itemRoutes);
 app.use('/api/v1/templates', templateRoutes);
 app.use('/api/v1/inventory', inventoryRoutes);
 app.use('/api/v1/sell-similar', sellSimilarRoutes);
+app.use('/api/v1/export', exportRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/listings', listingRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/workflow', workflowRoutes);
 app.use('/api/sold-data', soldDataRoutes);
+app.use('/api/pool', poolRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

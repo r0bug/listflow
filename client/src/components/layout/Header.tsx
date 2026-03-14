@@ -1,19 +1,21 @@
 import React from 'react';
 import { Menu, Bell, User, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
-import { useAppStore } from '../../stores/appStore';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onMenuToggle?: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onMenuToggle }) => {
   const { user, logout } = useAuthStore();
-  const { toggleSidebar } = useAppStore();
   const [showUserMenu, setShowUserMenu] = React.useState(false);
 
   return (
     <header className="bg-white border-b border-slate-200 h-14 flex items-center justify-between px-5 flex-shrink-0">
       <div className="flex items-center gap-4">
         <button
-          onClick={toggleSidebar}
-          className="p-2 hover:bg-slate-100 rounded-lg lg:hidden transition-colors"
+          onClick={onMenuToggle}
+          className="p-2 hover:bg-slate-100 rounded-lg md:hidden transition-colors"
         >
           <Menu size={20} className="text-slate-600" />
         </button>

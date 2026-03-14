@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance, type AxiosError } from 'axios';
 import type { ApiResponse } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 class ApiClient {
   private client: AxiosInstance;
@@ -343,6 +343,50 @@ class ApiClient {
     return response.data;
   }
 
+  async reprocessAi(id: string) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${id}/reprocess-ai`);
+    return response.data;
+  }
+
+  async reanalyzeItem(id: string, prompt: string, photoIds?: string[]) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${id}/reanalyze`, { prompt, photoIds });
+    return response.data;
+  }
+
+  async suggestItemPrice(id: string) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${id}/suggest-price`);
+    return response.data;
+  }
+
+  async uploadPhotosToItem(itemId: string, files: File[]) {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('photos', file));
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${itemId}/photos`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async pushToEbay(itemId: string) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${itemId}/push-to-ebay`);
+    return response.data;
+  }
+
+  async bulkPushToEbay(itemIds: string[]) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>('/dashboard/items/bulk-push-to-ebay', { itemIds });
+    return response.data;
+  }
+
+  async getListingDefaults() {
+    const response = await this.dashboardClient.get<ApiResponse<Record<string, unknown>>>('/dashboard/listing-defaults');
+    return response.data;
+  }
+
+  async saveListingDefaults(defaults: Record<string, unknown>) {
+    const response = await this.dashboardClient.put<ApiResponse<unknown>>('/dashboard/listing-defaults', defaults);
+    return response.data;
+  }
+
   async rejectItem(id: string, reason: string) {
     const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${id}/reject`, { reason });
     return response.data;
@@ -407,6 +451,99 @@ class ApiClient {
 
   async getEbayStatus() {
     const response = await this.client.get<ApiResponse<unknown>>('/ebay/status');
+    return response.data;
+  }
+
+  // ============================================================================
+  // CSV EXPORT
+  // ============================================================================
+
+  async exportCsv(itemIds: string[], markExported = true) {
+    const response = await this.client.post('/export/csv', { itemIds, markExported }, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async previewExport(itemId: string) {
+    const response = await this.client.get<ApiResponse<unknown>>(`/export/preview/${itemId}`);
+    return response.data;
+  }
+
+  // ============================================================================
+  // USER MANAGEMENT (ADMIN)
+  // ============================================================================
+
+  async getUsers() {
+    const response = await this.client.get<ApiResponse<unknown[]>>('/auth/users');
+    return response.data;
+  }
+
+  async createUser(data: { email: string; name: string; pin: string; role?: string; locationId?: string }) {
+    const response = await this.client.post<ApiResponse<unknown>>('/auth/users', data);
+    return response.data;
+  }
+
+  async deleteUser(id: string) {
+    const response = await this.client.delete<ApiResponse<unknown>>(`/auth/users/${id}`);
+    return response.data;
+  }
+
+  // ============================================================================
+  // PHOTO POOL
+  // ============================================================================
+
+  async uploadToPool(files: File[]) {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('photos', file));
+    const response = await this.dashboardClient.post<ApiResponse<unknown[]>>('/pool/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async getPoolPhotos() {
+    const response = await this.dashboardClient.get<ApiResponse<unknown[]>>('/pool/photos');
+    return response.data;
+  }
+
+  async getPoolGroups() {
+    const response = await this.dashboardClient.get<ApiResponse<Record<string, unknown[]>>>('/pool/groups');
+    return response.data;
+  }
+
+  async groupPoolPhotos(photoIds: string[], groupTag: string) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>('/pool/group', { photoIds, groupTag });
+    return response.data;
+  }
+
+  async ungroupPoolPhotos(photoIds: string[]) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>('/pool/ungroup', { photoIds });
+    return response.data;
+  }
+
+  async deletePoolPhoto(id: string) {
+    const response = await this.dashboardClient.delete<ApiResponse<unknown>>(`/pool/photos/${id}`);
+    return response.data;
+  }
+
+  async deletePoolGroup(groupTag: string) {
+    const response = await this.dashboardClient.delete<ApiResponse<unknown>>(`/pool/groups/${encodeURIComponent(groupTag)}`);
+    return response.data;
+  }
+
+  async attachPoolPhotosToItem(photoIds: string[], itemId: string) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>('/pool/attach-to-item', { photoIds, itemId });
+    return response.data;
+  }
+
+  async createItemsFromPool(groupTags: string[], skipAi = false) {
+    const response = await this.dashboardClient.post<ApiResponse<{
+      created: { id: string; sku: string; photoCount: number; groupTag: string }[];
+      errors: { groupTag: string; error: string }[];
+      totalCreated: number;
+      totalErrors: number;
+    }>>('/pool/create-items', { groupTags, skipAi }, { timeout: 300000 }); // 5 min timeout for AI
     return response.data;
   }
 

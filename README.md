@@ -50,7 +50,7 @@ A comprehensive, AI-powered eBay listing workflow system that automates the list
 - **Frontend**: React, Vite 5, TypeScript, Tailwind CSS 4
 - **Database**: PostgreSQL with Prisma ORM
 - **Queue**: Redis with Bull
-- **AI/Vision**: Segmind API (LLaVA)
+- **AI/Vision**: Claude Sonnet 4 (via Anthropic API), Segmind API (LLaVA)
 - **State Management**: Zustand
 - **Routing**: React Router 7
 - **eBay Integration**: @hendt/ebay-api
@@ -183,7 +183,9 @@ listflow/
 │   ├── controllers/              # Request handlers
 │   ├── services/                 # Business logic
 │   │   ├── ebay.service.ts       # eBay API integration
-│   │   ├── ai.service.ts         # AI/vision models
+│   │   ├── ai.service.ts         # AI/vision models (+ price suggestions)
+│   │   ├── csvExport.service.ts  # eBay File Exchange CSV export
+│   │   ├── imageHosting.service.ts # Public image hosting for exports
 │   │   ├── soldData.service.ts   # Sold data scraping
 │   │   └── cleanup.service.ts    # File maintenance
 │   ├── routes/                   # API routes
@@ -253,6 +255,22 @@ listflow/
 ### Sell Similar
 - `GET /api/v1/sell-similar/fetch/:ebayItemId` - Fetch eBay listing
 - `POST /api/v1/sell-similar/create` - Create item from listing
+
+### Export
+- `GET /api/v1/export/csv` - Export items as eBay File Exchange CSV
+
+### Photo Pool
+- `POST /api/pool/upload` - Upload photos to pool
+- `POST /api/pool/create-items` - Create items from pooled photos
+- `POST /api/pool/attach-to-item` - Attach pooled photos to existing items
+
+### Dashboard (Extended)
+- `POST /api/dashboard/item/:id/photos` - Upload photos to existing items
+- `POST /api/dashboard/item/:id/suggest-price` - AI price suggestion
+- `POST /api/dashboard/item/:id/push-to-ebay` - Push single item to eBay
+- `POST /api/dashboard/items/bulk-push-to-ebay` - Batch push to eBay
+- `GET /api/dashboard/listing-defaults` - Get location listing defaults
+- `PUT /api/dashboard/listing-defaults` - Save location listing defaults
 
 ### Research
 - `POST /api/v1/research/sold` - Search sold items

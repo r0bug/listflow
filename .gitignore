@@ -16,6 +16,7 @@ client/dist/
 # Uploads
 uploads/
 temp/
+public-images/
 
 # Database
 *.db

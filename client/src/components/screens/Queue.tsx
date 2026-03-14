@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Search, Filter, CheckSquare, DollarSign, List, Grid3X3, Loader2, X, ChevronDown } from 'lucide-react';
+import { Search, Filter, CheckSquare, DollarSign, List, Grid3X3, Loader2, X, ChevronDown, Download, ExternalLink } from 'lucide-react';
+import api from '../../api/client';
 import { cn } from '../../utils/cn';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 interface ItemCardProps {
   id: string;
@@ -99,7 +101,8 @@ interface FilterOptions {
 
 export const Queue: React.FC = () => {
   useParams<{ step?: string }>();
-  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
+  const isMobile = useIsMobile();
+  const [viewMode, setViewMode] = useState<'kanban' | 'list'>(isMobile ? 'list' : 'kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -268,6 +271,47 @@ export const Queue: React.FC = () => {
     setIsBulkProcessing(false);
   };
 
+  const handleExportCsv = async () => {
+    if (selectedItems.length === 0) return;
+
+    setIsBulkProcessing(true);
+    try {
+      const blob = await api.exportCsv(selectedItems);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `listflow-export-${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      setSelectedItems([]);
+      loadQueueData();
+    } catch (error) {
+      console.error('Failed to export CSV:', error);
+    }
+    setIsBulkProcessing(false);
+  };
+
+  const handlePushToEbay = async () => {
+    if (selectedItems.length === 0) return;
+    if (!window.confirm(`Push ${selectedItems.length} item(s) to eBay? This will create live listings.`)) return;
+
+    setIsBulkProcessing(true);
+    try {
+      const result = await api.bulkPushToEbay(selectedItems);
+      if (result.success) {
+        setSelectedItems([]);
+        loadQueueData();
+      } else {
+        console.error('Bulk push to eBay failed:', (result as any).error);
+      }
+    } catch (error) {
+      console.error('Failed to push to eBay:', error);
+    }
+    setIsBulkProcessing(false);
+  };
+
   const resetFilters = () => {
     setFilters({
       step: 'all',
@@ -285,148 +329,152 @@ export const Queue: React.FC = () => {
   return (
     <div className="h-full flex flex-col animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 space-y-3">
         <h1 className="text-2xl font-bold text-slate-900">Queue</h1>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+        <div className="flex flex-col md:flex-row md:items-center gap-3">
+          {/* Search - full width on mobile */}
+          <div className="relative flex-1 md:max-w-[256px]">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Search items..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="input pl-10 pr-4 py-2 w-64"
+              className="input pl-10 pr-4 py-2 w-full"
             />
           </div>
 
-          {/* Filter Dropdown */}
-          <div className="relative" ref={filterRef}>
-            <button
-              onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-              className={cn(
-                "p-2 border rounded-lg transition-colors flex items-center gap-1",
-                hasActiveFilters
-                  ? "border-ink-300 bg-ink-50 text-ink-600"
-                  : "border-slate-200 hover:bg-slate-50 text-slate-600"
-              )}
-            >
-              <Filter size={18} />
-              {hasActiveFilters && (
-                <span className="text-xs bg-ink-600 text-white rounded-full w-4 h-4 flex items-center justify-center font-medium">
-                  !
-                </span>
-              )}
-              <ChevronDown size={14} />
-            </button>
+          {/* Filters + View toggle row */}
+          <div className="flex items-center gap-3">
+            {/* Filter Dropdown */}
+            <div className="relative" ref={filterRef}>
+              <button
+                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                className={cn(
+                  "p-2 border rounded-lg transition-colors flex items-center gap-1 min-w-[44px] min-h-[44px] justify-center",
+                  hasActiveFilters
+                    ? "border-ink-300 bg-ink-50 text-ink-600"
+                    : "border-slate-200 hover:bg-slate-50 text-slate-600"
+                )}
+              >
+                <Filter size={18} />
+                {hasActiveFilters && (
+                  <span className="text-xs bg-ink-600 text-white rounded-full w-4 h-4 flex items-center justify-center font-medium">
+                    !
+                  </span>
+                )}
+                <ChevronDown size={14} />
+              </button>
 
-            {showFilterDropdown && (
-              <div className="absolute right-0 mt-2 w-72 card p-4 z-20 shadow-lg animate-slide-up">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-slate-900">Filters</h3>
-                  {hasActiveFilters && (
-                    <button
-                      onClick={resetFilters}
-                      className="text-xs text-ink-600 hover:text-ink-800 font-medium"
-                    >
-                      Reset all
-                    </button>
-                  )}
-                </div>
-
-                {/* Step Filter */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Step</label>
-                  <select
-                    value={filters.step}
-                    onChange={(e) => setFilters({ ...filters, step: e.target.value })}
-                    className="input w-full text-sm"
-                  >
-                    <option value="all">All Steps</option>
-                    <option value="identify">Identify</option>
-                    <option value="review">Review</option>
-                    <option value="price">Price</option>
-                    <option value="ready">Ready</option>
-                  </select>
-                </div>
-
-                {/* Confidence Filter */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Confidence</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      placeholder="Min"
-                      value={filters.confidenceMin ?? ''}
-                      onChange={(e) => setFilters({
-                        ...filters,
-                        confidenceMin: e.target.value ? parseInt(e.target.value) : null
-                      })}
-                      className="input w-full text-sm"
-                      min="0"
-                      max="100"
-                    />
-                    <span className="text-slate-400 font-medium">-</span>
-                    <input
-                      type="number"
-                      placeholder="Max"
-                      value={filters.confidenceMax ?? ''}
-                      onChange={(e) => setFilters({
-                        ...filters,
-                        confidenceMax: e.target.value ? parseInt(e.target.value) : null
-                      })}
-                      className="input w-full text-sm"
-                      min="0"
-                      max="100"
-                    />
+              {showFilterDropdown && (
+                <div className="absolute right-0 mt-2 w-72 card p-4 z-20 shadow-lg animate-slide-up">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-slate-900">Filters</h3>
+                    {hasActiveFilters && (
+                      <button
+                        onClick={resetFilters}
+                        className="text-xs text-ink-600 hover:text-ink-800 font-medium"
+                      >
+                        Reset all
+                      </button>
+                    )}
                   </div>
-                </div>
 
-                {/* Has Price Filter */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Pricing Status</label>
-                  <select
-                    value={filters.hasPrice === null ? 'all' : filters.hasPrice ? 'priced' : 'unpriced'}
-                    onChange={(e) => setFilters({
-                      ...filters,
-                      hasPrice: e.target.value === 'all' ? null : e.target.value === 'priced'
-                    })}
-                    className="input w-full text-sm"
+                  {/* Step Filter */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Step</label>
+                    <select
+                      value={filters.step}
+                      onChange={(e) => setFilters({ ...filters, step: e.target.value })}
+                      className="input w-full text-sm"
+                    >
+                      <option value="all">All Steps</option>
+                      <option value="identify">Identify</option>
+                      <option value="review">Review</option>
+                      <option value="price">Price</option>
+                      <option value="ready">Ready</option>
+                    </select>
+                  </div>
+
+                  {/* Confidence Filter */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Confidence</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        placeholder="Min"
+                        value={filters.confidenceMin ?? ''}
+                        onChange={(e) => setFilters({
+                          ...filters,
+                          confidenceMin: e.target.value ? parseInt(e.target.value) : null
+                        })}
+                        className="input w-full text-sm"
+                        min="0"
+                        max="100"
+                      />
+                      <span className="text-slate-400 font-medium">-</span>
+                      <input
+                        type="number"
+                        placeholder="Max"
+                        value={filters.confidenceMax ?? ''}
+                        onChange={(e) => setFilters({
+                          ...filters,
+                          confidenceMax: e.target.value ? parseInt(e.target.value) : null
+                        })}
+                        className="input w-full text-sm"
+                        min="0"
+                        max="100"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Has Price Filter */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Pricing Status</label>
+                    <select
+                      value={filters.hasPrice === null ? 'all' : filters.hasPrice ? 'priced' : 'unpriced'}
+                      onChange={(e) => setFilters({
+                        ...filters,
+                        hasPrice: e.target.value === 'all' ? null : e.target.value === 'priced'
+                      })}
+                      className="input w-full text-sm"
+                    >
+                      <option value="all">All</option>
+                      <option value="priced">Has Price</option>
+                      <option value="unpriced">No Price</option>
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={() => setShowFilterDropdown(false)}
+                    className="btn-primary w-full text-sm"
                   >
-                    <option value="all">All</option>
-                    <option value="priced">Has Price</option>
-                    <option value="unpriced">No Price</option>
-                  </select>
+                    Apply Filters
+                  </button>
                 </div>
-
-                <button
-                  onClick={() => setShowFilterDropdown(false)}
-                  className="btn-primary w-full text-sm"
-                >
-                  Apply Filters
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="flex border border-slate-200 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setViewMode('kanban')}
-              className={cn(
-                'p-2 transition-colors',
-                viewMode === 'kanban' ? 'bg-ink-100 text-ink-600' : 'hover:bg-slate-50 text-slate-500'
               )}
-            >
-              <Grid3X3 size={18} />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={cn(
-                'p-2 transition-colors',
-                viewMode === 'list' ? 'bg-ink-100 text-ink-600' : 'hover:bg-slate-50 text-slate-500'
-              )}
-            >
-              <List size={18} />
-            </button>
+            </div>
+
+            <div className="flex border border-slate-200 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={cn(
+                  'p-2 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center',
+                  viewMode === 'kanban' ? 'bg-ink-100 text-ink-600' : 'hover:bg-slate-50 text-slate-500'
+                )}
+              >
+                <Grid3X3 size={18} />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  'p-2 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center',
+                  viewMode === 'list' ? 'bg-ink-100 text-ink-600' : 'hover:bg-slate-50 text-slate-500'
+                )}
+              >
+                <List size={18} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -471,10 +519,10 @@ export const Queue: React.FC = () => {
                     }}
                   />
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-500">Photo</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-slate-500 hidden md:table-cell">Photo</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-500">Title</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-500">Step</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-500">Confidence</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-slate-500 hidden md:table-cell">Confidence</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-500">Price</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-500">Actions</th>
               </tr>
@@ -503,7 +551,7 @@ export const Queue: React.FC = () => {
                         className="rounded border-slate-300 text-ink-600 focus:ring-ink-500"
                       />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 hidden md:table-cell">
                       {item.thumbnail ? (
                         <img src={item.thumbnail} alt={item.title} className="w-12 h-12 object-cover rounded-lg" />
                       ) : (
@@ -516,7 +564,7 @@ export const Queue: React.FC = () => {
                         {step}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 hidden md:table-cell">
                       {item.confidence !== undefined && (
                         <span
                           className={cn(
@@ -555,7 +603,7 @@ export const Queue: React.FC = () => {
 
       {/* Bulk Actions */}
       {selectedItems.length > 0 && (
-        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-xl shadow-xl flex items-center gap-4 animate-slide-up">
+        <div className="fixed bottom-0 md:bottom-12 left-0 md:left-1/2 right-0 md:right-auto md:-translate-x-1/2 bg-slate-900 text-white px-4 md:px-6 py-3 md:rounded-xl shadow-xl flex flex-wrap items-center justify-center gap-3 md:gap-4 animate-slide-up z-30">
           <span className="text-sm font-medium">{selectedItems.length} selected</span>
           <button
             onClick={handleBulkReview}
@@ -580,6 +628,30 @@ export const Queue: React.FC = () => {
               <DollarSign size={16} />
             )}
             Bulk Price
+          </button>
+          <button
+            onClick={handleExportCsv}
+            disabled={isBulkProcessing}
+            className="flex items-center gap-2 px-3 py-1.5 bg-amber-600 rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 text-sm font-medium"
+          >
+            {isBulkProcessing ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Download size={16} />
+            )}
+            Export CSV
+          </button>
+          <button
+            onClick={handlePushToEbay}
+            disabled={isBulkProcessing}
+            className="flex items-center gap-2 px-3 py-1.5 bg-ink-500 rounded-lg hover:bg-ink-600 transition-colors disabled:opacity-50 text-sm font-medium"
+          >
+            {isBulkProcessing ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <ExternalLink size={16} />
+            )}
+            Push to eBay
           </button>
           <button
             onClick={() => setSelectedItems([])}

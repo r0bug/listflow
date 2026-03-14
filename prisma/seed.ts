@@ -21,58 +21,44 @@ async function main() {
   });
   console.log('Created location:', location.name);
 
-  // Hash the PIN (1111)
-  const hashedPin = await bcrypt.hash('1111', 10);
+  // Hash passwords/PINs
+  const adminPin = await bcrypt.hash('6809', 10);
+  const defaultPin = await bcrypt.hash('1502', 10);
 
-  // Create admin user
+  // Create master admin user
   const admin = await prisma.user.upsert({
     where: { email: 'admin@listflow.local' },
-    update: {},
+    update: { role: UserRole.ADMIN, name: 'bossman', password: adminPin },
     create: {
       id: 'user_admin',
       email: 'admin@listflow.local',
-      name: 'Admin User',
+      name: 'bossman',
       role: UserRole.ADMIN,
-      password: hashedPin,
+      password: adminPin,
       locationId: location.id,
     },
   });
-  console.log('Created user:', admin.name, '- PIN: 1111');
+  console.log('Created user:', admin.name, '(ADMIN)');
 
-  // Create additional users
-  const processor = await prisma.user.upsert({
-    where: { email: 'processor@listflow.local' },
-    update: {},
+  // Create default regular user
+  const user = await prisma.user.upsert({
+    where: { email: 'user@listflow.local' },
+    update: { role: UserRole.USER },
     create: {
-      id: 'user_processor',
-      email: 'processor@listflow.local',
-      name: 'Processor User',
-      role: UserRole.PROCESSOR,
-      password: hashedPin,
+      id: 'user_default',
+      email: 'user@listflow.local',
+      name: 'User',
+      role: UserRole.USER,
+      password: defaultPin,
       locationId: location.id,
     },
   });
-  console.log('Created user:', processor.name, '- PIN: 1111');
-
-  const photographer = await prisma.user.upsert({
-    where: { email: 'photo@listflow.local' },
-    update: {},
-    create: {
-      id: 'user_photographer',
-      email: 'photo@listflow.local',
-      name: 'Photographer',
-      role: UserRole.PHOTOGRAPHER,
-      password: hashedPin,
-      locationId: location.id,
-    },
-  });
-  console.log('Created user:', photographer.name, '- PIN: 1111');
+  console.log('Created user:', user.name, '(USER) - PIN: 1111');
 
   console.log('\nDatabase seeded successfully!');
-  console.log('\nDefault users created:');
-  console.log('  - Admin User (admin@listflow.local) - PIN: 1111');
-  console.log('  - Processor User (processor@listflow.local) - PIN: 1111');
-  console.log('  - Photographer (photo@listflow.local) - PIN: 1111');
+  console.log('\nDefault users:');
+  console.log('  - bossman (admin@listflow.local)');
+  console.log('  - User (user@listflow.local) - PIN: 1111');
 }
 
 main()

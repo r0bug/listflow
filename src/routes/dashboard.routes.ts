@@ -2,8 +2,57 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../config/database';
 import { WorkflowStage, TemplateSourceType } from '../../src/generated/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
+import { workflowService } from '../services/workflow.service';
+import { aiService } from '../services/ai.service';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import sharp from 'sharp';
+import { ebayService } from '../services/ebay.service';
+
+// Ensure upload directories exist
+const uploadDir = path.join(__dirname, '../../uploads');
+const thumbDir = path.join(uploadDir, 'thumbnails');
+[uploadDir, thumbDir].forEach((dir) => {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+});
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadDir),
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, 'item-' + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = /jpeg|jpg|png|gif|webp/;
+    if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  },
+});
 
 const router = Router();
+
+// Helper: extract userId from auth token or fall back to first admin
+async function resolveUserId(req: Request): Promise<string> {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    try {
+      const jwt = await import('jsonwebtoken');
+      const decoded = jwt.default.verify(token, process.env.JWT_SECRET || 'dev-secret-change-in-production') as { userId: string };
+      if (decoded.userId) return decoded.userId;
+    } catch {}
+  }
+  const admin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+  return admin?.id || 'unknown';
+}
 
 // GET /api/dashboard/stats - Get dashboard statistics
 router.get('/stats', async (req, res) => {
@@ -269,10 +318,11 @@ router.get('/queue', async (req, res) => {
     ]);
 
     // Transform to queue format
+    const ensureLeadingSlash = (p: string | null | undefined) => p ? (p.startsWith('/') ? p : `/${p}`) : null;
     const transformItem = (item: { id: string; title: string | null; photos?: { thumbnailPath: string | null }[]; aiAnalysis?: unknown; buyNowPrice?: number | null; startingPrice?: number | null }, step: string) => ({
       id: item.id,
       title: item.title || 'Untitled Item',
-      thumbnail: item.photos?.[0]?.thumbnailPath || null,
+      thumbnail: ensureLeadingSlash(item.photos?.[0]?.thumbnailPath),
       confidence: (item.aiAnalysis as Record<string, unknown>)?.confidence || undefined,
       price: item.buyNowPrice || item.startingPrice || undefined,
       step,
@@ -514,18 +564,40 @@ router.get('/item/:id', async (req, res) => {
       description: item.description || '',
       aiAnalysis: {
         confidence: aiAnalysis.confidence || 0,
-        model: aiAnalysis.modelUsed || 'unknown',
-        justification: aiAnalysis.justification || 'No AI analysis available',
+        model: aiAnalysis.modelUsed || 'claude-sonnet',
+        justification: aiAnalysis.rawAnalysis || aiAnalysis.justification || 'No AI analysis available',
       },
       suggestedPrice: item.buyNowPrice || item.startingPrice || 0,
-      photos: item.photos.map(p => ({
-        id: p.id,
-        url: p.thumbnailPath || p.originalPath,
-        isPrimary: p.isPrimary
-      })),
+      photos: item.photos.map(p => {
+        const rawPath = p.thumbnailPath || p.originalPath;
+        return {
+          id: p.id,
+          url: rawPath?.startsWith('/') ? rawPath : `/${rawPath}`,
+          isPrimary: p.isPrimary
+        };
+      }),
       location: item.location?.name || 'Unassigned',
       locationCode: item.location?.code || '',
       createdBy: item.createdBy?.name || 'Unknown',
+      aiCost: item.aiCost || 0,
+      // Pricing/Shipping/Listing fields
+      startingPrice: item.startingPrice || 0,
+      buyNowPrice: item.buyNowPrice || 0,
+      shippingCost: item.shippingCost || 0,
+      shippingService: item.shippingService || 'USPSPriority',
+      shippingType: item.shippingType || 'Flat',
+      weight: item.weight || null,
+      packageDimensions: item.packageDimensions || null,
+      handlingTime: item.handlingTime || 3,
+      listingFormat: item.listingFormat || 'FixedPrice',
+      listingDuration: item.listingDuration || 'GTC',
+      returnPolicy: item.returnPolicy || null,
+      quantity: item.quantity || 1,
+      postalCode: item.postalCode || '',
+      aiPriceSuggestion: item.aiPriceSuggestion || null,
+      ebayId: item.ebayId || null,
+      publishedAt: item.publishedAt?.toISOString() || null,
+      exportedAt: item.exportedAt?.toISOString() || null,
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString(),
       history: item.workflowActions.map(action => ({
@@ -560,7 +632,18 @@ router.put('/item/:id', async (req, res) => {
       brand,
       itemSpecifics,
       startingPrice,
-      buyNowPrice
+      buyNowPrice,
+      shippingCost,
+      shippingService,
+      shippingType,
+      weight,
+      packageDimensions,
+      handlingTime,
+      listingFormat,
+      listingDuration,
+      returnPolicy,
+      quantity,
+      postalCode
     } = req.body;
 
     // Build update data
@@ -572,6 +655,17 @@ router.put('/item/:id', async (req, res) => {
     if (brand !== undefined) updateData.brand = brand;
     if (startingPrice !== undefined) updateData.startingPrice = startingPrice;
     if (buyNowPrice !== undefined) updateData.buyNowPrice = buyNowPrice;
+    if (shippingCost !== undefined) updateData.shippingCost = shippingCost;
+    if (shippingService !== undefined) updateData.shippingService = shippingService;
+    if (shippingType !== undefined) updateData.shippingType = shippingType;
+    if (weight !== undefined) updateData.weight = weight;
+    if (packageDimensions !== undefined) updateData.packageDimensions = packageDimensions;
+    if (handlingTime !== undefined) updateData.handlingTime = handlingTime;
+    if (listingFormat !== undefined) updateData.listingFormat = listingFormat;
+    if (listingDuration !== undefined) updateData.listingDuration = listingDuration;
+    if (returnPolicy !== undefined) updateData.returnPolicy = returnPolicy;
+    if (quantity !== undefined) updateData.quantity = quantity;
+    if (postalCode !== undefined) updateData.postalCode = postalCode;
 
     // Store item specifics in aiAnalysis JSON
     if (itemSpecifics !== undefined) {
@@ -608,12 +702,70 @@ router.put('/item/:id', async (req, res) => {
   }
 });
 
+// POST /api/dashboard/item/:id/photos - Upload photos directly to an existing item
+router.post('/item/:id/photos', upload.array('photos', 20), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ success: false, error: 'No files uploaded' });
+    }
+
+    const item = await prisma.item.findUnique({ where: { id } });
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    // Get current max order
+    const maxOrder = await prisma.photo.aggregate({
+      where: { itemId: id },
+      _max: { order: true },
+    });
+    let nextOrder = (maxOrder._max.order ?? -1) + 1;
+
+    const createdPhotos = [];
+
+    for (const file of files) {
+      const thumbFilename = 'thumb-' + path.basename(file.filename);
+      const thumbPath = path.join(thumbDir, thumbFilename);
+
+      let thumbGenerated = false;
+      try {
+        await sharp(file.path)
+          .resize(300, 300, { fit: 'cover' })
+          .jpeg({ quality: 70 })
+          .toFile(thumbPath);
+        thumbGenerated = true;
+      } catch {
+        // Continue without thumbnail
+      }
+
+      const photo = await prisma.photo.create({
+        data: {
+          itemId: id,
+          originalPath: `uploads/${file.filename}`,
+          thumbnailPath: thumbGenerated ? `uploads/thumbnails/${thumbFilename}` : null,
+          isPrimary: false,
+          order: nextOrder++,
+        },
+      });
+
+      createdPhotos.push(photo);
+    }
+
+    res.json({ success: true, data: createdPhotos });
+  } catch (error) {
+    console.error('Item photo upload error:', error);
+    res.status(500).json({ success: false, error: 'Failed to upload photos' });
+  }
+});
+
 // POST /api/dashboard/item/:id/advance - Advance item to next workflow stage
-router.post('/item/:id/advance', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/item/:id/advance', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { notes } = req.body;
-    const userId = req.user?.id;
+    const userId = await resolveUserId(req);
 
     const item = await prisma.item.findUnique({
       where: { id },
@@ -643,6 +795,14 @@ router.post('/item/:id/advance', authMiddleware, async (req: AuthRequest, res: R
 
     const nextStage = stageOrder[currentIndex + 1] as string;
 
+    // Block direct advance to PUBLISHED — must use CSV export or eBay push
+    if (nextStage === 'PUBLISHED') {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot advance directly to PUBLISHED. Use "Export CSV" or "Push to eBay" instead.'
+      });
+    }
+
     const [updatedItem] = await prisma.$transaction([
       prisma.item.update({
         where: { id },
@@ -651,7 +811,7 @@ router.post('/item/:id/advance', authMiddleware, async (req: AuthRequest, res: R
       prisma.workflowAction.create({
         data: {
           itemId: id,
-          userId: userId!,
+          userId,
           fromStage: item.stage,
           toStage: nextStage as 'PHOTO_UPLOAD' | 'AI_PROCESSING' | 'REVIEW_EDIT' | 'PRICING' | 'FINAL_REVIEW' | 'PUBLISHED',
           action: 'advance',
@@ -674,12 +834,259 @@ router.post('/item/:id/advance', authMiddleware, async (req: AuthRequest, res: R
   }
 });
 
+// POST /api/dashboard/item/:id/reprocess-ai - Re-run AI analysis
+router.post('/item/:id/reprocess-ai', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const item = await prisma.item.findUnique({
+      where: { id },
+      include: { photos: { orderBy: [{ isPrimary: 'desc' as const }, { order: 'asc' as const }] } }
+    });
+
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    if (item.photos.length === 0) {
+      return res.status(400).json({ success: false, error: 'Item has no photos to analyze' });
+    }
+
+    // Run AI processing
+    await workflowService.processWithAI(item.id);
+
+    // Reload item to get updated data
+    const updated = await prisma.item.findUnique({ where: { id }, select: { title: true, description: true, aiAnalysis: true } });
+
+    res.json({ success: true, data: updated });
+  } catch (error: any) {
+    console.error('AI reprocess error:', error);
+    res.status(500).json({ success: false, error: error.message || 'AI processing failed' });
+  }
+});
+
+// POST /api/dashboard/item/:id/reanalyze - Re-analyze selected photos with a correction prompt
+router.post('/item/:id/reanalyze', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { photoIds, prompt } = req.body as { photoIds?: string[]; prompt: string };
+
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ success: false, error: 'A correction prompt is required' });
+    }
+
+    const item = await prisma.item.findUnique({
+      where: { id },
+      include: { photos: { orderBy: [{ isPrimary: 'desc' as const }, { order: 'asc' as const }] } }
+    });
+
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    // Select photos: use specified photoIds, or all photos if none specified
+    const selectedPhotos = photoIds && photoIds.length > 0
+      ? item.photos.filter(p => photoIds.includes(p.id))
+      : item.photos;
+
+    if (selectedPhotos.length === 0) {
+      return res.status(400).json({ success: false, error: 'No matching photos found' });
+    }
+
+    // Build existing analysis from item data
+    const existingAnalysis = {
+      itemType: item.title || 'Unknown',
+      brand: item.brand || 'Unknown',
+      condition: item.condition || 'Used',
+      features: item.features || [],
+      category: item.category || 'General',
+      estimatedValue: '',
+      rawAnalysis: (item.aiAnalysis as any)?.rawAnalysis || '',
+      model: (item.aiAnalysis as any)?.model
+    };
+
+    const photoPaths = selectedPhotos.map(p => p.originalPath);
+    const { analysis, cost } = await aiService.reanalyzeWithPrompt(photoPaths, prompt.trim(), existingAnalysis);
+
+    // Generate updated listing from corrected analysis
+    const { listing, cost: listingCost } = await aiService.generateListing({
+      imageAnalysis: analysis,
+      category: item.category ?? undefined,
+      condition: item.condition ?? undefined
+    });
+
+    const totalCost = cost + listingCost;
+    const analysisJson: any = JSON.parse(JSON.stringify(analysis));
+
+    // Update item with corrected AI results
+    await prisma.item.update({
+      where: { id },
+      data: {
+        title: listing.title,
+        description: listing.description,
+        category: analysis.category || item.category,
+        condition: analysis.condition || item.condition,
+        brand: analysis.brand,
+        features: analysis.features || [],
+        keywords: listing.tags || [],
+        aiAnalysis: analysisJson,
+        aiCost: { increment: totalCost }
+      }
+    });
+
+    const updated = await prisma.item.findUnique({
+      where: { id },
+      select: { title: true, description: true, aiAnalysis: true, aiCost: true }
+    });
+
+    res.json({ success: true, data: updated, cost: totalCost });
+  } catch (error: any) {
+    console.error('AI reanalyze error:', error);
+    res.status(500).json({ success: false, error: error.message || 'AI reanalysis failed' });
+  }
+});
+
+// POST /api/dashboard/item/:id/suggest-price - Get AI price suggestion
+router.post('/item/:id/suggest-price', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const item = await prisma.item.findUnique({
+      where: { id },
+      select: { title: true, brand: true, condition: true, category: true, features: true, description: true }
+    });
+
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    const suggestion = await aiService.suggestPrice({
+      title: item.title || '',
+      brand: item.brand || '',
+      condition: item.condition || '',
+      category: item.category || '',
+      features: item.features || [],
+      description: item.description || '',
+    });
+
+    // Store suggestion on item
+    await prisma.item.update({
+      where: { id },
+      data: { aiPriceSuggestion: suggestion as any }
+    });
+
+    res.json({ success: true, data: suggestion });
+  } catch (error: any) {
+    console.error('Price suggestion error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to get price suggestion' });
+  }
+});
+
+// POST /api/dashboard/item/:id/push-to-ebay - Push item to eBay
+router.post('/item/:id/push-to-ebay', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = await resolveUserId(req);
+
+    const item = await prisma.item.findUnique({
+      where: { id },
+      include: {
+        photos: { orderBy: { order: 'asc' } },
+      },
+    });
+
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    if (item.stage !== 'FINAL_REVIEW') {
+      return res.status(400).json({ success: false, error: 'Item must be at FINAL_REVIEW stage to push to eBay' });
+    }
+
+    // Build image URLs from public URLs
+    const imageUrls = item.photos
+      .map(p => p.publicUrl)
+      .filter((url): url is string => !!url);
+
+    // Determine listing type for eBay
+    const format = item.listingFormat || 'FixedPrice';
+    const isAuction = format === 'Auction' || format === 'AuctionWithBIN';
+
+    const listingData = {
+      title: (item.title || 'Item for Sale').substring(0, 80),
+      description: item.description || '',
+      price: isAuction ? (item.startingPrice || item.buyNowPrice || 0) : (item.buyNowPrice || item.startingPrice || 0),
+      buyNowPrice: format === 'AuctionWithBIN' ? item.buyNowPrice || undefined : undefined,
+      category: item.category || '',
+      condition: item.condition || 'Used',
+      imageUrls,
+      quantity: item.quantity || 1,
+      shippingCost: item.shippingCost || undefined,
+    };
+
+    const result = await ebayService.createListing(listingData);
+
+    if (result.success) {
+      // Update item
+      await prisma.item.update({
+        where: { id },
+        data: {
+          ebayId: result.listingId,
+          stage: 'PUBLISHED',
+          publishedAt: new Date(),
+        },
+      });
+
+      // Create Listing record
+      await prisma.listing.create({
+        data: {
+          title: item.title || 'Item',
+          description: item.description,
+          price: listingData.price,
+          buyNowPrice: item.buyNowPrice,
+          ebayId: result.listingId,
+          status: 'active',
+          imageUrls,
+          category: item.category,
+          condition: item.condition,
+          itemId: id,
+        },
+      });
+
+      // Create workflow action
+      await prisma.workflowAction.create({
+        data: {
+          itemId: id,
+          userId,
+          fromStage: 'FINAL_REVIEW',
+          toStage: 'PUBLISHED',
+          action: 'publish',
+          notes: `Pushed to eBay: ${result.listingId}`,
+        },
+      });
+
+      res.json({
+        success: true,
+        data: {
+          ebayId: result.listingId,
+          listingUrl: result.listingUrl,
+        },
+      });
+    } else {
+      res.status(500).json({ success: false, error: 'eBay listing creation failed' });
+    }
+  } catch (error: any) {
+    console.error('eBay push error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to push to eBay' });
+  }
+});
+
 // POST /api/dashboard/item/:id/reject - Reject item
-router.post('/item/:id/reject', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/item/:id/reject', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
-    const userId = req.user?.id;
+    const userId = await resolveUserId(req);
 
     const item = await prisma.item.findUnique({
       where: { id },
@@ -698,7 +1105,7 @@ router.post('/item/:id/reject', authMiddleware, async (req: AuthRequest, res: Re
       prisma.workflowAction.create({
         data: {
           itemId: id,
-          userId: userId!,
+          userId,
           fromStage: item.stage,
           toStage: 'REJECTED',
           action: 'reject',
@@ -1258,14 +1665,104 @@ router.post('/templates/:id/use', async (req, res) => {
 // BULK OPERATIONS
 // ============================================================================
 
+// POST /api/dashboard/items/bulk-push-to-ebay - Bulk push items to eBay
+router.post('/items/bulk-push-to-ebay', async (req: Request, res: Response) => {
+  try {
+    const { itemIds } = req.body;
+    if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'itemIds array required' });
+    }
+
+    const results: { id: string; success: boolean; ebayId?: string; error?: string }[] = [];
+
+    for (const itemId of itemIds) {
+      try {
+        // Simulate calling the single push endpoint logic inline
+        const item = await prisma.item.findUnique({
+          where: { id: itemId },
+          include: { photos: { orderBy: { order: 'asc' } } },
+        });
+
+        if (!item || item.stage !== 'FINAL_REVIEW') {
+          results.push({ id: itemId, success: false, error: 'Not at FINAL_REVIEW stage' });
+          continue;
+        }
+
+        const imageUrls = item.photos.map(p => p.publicUrl).filter((url): url is string => !!url);
+        const format = item.listingFormat || 'FixedPrice';
+        const isAuction = format === 'Auction' || format === 'AuctionWithBIN';
+
+        const result = await ebayService.createListing({
+          title: (item.title || 'Item').substring(0, 80),
+          description: item.description || '',
+          price: isAuction ? (item.startingPrice || item.buyNowPrice || 0) : (item.buyNowPrice || item.startingPrice || 0),
+          buyNowPrice: format === 'AuctionWithBIN' ? item.buyNowPrice || undefined : undefined,
+          category: item.category || '',
+          condition: item.condition || 'Used',
+          imageUrls,
+          quantity: item.quantity || 1,
+          shippingCost: item.shippingCost || undefined,
+        });
+
+        if (result.success) {
+          const userId = await resolveUserId(req);
+          await prisma.item.update({
+            where: { id: itemId },
+            data: { ebayId: result.listingId, stage: 'PUBLISHED', publishedAt: new Date() },
+          });
+          await prisma.listing.create({
+            data: {
+              title: item.title || 'Item',
+              description: item.description,
+              price: isAuction ? (item.startingPrice || 0) : (item.buyNowPrice || item.startingPrice || 0),
+              buyNowPrice: item.buyNowPrice,
+              ebayId: result.listingId,
+              status: 'active',
+              imageUrls,
+              category: item.category,
+              condition: item.condition,
+              itemId,
+            },
+          });
+          await prisma.workflowAction.create({
+            data: {
+              itemId, userId,
+              fromStage: 'FINAL_REVIEW', toStage: 'PUBLISHED',
+              action: 'publish', notes: `Bulk pushed to eBay: ${result.listingId}`,
+            },
+          });
+          results.push({ id: itemId, success: true, ebayId: result.listingId });
+        } else {
+          results.push({ id: itemId, success: false, error: 'eBay API failed' });
+        }
+      } catch (err: any) {
+        results.push({ id: itemId, success: false, error: err.message });
+      }
+    }
+
+    const succeeded = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+
+    res.json({
+      success: true,
+      data: { results, succeeded, failed },
+    });
+  } catch (error: any) {
+    console.error('Bulk eBay push error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to bulk push to eBay' });
+  }
+});
+
 // POST /api/dashboard/items/bulk-advance - Advance multiple items to next stage
-router.post('/items/bulk-advance', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/items/bulk-advance', async (req: Request, res: Response) => {
   try {
     const { itemIds, targetStage } = req.body;
 
     if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
       return res.status(400).json({ success: false, error: 'itemIds array is required' });
     }
+
+    const userId = await resolveUserId(req);
 
     // Define stage progression
     const stageOrder = [
@@ -1314,7 +1811,7 @@ router.post('/items/bulk-advance', authMiddleware, async (req: AuthRequest, res:
           prisma.workflowAction.create({
             data: {
               itemId: item.id,
-              userId: (req as AuthRequest).user?.id || 'system',
+              userId,
               fromStage: item.stage,
               toStage: nextStage as WorkflowStage,
               action: 'bulk_advance',
@@ -1341,13 +1838,15 @@ router.post('/items/bulk-advance', authMiddleware, async (req: AuthRequest, res:
 });
 
 // POST /api/dashboard/items/bulk-price - Set prices for multiple items
-router.post('/items/bulk-price', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/items/bulk-price', async (req: Request, res: Response) => {
   try {
     const { itemIds, priceAdjustment } = req.body;
 
     if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
       return res.status(400).json({ success: false, error: 'itemIds array is required' });
     }
+
+    const userId = await resolveUserId(req);
 
     // Get all items with their current prices
     const items = await prisma.item.findMany({
@@ -1393,7 +1892,7 @@ router.post('/items/bulk-price', authMiddleware, async (req: AuthRequest, res: R
           prisma.workflowAction.create({
             data: {
               itemId: item.id,
-              userId: (req as AuthRequest).user?.id || 'system',
+              userId,
               fromStage: item.stage,
               toStage: (updateData.stage as WorkflowStage) || item.stage,
               action: 'bulk_price',
@@ -1565,6 +2064,60 @@ router.get('/reports/export', async (req, res) => {
   } catch (error) {
     console.error('Error exporting reports:', error);
     res.status(500).json({ success: false, error: 'Failed to export reports' });
+  }
+});
+
+// GET /api/dashboard/listing-defaults - Get listing defaults for the active location
+router.get('/listing-defaults', async (req: Request, res: Response) => {
+  try {
+    const location = await prisma.location.findFirst({
+      where: { isActive: true },
+      select: { id: true, settings: true },
+    });
+
+    if (!location) {
+      return res.json({ success: true, data: {} });
+    }
+
+    const settings = (location.settings as Record<string, unknown>) || {};
+    const defaults = (settings.listingDefaults as Record<string, unknown>) || {};
+
+    res.json({ success: true, data: defaults });
+  } catch (error) {
+    console.error('Error fetching listing defaults:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch listing defaults' });
+  }
+});
+
+// PUT /api/dashboard/listing-defaults - Save listing defaults for the active location
+router.put('/listing-defaults', async (req: Request, res: Response) => {
+  try {
+    const defaults = req.body;
+
+    const location = await prisma.location.findFirst({
+      where: { isActive: true },
+    });
+
+    if (!location) {
+      return res.status(400).json({ success: false, error: 'No active location found' });
+    }
+
+    const existingSettings = (location.settings as Record<string, unknown>) || {};
+
+    await prisma.location.update({
+      where: { id: location.id },
+      data: {
+        settings: {
+          ...existingSettings,
+          listingDefaults: defaults,
+        },
+      },
+    });
+
+    res.json({ success: true, message: 'Listing defaults saved' });
+  } catch (error) {
+    console.error('Error saving listing defaults:', error);
+    res.status(500).json({ success: false, error: 'Failed to save listing defaults' });
   }
 });
 

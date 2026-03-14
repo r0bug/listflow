@@ -35,7 +35,7 @@ export type ListingType = 'AUCTION' | 'FIXED_PRICE' | 'AUCTION_BIN';
 
 export type TemplateSourceType = 'MANUAL' | 'SELL_SIMILAR' | 'AI_GENERATED' | 'IMPORTED';
 
-export type DomainRole = 'OWNER' | 'ADMIN' | 'MANAGER' | 'MEMBER' | 'VIEWER';
+export type DomainRole = 'ADMIN' | 'USER';
 
 // ============================================================================
 // DOMAIN & AUTH
@@ -91,6 +91,7 @@ export interface ItemPhoto {
   originalPath: string;
   optimizedPath?: string;
   thumbnailPath?: string;
+  publicUrl?: string;
   ebayUrl?: string;
   filename: string;
   mimeType: string;
@@ -169,6 +170,7 @@ export interface Item {
   reviewedAt?: string;
   approvedAt?: string;
   listedAt?: string;
+  exportedAt?: string;
   soldAt?: string;
   fulfilledAt?: string;
   createdAt: string;

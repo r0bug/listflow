@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   User,
+  Users,
   Building,
   CreditCard,
   Bell,
@@ -11,12 +12,17 @@ import {
   Save,
   Check,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Trash2,
+  Plus,
+  Loader2,
+  Package,
 } from 'lucide-react';
+import api from '../../api/client';
 import { cn } from '../../utils/cn';
 import { useAuthStore } from '../../stores/authStore';
 
-type SettingsTab = 'profile' | 'ebay' | 'ai' | 'notifications' | 'appearance' | 'security';
+type SettingsTab = 'profile' | 'ebay' | 'listing' | 'ai' | 'notifications' | 'appearance' | 'security' | 'users';
 
 interface TabConfig {
   id: SettingsTab;
@@ -24,20 +30,33 @@ interface TabConfig {
   icon: React.ReactNode;
 }
 
-const tabs: TabConfig[] = [
+const baseTabs: TabConfig[] = [
   { id: 'profile', label: 'Profile', icon: <User size={20} /> },
   { id: 'ebay', label: 'eBay Account', icon: <CreditCard size={20} /> },
+  { id: 'listing', label: 'Listing Defaults', icon: <Package size={20} /> },
   { id: 'ai', label: 'AI Settings', icon: <Database size={20} /> },
   { id: 'notifications', label: 'Notifications', icon: <Bell size={20} /> },
   { id: 'appearance', label: 'Appearance', icon: <Palette size={20} /> },
   { id: 'security', label: 'Security', icon: <Shield size={20} /> },
 ];
 
+const adminTab: TabConfig = { id: 'users', label: 'User Management', icon: <Users size={20} /> };
+
 export const Settings: React.FC = () => {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<SettingsTab>('ebay');
   const [isSaving, setIsSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState('');
+
+  const isAdmin = user?.role === 'ADMIN';
+  const tabs = isAdmin ? [...baseTabs, adminTab] : baseTabs;
+
+  // User management state (admin only)
+  const [userList, setUserList] = useState<{ id: string; email: string; name: string; role: string; lastActive?: string }[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [showAddUserForm, setShowAddUserForm] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({ name: '', email: '', pin: '', role: 'USER' });
+  const [userError, setUserError] = useState('');
 
   // Appearance state
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
@@ -114,6 +133,26 @@ export const Settings: React.FC = () => {
     defaultModel: 'llava',
   });
 
+  // Listing defaults state
+  const [listingDefaults, setListingDefaults] = useState({
+    listingFormat: 'FixedPrice',
+    listingDuration: 'GTC',
+    quantity: 1,
+    shippingService: 'USPSPriority',
+    shippingType: 'Flat',
+    shippingCost: 0,
+    handlingTime: 3,
+    postalCode: '',
+    bestOffer: false,
+    returnPolicy: {
+      returnsAccepted: 'true',
+      returnDays: '30',
+      refundType: 'MoneyBack',
+      shippingCostPaidBy: 'Buyer',
+    },
+  });
+  const [listingDefaultsLoaded, setListingDefaultsLoaded] = useState(false);
+
   const [notificationSettings, setNotificationSettings] = useState({
     emailNotifications: true,
     itemSold: true,
@@ -121,12 +160,59 @@ export const Settings: React.FC = () => {
     dailyDigest: true,
   });
 
+  // Load listing defaults when tab is activated
+  useEffect(() => {
+    if (activeTab === 'listing' && !listingDefaultsLoaded) {
+      const loadDefaults = async () => {
+        try {
+          const result = await api.getListingDefaults();
+          if (result.success && result.data) {
+            const d = result.data as Record<string, unknown>;
+            setListingDefaults(prev => ({
+              ...prev,
+              ...(d.listingFormat ? { listingFormat: d.listingFormat as string } : {}),
+              ...(d.listingDuration ? { listingDuration: d.listingDuration as string } : {}),
+              ...(d.quantity != null ? { quantity: d.quantity as number } : {}),
+              ...(d.shippingService ? { shippingService: d.shippingService as string } : {}),
+              ...(d.shippingType ? { shippingType: d.shippingType as string } : {}),
+              ...(d.shippingCost != null ? { shippingCost: d.shippingCost as number } : {}),
+              ...(d.handlingTime != null ? { handlingTime: d.handlingTime as number } : {}),
+              ...(d.postalCode ? { postalCode: d.postalCode as string } : {}),
+              ...(d.bestOffer != null ? { bestOffer: d.bestOffer as boolean } : {}),
+              ...(d.returnPolicy ? { returnPolicy: d.returnPolicy as typeof prev.returnPolicy } : {}),
+            }));
+            setListingDefaultsLoaded(true);
+          }
+        } catch (err) {
+          console.error('Failed to load listing defaults:', err);
+        }
+      };
+      loadDefaults();
+    }
+  }, [activeTab, listingDefaultsLoaded]);
+
   const handleSave = async () => {
     setIsSaving(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    if (activeTab === 'listing') {
+      try {
+        const result = await api.saveListingDefaults(listingDefaults);
+        if (result.success) {
+          setSavedMessage('Listing defaults saved! New items will use these settings.');
+        } else {
+          setSavedMessage('Failed to save listing defaults');
+        }
+      } catch (err) {
+        console.error('Failed to save listing defaults:', err);
+        setSavedMessage('Failed to save listing defaults');
+      }
+    } else {
+      // Simulate for other tabs
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setSavedMessage('Settings saved successfully!');
+    }
+
     setIsSaving(false);
-    setSavedMessage('Settings saved successfully!');
     setTimeout(() => setSavedMessage(''), 3000);
   };
 
@@ -181,6 +267,58 @@ export const Settings: React.FC = () => {
       setPinError('Failed to update PIN. Please try again.');
     }
   };
+
+  const loadUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const result = await api.getUsers();
+      if (result.success) {
+        setUserList(result.data as typeof userList);
+      }
+    } catch (err) {
+      console.error('Failed to load users:', err);
+    }
+    setUsersLoading(false);
+  };
+
+  const handleCreateUser = async () => {
+    setUserError('');
+    if (!newUserForm.name || !newUserForm.email || !newUserForm.pin) {
+      setUserError('Name, email, and PIN are required');
+      return;
+    }
+    if (!/^\d{4}$/.test(newUserForm.pin)) {
+      setUserError('PIN must be exactly 4 digits');
+      return;
+    }
+    try {
+      const result = await api.createUser(newUserForm);
+      if (result.success) {
+        setNewUserForm({ name: '', email: '', pin: '', role: 'USER' });
+        setShowAddUserForm(false);
+        loadUsers();
+      }
+    } catch (err: any) {
+      setUserError(err.response?.data?.error || 'Failed to create user');
+    }
+  };
+
+  const handleDeleteUser = async (id: string, name: string) => {
+    if (!window.confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+    try {
+      await api.deleteUser(id);
+      loadUsers();
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+    }
+  };
+
+  // Load users when switching to the users tab
+  useEffect(() => {
+    if (activeTab === 'users' && isAdmin) {
+      loadUsers();
+    }
+  }, [activeTab]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -425,6 +563,249 @@ export const Settings: React.FC = () => {
           </div>
         );
 
+      case 'listing':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium text-slate-900 mb-2">Listing Defaults</h3>
+              <p className="text-sm text-slate-500 mb-4">
+                These defaults are applied to every new item created from the photo pool. You can override them on individual items.
+              </p>
+            </div>
+
+            {/* Listing Format */}
+            <div className="p-4 bg-slate-50 rounded-lg space-y-4">
+              <h4 className="font-medium text-slate-900">Listing Format</h4>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Format</label>
+                <div className="flex gap-4">
+                  {['FixedPrice', 'Auction', 'AuctionWithBIN'].map((fmt) => (
+                    <label key={fmt} className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="defaultListingFormat"
+                        value={fmt}
+                        checked={listingDefaults.listingFormat === fmt}
+                        onChange={(e) => setListingDefaults({ ...listingDefaults, listingFormat: e.target.value })}
+                        className="text-ink-600"
+                      />
+                      <span className="text-sm text-slate-700">{fmt === 'AuctionWithBIN' ? 'Auction + BIN' : fmt}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Duration</label>
+                  <select
+                    value={listingDefaults.listingDuration}
+                    onChange={(e) => setListingDefaults({ ...listingDefaults, listingDuration: e.target.value })}
+                    className="input w-full bg-white"
+                  >
+                    <option value="GTC">Good 'Til Cancelled</option>
+                    <option value="3">3 Days</option>
+                    <option value="5">5 Days</option>
+                    <option value="7">7 Days</option>
+                    <option value="10">10 Days</option>
+                  </select>
+                </div>
+                <div className="w-24">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Qty</label>
+                  <input
+                    type="number"
+                    value={listingDefaults.quantity}
+                    onChange={(e) => setListingDefaults({ ...listingDefaults, quantity: parseInt(e.target.value) || 1 })}
+                    className="input w-full bg-white"
+                    min="1"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-700">Best Offer</p>
+                  <p className="text-xs text-slate-500">Allow buyers to make offers</p>
+                </div>
+                <button
+                  onClick={() => setListingDefaults({ ...listingDefaults, bestOffer: !listingDefaults.bestOffer })}
+                  className={cn(
+                    'relative w-12 h-6 rounded-full transition-colors',
+                    listingDefaults.bestOffer ? 'bg-ink-600' : 'bg-slate-200'
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
+                      listingDefaults.bestOffer ? 'translate-x-7' : 'translate-x-1'
+                    )}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Shipping */}
+            <div className="p-4 bg-slate-50 rounded-lg space-y-4">
+              <h4 className="font-medium text-slate-900">Shipping</h4>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
+                <div className="flex gap-4">
+                  {['Flat', 'Calculated'].map((t) => (
+                    <label key={t} className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="defaultShippingType"
+                        value={t}
+                        checked={listingDefaults.shippingType === t}
+                        onChange={(e) => setListingDefaults({ ...listingDefaults, shippingType: e.target.value })}
+                        className="text-ink-600"
+                      />
+                      <span className="text-sm text-slate-700">{t}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Service</label>
+                <select
+                  value={listingDefaults.shippingService}
+                  onChange={(e) => setListingDefaults({ ...listingDefaults, shippingService: e.target.value })}
+                  className="input w-full bg-white"
+                >
+                  <option value="USPSPriority">USPS Priority Mail</option>
+                  <option value="USPSFirstClass">USPS First Class</option>
+                  <option value="USPSGround">USPS Ground Advantage</option>
+                  <option value="FedExGround">FedEx Ground</option>
+                  <option value="FedExHomeDelivery">FedEx Home Delivery</option>
+                  <option value="UPSGround">UPS Ground</option>
+                  <option value="UPS3Day">UPS 3 Day Select</option>
+                </select>
+              </div>
+              {listingDefaults.shippingType === 'Flat' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Default Shipping Cost ($)</label>
+                  <input
+                    type="number"
+                    value={listingDefaults.shippingCost || ''}
+                    onChange={(e) => setListingDefaults({ ...listingDefaults, shippingCost: parseFloat(e.target.value) || 0 })}
+                    className="input w-full bg-white"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Handling Time (business days)</label>
+                <input
+                  type="number"
+                  value={listingDefaults.handlingTime}
+                  onChange={(e) => setListingDefaults({ ...listingDefaults, handlingTime: parseInt(e.target.value) || 1 })}
+                  className="input w-full bg-white"
+                  min="0"
+                  max="30"
+                />
+              </div>
+            </div>
+
+            {/* Returns */}
+            <div className="p-4 bg-slate-50 rounded-lg space-y-4">
+              <h4 className="font-medium text-slate-900">Returns</h4>
+              <div className="flex items-center gap-4">
+                <label className="text-sm font-medium text-slate-700">Accept Returns:</label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="defaultReturnsAccepted"
+                    checked={listingDefaults.returnPolicy.returnsAccepted !== 'false'}
+                    onChange={() => setListingDefaults({
+                      ...listingDefaults,
+                      returnPolicy: { ...listingDefaults.returnPolicy, returnsAccepted: 'true' }
+                    })}
+                    className="text-ink-600"
+                  />
+                  <span className="text-sm">Yes</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="defaultReturnsAccepted"
+                    checked={listingDefaults.returnPolicy.returnsAccepted === 'false'}
+                    onChange={() => setListingDefaults({
+                      ...listingDefaults,
+                      returnPolicy: { ...listingDefaults.returnPolicy, returnsAccepted: 'false' }
+                    })}
+                    className="text-ink-600"
+                  />
+                  <span className="text-sm">No</span>
+                </label>
+              </div>
+              {listingDefaults.returnPolicy.returnsAccepted !== 'false' && (
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Period</label>
+                    <select
+                      value={listingDefaults.returnPolicy.returnDays}
+                      onChange={(e) => setListingDefaults({
+                        ...listingDefaults,
+                        returnPolicy: { ...listingDefaults.returnPolicy, returnDays: e.target.value }
+                      })}
+                      className="input w-full bg-white"
+                    >
+                      <option value="14">14 Days</option>
+                      <option value="30">30 Days</option>
+                      <option value="60">60 Days</option>
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Refund</label>
+                    <select
+                      value={listingDefaults.returnPolicy.refundType}
+                      onChange={(e) => setListingDefaults({
+                        ...listingDefaults,
+                        returnPolicy: { ...listingDefaults.returnPolicy, refundType: e.target.value }
+                      })}
+                      className="input w-full bg-white"
+                    >
+                      <option value="MoneyBack">Money Back</option>
+                      <option value="Exchange">Exchange</option>
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Return Shipping</label>
+                    <select
+                      value={listingDefaults.returnPolicy.shippingCostPaidBy}
+                      onChange={(e) => setListingDefaults({
+                        ...listingDefaults,
+                        returnPolicy: { ...listingDefaults.returnPolicy, shippingCostPaidBy: e.target.value }
+                      })}
+                      className="input w-full bg-white"
+                    >
+                      <option value="Buyer">Buyer Pays</option>
+                      <option value="Seller">Seller Pays</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Location */}
+            <div className="p-4 bg-slate-50 rounded-lg space-y-4">
+              <h4 className="font-medium text-slate-900">Item Location</h4>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Postal Code</label>
+                <input
+                  type="text"
+                  value={listingDefaults.postalCode}
+                  onChange={(e) => setListingDefaults({ ...listingDefaults, postalCode: e.target.value })}
+                  className="input w-full bg-white"
+                  placeholder="e.g., 10001"
+                  maxLength={10}
+                />
+                <p className="text-xs text-slate-500 mt-1">Used as item location on eBay and in CSV exports</p>
+              </div>
+            </div>
+          </div>
+        );
+
       case 'ai':
         return (
           <div className="space-y-6">
@@ -627,6 +1008,123 @@ export const Settings: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
+        );
+
+      case 'users':
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium text-slate-900">User Management</h3>
+              <button
+                onClick={() => setShowAddUserForm(!showAddUserForm)}
+                className="btn-primary flex items-center gap-2 text-sm"
+              >
+                <Plus size={16} />
+                Add User
+              </button>
+            </div>
+
+            {showAddUserForm && (
+              <div className="card p-4 border border-ink-200 bg-ink-50 space-y-3">
+                <h4 className="font-medium text-slate-900">New User</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
+                    <input
+                      type="text"
+                      value={newUserForm.name}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                      className="input"
+                      placeholder="John Doe"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={newUserForm.email}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                      className="input"
+                      placeholder="user@listflow.local"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">PIN (4 digits)</label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      value={newUserForm.pin}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, pin: e.target.value })}
+                      className="input"
+                      placeholder="1234"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
+                    <select
+                      value={newUserForm.role}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
+                      className="input"
+                    >
+                      <option value="USER">User</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                  </div>
+                </div>
+                {userError && (
+                  <div className="flex items-center gap-2 text-coral-600 text-sm">
+                    <AlertCircle size={16} />
+                    {userError}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <button onClick={handleCreateUser} className="btn-primary text-sm">
+                    Create User
+                  </button>
+                  <button
+                    onClick={() => { setShowAddUserForm(false); setUserError(''); }}
+                    className="btn-secondary text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {usersLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-ink-600" />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {userList.map((u) => (
+                  <div key={u.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-slate-900">{u.name}</p>
+                      <p className="text-sm text-slate-500">{u.email}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={cn(
+                        'text-xs font-medium px-2 py-1 rounded-full',
+                        u.role === 'ADMIN' ? 'badge-plum' : 'badge'
+                      )}>
+                        {u.role}
+                      </span>
+                      {u.id !== user?.id && (
+                        <button
+                          onClick={() => handleDeleteUser(u.id, u.name)}
+                          className="text-slate-400 hover:text-coral-500 p-1 transition-colors"
+                          title="Delete user"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
 

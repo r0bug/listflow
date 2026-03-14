@@ -605,7 +605,7 @@ router.post('/create-item', async (req: Request, res: Response) => {
     let user = userId ? await prisma.user.findUnique({ where: { id: userId } }) : null;
     if (!user) {
       user = await prisma.user.findFirst({
-        where: { role: { in: ['ADMIN', 'MANAGER', 'PROCESSOR'] } }
+        where: { role: { in: ['ADMIN', 'USER'] } }
       });
     }
 

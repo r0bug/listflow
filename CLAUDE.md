@@ -62,16 +62,26 @@ The following must ONLY exist in `.env` files and NEVER in committed code:
 - [x] Unified backend serving both interfaces
 
 ### Technical Tasks
-- [ ] Complete React frontend setup with Vite
+- [x] Complete React frontend setup with Vite
 - [ ] Implement drag-and-drop with react-dropzone
-- [ ] Set up PostgreSQL database with Prisma
+- [x] Set up PostgreSQL database with Prisma
 - [ ] Create Docker compose for local development
 - [ ] Implement queue system with Bull for batch processing
-- [ ] Add comprehensive error handling
+- [x] Add comprehensive error handling
 - [ ] Set up testing infrastructure
-- [ ] Create API documentation
-- [ ] Implement rate limiting for API calls
-- [ ] Add image optimization pipeline
+- [x] Create API documentation
+- [x] Implement rate limiting for API calls
+- [x] Add image optimization pipeline (Sharp)
+
+### Workflow Overhaul (Completed)
+- [x] Extended Item schema with shipping, listing format, returns, weight, dimensions fields
+- [x] Add photos to existing items (upload endpoint + UI)
+- [x] Full pricing stage with AI price suggestions (Claude Sonnet 4)
+- [x] CSV export in eBay File Exchange format (25-column)
+- [x] eBay API push (single + bulk) with Listing record creation
+- [x] Settings page with listing defaults (format, shipping, returns, location)
+- [x] Location-level settings persistence (Json field on Location model)
+- [x] Photo pool: attach ungrouped photos to existing items
 
 ### Development Commands
 ```bash
@@ -103,6 +113,13 @@ docker-compose down      # Stop all services
 - `POST /api/listings/create` - Create eBay listing
 - `GET /api/listings/history` - Get listing history
 - `GET /api/listings/:id` - Get specific listing
+- `POST /api/dashboard/item/:id/photos` - Upload photos to existing item
+- `POST /api/dashboard/item/:id/suggest-price` - AI price suggestion
+- `POST /api/dashboard/item/:id/push-to-ebay` - Push item to eBay
+- `POST /api/dashboard/items/bulk-push-to-ebay` - Batch push to eBay
+- `GET /api/v1/export/csv` - Export items as eBay CSV
+- `GET/PUT /api/dashboard/listing-defaults` - Listing defaults
+- `POST /api/pool/attach-to-item` - Attach pooled photos to item
 
 ### Testing Checklist
 - [ ] Image upload works with various formats (JPG, PNG, WebP)

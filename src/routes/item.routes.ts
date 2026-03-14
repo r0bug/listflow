@@ -145,9 +145,9 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
         aiAnalysis,
         photos: item.photos.map(p => ({
           id: p.id,
-          originalPath: p.originalPath,
-          thumbnailPath: p.thumbnailPath,
-          optimizedPath: p.optimizedPath,
+          originalPath: p.originalPath?.startsWith('/') ? p.originalPath : `/${p.originalPath}`,
+          thumbnailPath: p.thumbnailPath ? (p.thumbnailPath.startsWith('/') ? p.thumbnailPath : `/${p.thumbnailPath}`) : null,
+          optimizedPath: p.optimizedPath ? (p.optimizedPath.startsWith('/') ? p.optimizedPath : `/${p.optimizedPath}`) : null,
           isPrimary: p.isPrimary,
           order: p.order,
           analysis: p.analysis,

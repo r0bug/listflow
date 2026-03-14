@@ -498,7 +498,7 @@ program
   .action(async (options) => {
     // For testing, use provided user ID or create a test user
     const userId = options.user || 'test-user-id';
-    const role = options.role || UserRole.PROCESSOR;
+    const role = options.role || UserRole.USER;
     
     await processItems(userId, role);
   });
@@ -577,15 +577,15 @@ program
     try {
       // Create a test user if needed
       let user = await prisma.user.findFirst({
-        where: { role: UserRole.PHOTOGRAPHER }
+        where: { role: { in: [UserRole.ADMIN, UserRole.USER] } }
       });
-      
+
       if (!user) {
         user = await prisma.user.create({
           data: {
-            email: 'photographer@test.com',
-            name: 'Test Photographer',
-            role: UserRole.PHOTOGRAPHER,
+            email: 'user@test.com',
+            name: 'Test User',
+            role: UserRole.USER,
             password: 'test' // In production, hash this
           }
         });

@@ -14,6 +14,15 @@ interface ListingData {
   imageUrls: string[];
   quantity?: number;
   shippingCost?: number;
+  listingFormat?: string;
+  listingDuration?: string;
+  handlingTime?: number;
+  returnPolicy?: { returnsAccepted?: string; refundType?: string; returnDays?: string; shippingCostPaidBy?: string };
+  shippingService?: string;
+  shippingType?: string;
+  weight?: number;
+  packageDimensions?: { length?: number; width?: number; height?: number };
+  postalCode?: string;
 }
 
 class EbayService {
@@ -44,6 +53,17 @@ class EbayService {
     }
 
     try {
+      // Determine eBay listing type
+      const format = data.listingFormat || (data.buyNowPrice ? 'FixedPrice' : 'Auction');
+      const ebayListingType = format === 'FixedPrice' ? 'FixedPriceItem' : 'Chinese';
+      const ebayDuration = data.listingDuration === 'GTC' ? 'GTC'
+        : data.listingDuration ? `Days_${data.listingDuration}`
+        : (format === 'FixedPrice' ? 'GTC' : 'Days_7');
+
+      // Build return policy
+      const returnPol = data.returnPolicy || {};
+      const returnsAccepted = returnPol.returnsAccepted === 'false' ? 'ReturnsNotAccepted' : 'ReturnsAccepted';
+
       const listing = {
         Item: {
           Title: data.title,
@@ -55,30 +75,41 @@ class EbayService {
           BuyItNowPrice: data.buyNowPrice,
           Country: 'US',
           Currency: 'USD',
-          DispatchTimeMax: 3,
-          ListingDuration: 'Days_7',
-          ListingType: data.buyNowPrice ? 'FixedPriceItem' : 'Chinese',
+          DispatchTimeMax: data.handlingTime || 3,
+          ListingDuration: ebayDuration,
+          ListingType: ebayListingType,
           PaymentMethods: 'PayPal',
           PayPalEmailAddress: process.env.PAYPAL_EMAIL,
           PictureDetails: {
             PictureURL: data.imageUrls
           },
-          PostalCode: process.env.SELLER_POSTAL_CODE || '10001',
+          PostalCode: data.postalCode || process.env.SELLER_POSTAL_CODE || '10001',
           Quantity: data.quantity || 1,
           ReturnPolicy: {
-            ReturnsAcceptedOption: 'ReturnsAccepted',
-            RefundOption: 'MoneyBack',
-            ReturnsWithinOption: 'Days_30',
-            ShippingCostPaidByOption: 'Buyer'
+            ReturnsAcceptedOption: returnsAccepted,
+            RefundOption: returnPol.refundType || 'MoneyBack',
+            ReturnsWithinOption: returnPol.returnDays ? `Days_${returnPol.returnDays}` : 'Days_30',
+            ShippingCostPaidByOption: returnPol.shippingCostPaidBy || 'Buyer'
           },
           ShippingDetails: {
-            ShippingType: 'Flat',
+            ShippingType: data.shippingType || 'Flat',
             ShippingServiceOptions: {
               ShippingServicePriority: 1,
-              ShippingService: 'USPSPriority',
+              ShippingService: data.shippingService || 'USPSPriority',
               ShippingServiceCost: data.shippingCost || 9.99
             }
           },
+          ...(data.weight ? {
+            ShippingPackageDetails: {
+              WeightMajor: Math.floor(data.weight / 16),
+              WeightMinor: Math.round(data.weight % 16),
+              ...(data.packageDimensions ? {
+                PackageLength: data.packageDimensions.length,
+                PackageWidth: data.packageDimensions.width,
+                PackageDepth: data.packageDimensions.height,
+              } : {})
+            }
+          } : {}),
           ConditionID: this.mapCondition(data.condition)
         }
       };

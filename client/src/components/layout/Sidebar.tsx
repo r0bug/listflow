@@ -14,7 +14,6 @@ import {
   Copy,
   BarChart3,
 } from 'lucide-react';
-import { useAppStore } from '../../stores/appStore';
 import { cn } from '../../utils/cn';
 
 interface NavItemProps {
@@ -22,10 +21,11 @@ interface NavItemProps {
   icon: React.ReactNode;
   label: string;
   badge?: number;
+  onNavigate?: () => void;
   children?: { to: string; label: string; badge?: number }[];
 }
 
-const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, children }) => {
+const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, onNavigate, children }) => {
   const [expanded, setExpanded] = React.useState(false);
   const hasChildren = children && children.length > 0;
 
@@ -48,6 +48,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, children }) =
               <NavLink
                 key={child.to}
                 to={child.to}
+                onClick={onNavigate}
                 className={({ isActive }) =>
                   cn(
                     'flex items-center justify-between px-3 py-1.5 rounded-lg text-sm transition-colors',
@@ -74,6 +75,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, children }) =
   return (
     <NavLink
       to={to}
+      onClick={onNavigate}
       className={({ isActive }) =>
         cn(
           'flex items-center justify-between px-3 py-2 rounded-lg transition-colors',
@@ -96,51 +98,75 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, children }) =
   );
 };
 
-export const Sidebar: React.FC = () => {
-  const { sidebarCollapsed } = useAppStore();
+interface SidebarProps {
+  isMobileOpen?: boolean;
+  onNavigate?: () => void;
+}
 
-  if (sidebarCollapsed) {
-    return null;
+export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onNavigate }) => {
+  const navContent = (
+    <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+      <NavItem to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" onNavigate={onNavigate} />
+      <NavItem to="/import" icon={<Upload size={18} />} label="Import" onNavigate={onNavigate} />
+
+      <NavItem
+        to="/queue"
+        icon={<ListTodo size={18} />}
+        label="Queue"
+        onNavigate={onNavigate}
+        children={[
+          { to: '/queue/identify', label: 'Identify', badge: 12 },
+          { to: '/queue/review', label: 'Review', badge: 18 },
+          { to: '/queue/price', label: 'Price', badge: 9 },
+          { to: '/queue/ready', label: 'Ready', badge: 8 },
+        ]}
+      />
+
+      <NavItem
+        to="/listings"
+        icon={<Package size={18} />}
+        label="Listings"
+        onNavigate={onNavigate}
+        children={[
+          { to: '/listings/active', label: 'Active' },
+          { to: '/listings/sold', label: 'Sold' },
+        ]}
+      />
+
+      <NavItem to="/inventory" icon={<Warehouse size={18} />} label="Inventory" onNavigate={onNavigate} />
+      <NavItem to="/templates" icon={<FileText size={18} />} label="Templates" onNavigate={onNavigate} />
+      <NavItem to="/sell-similar" icon={<Copy size={18} />} label="Sell Similar" onNavigate={onNavigate} />
+      <NavItem to="/research" icon={<Search size={18} />} label="Research" onNavigate={onNavigate} />
+      <NavItem to="/reports" icon={<BarChart3 size={18} />} label="Reports" onNavigate={onNavigate} />
+
+      <div className="pt-3 mt-3 border-t border-slate-100">
+        <NavItem to="/settings" icon={<Settings size={18} />} label="Settings" onNavigate={onNavigate} />
+      </div>
+    </nav>
+  );
+
+  // Mobile: overlay drawer
+  if (isMobileOpen !== undefined) {
+    if (!isMobileOpen) return null;
+    return (
+      <>
+        {/* Backdrop */}
+        <div
+          className="fixed inset-0 bg-slate-900/40 z-30 md:hidden"
+          onClick={onNavigate}
+        />
+        {/* Drawer */}
+        <aside className="fixed inset-y-0 left-0 z-40 w-60 bg-white border-r border-slate-200 flex flex-col h-full shadow-xl md:hidden animate-slide-in-left">
+          {navContent}
+        </aside>
+      </>
+    );
   }
 
+  // Desktop: inline sidebar
   return (
-    <aside className="w-60 bg-white border-r border-slate-200 flex flex-col h-full">
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        <NavItem to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" />
-        <NavItem to="/import" icon={<Upload size={18} />} label="Import" />
-
-        <NavItem
-          to="/queue"
-          icon={<ListTodo size={18} />}
-          label="Queue"
-          children={[
-            { to: '/queue/identify', label: 'Identify', badge: 12 },
-            { to: '/queue/review', label: 'Review', badge: 18 },
-            { to: '/queue/price', label: 'Price', badge: 9 },
-            { to: '/queue/ready', label: 'Ready', badge: 8 },
-          ]}
-        />
-
-        <NavItem
-          to="/listings"
-          icon={<Package size={18} />}
-          label="Listings"
-          children={[
-            { to: '/listings/active', label: 'Active' },
-            { to: '/listings/sold', label: 'Sold' },
-          ]}
-        />
-
-        <NavItem to="/inventory" icon={<Warehouse size={18} />} label="Inventory" />
-        <NavItem to="/templates" icon={<FileText size={18} />} label="Templates" />
-        <NavItem to="/sell-similar" icon={<Copy size={18} />} label="Sell Similar" />
-        <NavItem to="/research" icon={<Search size={18} />} label="Research" />
-        <NavItem to="/reports" icon={<BarChart3 size={18} />} label="Reports" />
-
-        <div className="pt-3 mt-3 border-t border-slate-100">
-          <NavItem to="/settings" icon={<Settings size={18} />} label="Settings" />
-        </div>
-      </nav>
+    <aside className="hidden md:flex w-60 bg-white border-r border-slate-200 flex-col h-full">
+      {navContent}
     </aside>
   );
 };

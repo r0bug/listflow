@@ -12,73 +12,76 @@ interface WorkflowTransition {
 export class WorkflowService {
   private prisma: PrismaClient;
   
+  // All roles for transitions (simplified: ADMIN and USER can do everything)
+  private allRoles: UserRole[] = [UserRole.ADMIN, UserRole.USER];
+
   // Define valid transitions and who can perform them
   private transitions: WorkflowTransition[] = [
     // Photo upload to AI processing
     {
       fromStage: WorkflowStage.PHOTO_UPLOAD,
       toStage: WorkflowStage.AI_PROCESSING,
-      allowedRoles: [UserRole.PHOTOGRAPHER, UserRole.MANAGER, UserRole.ADMIN],
+      allowedRoles: this.allRoles,
       action: 'process'
     },
     // AI processing to review
     {
       fromStage: WorkflowStage.AI_PROCESSING,
       toStage: WorkflowStage.REVIEW_EDIT,
-      allowedRoles: [UserRole.PROCESSOR, UserRole.MANAGER, UserRole.ADMIN],
+      allowedRoles: this.allRoles,
       action: 'complete_ai'
     },
     // Review to pricing
     {
       fromStage: WorkflowStage.REVIEW_EDIT,
       toStage: WorkflowStage.PRICING,
-      allowedRoles: [UserRole.PROCESSOR, UserRole.MANAGER, UserRole.ADMIN],
+      allowedRoles: this.allRoles,
       action: 'approve_description'
     },
     // Pricing to final review
     {
       fromStage: WorkflowStage.PRICING,
       toStage: WorkflowStage.FINAL_REVIEW,
-      allowedRoles: [UserRole.PRICER, UserRole.MANAGER, UserRole.ADMIN],
+      allowedRoles: this.allRoles,
       action: 'set_price'
     },
     // Final review to published
     {
       fromStage: WorkflowStage.FINAL_REVIEW,
       toStage: WorkflowStage.PUBLISHED,
-      allowedRoles: [UserRole.PUBLISHER, UserRole.MANAGER, UserRole.ADMIN],
+      allowedRoles: this.allRoles,
       action: 'publish'
     },
     // Any stage can be rejected
     {
       fromStage: WorkflowStage.REVIEW_EDIT,
       toStage: WorkflowStage.REJECTED,
-      allowedRoles: [UserRole.PROCESSOR, UserRole.MANAGER, UserRole.ADMIN],
+      allowedRoles: this.allRoles,
       action: 'reject'
     },
     {
       fromStage: WorkflowStage.PRICING,
       toStage: WorkflowStage.REJECTED,
-      allowedRoles: [UserRole.PRICER, UserRole.MANAGER, UserRole.ADMIN],
+      allowedRoles: this.allRoles,
       action: 'reject'
     },
     {
       fromStage: WorkflowStage.FINAL_REVIEW,
       toStage: WorkflowStage.REJECTED,
-      allowedRoles: [UserRole.PUBLISHER, UserRole.MANAGER, UserRole.ADMIN],
+      allowedRoles: this.allRoles,
       action: 'reject'
     },
     // Allow going back for revisions
     {
       fromStage: WorkflowStage.PRICING,
       toStage: WorkflowStage.REVIEW_EDIT,
-      allowedRoles: [UserRole.PRICER, UserRole.MANAGER, UserRole.ADMIN],
+      allowedRoles: this.allRoles,
       action: 'send_back'
     },
     {
       fromStage: WorkflowStage.FINAL_REVIEW,
       toStage: WorkflowStage.PRICING,
-      allowedRoles: [UserRole.PUBLISHER, UserRole.MANAGER, UserRole.ADMIN],
+      allowedRoles: this.allRoles,
       action: 'send_back'
     }
   ];
@@ -188,21 +191,25 @@ export class WorkflowService {
       throw new Error('Item not found or has no photos');
     }
     
-    // Process primary photo or first photo
-    const primaryPhoto = item.photos.find(p => p.isPrimary) || item.photos[0];
-    
     try {
-      // Analyze the image
-      const analysis = await aiService.analyzeImage(primaryPhoto.originalPath);
-      
+      // Send ALL photos to Claude in a single call for comprehensive analysis
+      const allPhotoPaths = item.photos.map(p => p.originalPath);
+      const { analysis, cost: analysisCost } = await aiService.analyzeImages(allPhotoPaths);
+
       // Generate listing based on analysis
-      const listing = await aiService.generateListing({
+      const { listing, cost: listingCost } = await aiService.generateListing({
         imageAnalysis: analysis,
-        category: item.category,
-        condition: item.condition
+        category: item.category ?? undefined,
+        condition: item.condition ?? undefined
       });
-      
-      // Update item with AI results
+
+      // Accumulate total AI cost for this run
+      const totalCost = analysisCost + listingCost;
+
+      // Serialize to plain JSON for Prisma's InputJsonValue type
+      const analysisJson: any = JSON.parse(JSON.stringify(analysis));
+
+      // Update item with AI results and increment cumulative AI cost
       await this.prisma.item.update({
         where: { id: itemId },
         data: {
@@ -213,15 +220,17 @@ export class WorkflowService {
           brand: analysis.brand,
           features: analysis.features || [],
           keywords: listing.tags || [],
-          aiAnalysis: analysis
+          aiAnalysis: analysisJson,
+          aiCost: { increment: totalCost }
         }
       });
-      
-      // Update photo with analysis
+
+      // Mark all photos as processed
+      const primaryPhoto = item.photos.find(p => p.isPrimary) || item.photos[0];
       await this.prisma.photo.update({
         where: { id: primaryPhoto.id },
         data: {
-          analysis: analysis,
+          analysis: analysisJson,
           processedAt: new Date()
         }
       });
@@ -239,20 +248,9 @@ export class WorkflowService {
     }
   }
 
-  async getItemsForStage(stage: WorkflowStage, userId?: string) {
-    const where: { stage: WorkflowStage; createdById?: string } = { stage };
-    
-    if (userId) {
-      const user = await this.prisma.user.findUnique({ where: { id: userId } });
-      
-      // Filter based on user role
-      if (user?.role === UserRole.PHOTOGRAPHER) {
-        where.createdById = userId;
-      }
-    }
-    
+  async getItemsForStage(stage: WorkflowStage, _userId?: string) {
     return this.prisma.item.findMany({
-      where,
+      where: { stage },
       include: {
         photos: { orderBy: { order: 'asc' } },
         createdBy: true,
@@ -269,35 +267,16 @@ export class WorkflowService {
   async getNextItemForUser(userId: string, currentItemId?: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('User not found');
-    
-    // Determine which stages this user can work on
-    let stages: WorkflowStage[] = [];
-    
-    switch (user.role) {
-      case UserRole.PHOTOGRAPHER:
-        stages = [WorkflowStage.PHOTO_UPLOAD];
-        break;
-      case UserRole.PROCESSOR:
-        stages = [WorkflowStage.REVIEW_EDIT];
-        break;
-      case UserRole.PRICER:
-        stages = [WorkflowStage.PRICING];
-        break;
-      case UserRole.PUBLISHER:
-        stages = [WorkflowStage.FINAL_REVIEW];
-        break;
-      case UserRole.MANAGER:
-      case UserRole.ADMIN:
-        stages = [
-          WorkflowStage.PHOTO_UPLOAD,
-          WorkflowStage.REVIEW_EDIT,
-          WorkflowStage.PRICING,
-          WorkflowStage.FINAL_REVIEW
-        ];
-        break;
-    }
-    
-    // Find next item in queue for user's stages
+
+    // All users (ADMIN and USER) can work on all stages
+    const stages: WorkflowStage[] = [
+      WorkflowStage.PHOTO_UPLOAD,
+      WorkflowStage.REVIEW_EDIT,
+      WorkflowStage.PRICING,
+      WorkflowStage.FINAL_REVIEW
+    ];
+
+    // Find next item in queue
     const nextItem = await this.prisma.item.findFirst({
       where: {
         stage: { in: stages },
@@ -310,7 +289,7 @@ export class WorkflowService {
       },
       orderBy: { createdAt: 'asc' }
     });
-    
+
     return nextItem;
   }
 

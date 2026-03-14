@@ -12,7 +12,12 @@ import {
   Save,
   Check,
   Edit2,
+  Download,
+  DollarSign,
+  Package,
+  ExternalLink,
 } from 'lucide-react';
+import api from '../../api/client';
 import { cn } from '../../utils/cn';
 
 interface ItemData {
@@ -39,6 +44,24 @@ interface ItemData {
   locationCode: string;
   createdBy: string;
   createdAt: string;
+  aiCost?: number;
+  startingPrice: number;
+  buyNowPrice: number;
+  shippingCost: number;
+  shippingService: string;
+  shippingType: string;
+  weight: number | null;
+  packageDimensions: { length?: number; width?: number; height?: number } | null;
+  handlingTime: number;
+  listingFormat: string;
+  listingDuration: string;
+  returnPolicy: { returnsAccepted?: string; refundType?: string; returnDays?: string; shippingCostPaidBy?: string } | null;
+  quantity: number;
+  postalCode: string;
+  aiPriceSuggestion: { min: number; max: number; confidence: string; reasoning: string } | null;
+  ebayId: string | null;
+  publishedAt: string | null;
+  exportedAt: string | null;
 }
 
 interface NavigationData {
@@ -88,9 +111,12 @@ export const ItemDetail: React.FC = () => {
   const [showAddSpecificModal, setShowAddSpecificModal] = useState(false);
   const [newSpecific, setNewSpecific] = useState({ name: '', value: '' });
 
-  // Redo context
+  // Redo / reanalyze context
   const [redoContext, setRedoContext] = useState('');
   const [showRedoInput, setShowRedoInput] = useState(false);
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
+  const [isSuggestingPrice, setIsSuggestingPrice] = useState(false);
+  const [isPushingToEbay, setIsPushingToEbay] = useState(false);
 
   // Load item data
   const loadItem = useCallback(async () => {
@@ -151,7 +177,20 @@ export const ItemDetail: React.FC = () => {
           category: item.category,
           condition: item.condition,
           brand: item.brand,
-          itemSpecifics: item.itemSpecifics
+          itemSpecifics: item.itemSpecifics,
+          startingPrice: item.startingPrice,
+          buyNowPrice: item.buyNowPrice,
+          shippingCost: item.shippingCost,
+          shippingService: item.shippingService,
+          shippingType: item.shippingType,
+          weight: item.weight,
+          packageDimensions: item.packageDimensions,
+          handlingTime: item.handlingTime,
+          listingFormat: item.listingFormat,
+          listingDuration: item.listingDuration,
+          returnPolicy: item.returnPolicy,
+          quantity: item.quantity,
+          postalCode: item.postalCode,
         })
       });
 
@@ -212,37 +251,125 @@ export const ItemDetail: React.FC = () => {
     setIsSaving(false);
   };
 
-  // Redo AI analysis
+  // Redo AI analysis (full reprocess or targeted reanalyze with prompt)
   const handleRedo = async () => {
-    if (!item || !redoContext.trim()) return;
+    if (!item) return;
 
     setIsSaving(true);
+    setError(null);
     try {
-      // For now, just save the context as a note and keep item in same stage
-      // In a real implementation, this would trigger AI re-analysis
-      const response = await fetch(`/api/dashboard/item/${item.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          // Store redo context in description or separate field
-          description: item.description + `\n\n[Redo context: ${redoContext}]`
-        })
-      });
-
-      const result = await response.json();
+      let result;
+      if (redoContext.trim()) {
+        // Targeted reanalyze with correction prompt + optional selected photos
+        result = await api.reanalyzeItem(
+          item.id,
+          redoContext.trim(),
+          selectedPhotoIds.length > 0 ? selectedPhotoIds : undefined
+        );
+      } else {
+        // Full reprocess from scratch
+        result = await api.reprocessAi(item.id);
+      }
       if (result.success) {
-        setSuccessMessage('Redo context saved - AI will reprocess');
+        setSuccessMessage('AI analysis complete - reloading...');
         setShowRedoInput(false);
         setRedoContext('');
+        setSelectedPhotoIds([]);
         loadItem();
       } else {
-        setError(result.error || 'Failed to submit redo');
+        setError((result as any).error || 'AI processing failed');
       }
     } catch (err) {
-      console.error('Error submitting redo:', err);
-      setError('Failed to submit redo');
+      console.error('Error running AI:', err);
+      setError('Failed to run AI analysis');
     }
     setIsSaving(false);
+  };
+
+  // Export to CSV
+  const handleExportCsv = async () => {
+    if (!item) return;
+    setIsSaving(true);
+    try {
+      const blob = await api.exportCsv([item.id]);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `listflow-${item.displayId}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      setSuccessMessage('CSV exported');
+      setTimeout(() => setSuccessMessage(null), 2000);
+    } catch (err) {
+      console.error('Error exporting CSV:', err);
+      setError('Failed to export CSV');
+    }
+    setIsSaving(false);
+  };
+
+  // AI Price Suggestion
+  const handleSuggestPrice = async () => {
+    if (!item) return;
+    setIsSuggestingPrice(true);
+    try {
+      const result = await api.suggestItemPrice(item.id);
+      if (result.success) {
+        setItem({ ...item, aiPriceSuggestion: result.data as any });
+        setSuccessMessage('Price suggestion received');
+        setTimeout(() => setSuccessMessage(null), 2000);
+      } else {
+        setError((result as any).error || 'Failed to get price suggestion');
+      }
+    } catch (err) {
+      console.error('Error getting price suggestion:', err);
+      setError('Failed to get AI price suggestion');
+    }
+    setIsSuggestingPrice(false);
+  };
+
+  // Push to eBay
+  const handlePushToEbay = async () => {
+    if (!item) return;
+    if (!window.confirm('Push this item to eBay? This action will create a live listing.')) return;
+
+    setIsPushingToEbay(true);
+    try {
+      const result = await api.pushToEbay(item.id);
+      if (result.success) {
+        setSuccessMessage('Successfully pushed to eBay!');
+        loadItem(); // Reload to get updated state
+      } else {
+        setError((result as any).error || 'Failed to push to eBay');
+      }
+    } catch (err) {
+      console.error('Error pushing to eBay:', err);
+      setError('Failed to push to eBay');
+    }
+    setIsPushingToEbay(false);
+  };
+
+  // Upload additional photos
+  const handleUploadMorePhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!item || !e.target.files || e.target.files.length === 0) return;
+    const files = Array.from(e.target.files);
+    setIsSaving(true);
+    try {
+      const result = await api.uploadPhotosToItem(item.id, files);
+      if (result.success) {
+        setSuccessMessage('Photos uploaded');
+        loadItem();
+        setTimeout(() => setSuccessMessage(null), 2000);
+      } else {
+        setError((result as any).error || 'Failed to upload photos');
+      }
+    } catch (err) {
+      console.error('Error uploading photos:', err);
+      setError('Failed to upload photos');
+    }
+    setIsSaving(false);
+    e.target.value = '';
   };
 
   // Reject item
@@ -437,6 +564,17 @@ export const ItemDetail: React.FC = () => {
                   )}
                 </button>
               ))}
+              {/* Add photo button */}
+              <label className="w-16 h-16 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400 hover:border-ink-500 hover:text-ink-500 cursor-pointer transition-colors">
+                <Plus size={20} />
+                <input
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleUploadMorePhotos}
+                  className="hidden"
+                />
+              </label>
             </div>
           </div>
 
@@ -479,6 +617,11 @@ export const ItemDetail: React.FC = () => {
                 <span className="badge-ink">
                   AI: {item.aiAnalysis.confidence}%
                 </span>
+                {item.aiCost != null && item.aiCost > 0 && (
+                  <span className="text-xs text-slate-400" title="Total AI cost for this item">
+                    ${item.aiCost.toFixed(4)}
+                  </span>
+                )}
                 <button
                   onClick={() => setEditingTitle(!editingTitle)}
                   className="text-ink-600 text-sm hover:text-ink-800 flex items-center gap-1 transition-colors"
@@ -596,23 +739,25 @@ export const ItemDetail: React.FC = () => {
                 <p className="text-slate-500 text-sm">No item specifics added</p>
               ) : (
                 item.itemSpecifics.map((specific, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <span className="text-slate-500 w-28 flex-shrink-0 text-sm">
+                  <div key={index} className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+                    <span className="text-slate-500 md:w-28 flex-shrink-0 text-sm">
                       {specific.name}:
                     </span>
-                    <input
-                      type="text"
-                      value={specific.value}
-                      onChange={(e) => handleUpdateSpecific(index, e.target.value)}
-                      className="flex-1 px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-ink-500/20 focus:border-ink-500 transition-colors"
-                    />
-                    <button
-                      onClick={() => handleRemoveSpecific(index)}
-                      className="text-slate-400 hover:text-coral-500 p-1 transition-colors"
-                      title="Remove"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="text"
+                        value={specific.value}
+                        onChange={(e) => handleUpdateSpecific(index, e.target.value)}
+                        className="flex-1 px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-ink-500/20 focus:border-ink-500 transition-colors min-h-[44px]"
+                      />
+                      <button
+                        onClick={() => handleRemoveSpecific(index)}
+                        className="text-slate-400 hover:text-coral-500 p-1 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                        title="Remove"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
@@ -694,22 +839,384 @@ export const ItemDetail: React.FC = () => {
               />
             )}
           </div>
+
+          {/* Pricing & Listing Form - always visible so details can be set at any stage */}
+              {/* Listing Format Card */}
+              <div className="card p-4">
+                <h3 className="font-semibold text-slate-900 mb-3">Listing Format</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Format</label>
+                    <div className="flex gap-3">
+                      {['FixedPrice', 'Auction', 'AuctionWithBIN'].map((fmt) => (
+                        <label key={fmt} className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="listingFormat"
+                            value={fmt}
+                            checked={item.listingFormat === fmt}
+                            onChange={(e) => updateField('listingFormat', e.target.value)}
+                            className="text-ink-600"
+                          />
+                          <span className="text-sm text-slate-700">{fmt === 'AuctionWithBIN' ? 'Auction + BIN' : fmt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Duration</label>
+                      <select
+                        value={item.listingDuration}
+                        onChange={(e) => updateField('listingDuration', e.target.value)}
+                        className="input w-full"
+                      >
+                        <option value="GTC">Good 'Til Cancelled</option>
+                        <option value="3">3 Days</option>
+                        <option value="5">5 Days</option>
+                        <option value="7">7 Days</option>
+                        <option value="10">10 Days</option>
+                      </select>
+                    </div>
+                    <div className="w-24">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Qty</label>
+                      <input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => updateField('quantity', parseInt(e.target.value) || 1)}
+                        className="input w-full"
+                        min="1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pricing Card */}
+              <div className="card p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-slate-900">Pricing</h3>
+                  <button
+                    onClick={handleSuggestPrice}
+                    disabled={isSuggestingPrice}
+                    className="flex items-center gap-1 text-sm text-ink-600 hover:text-ink-800 transition-colors"
+                  >
+                    {isSuggestingPrice ? <Loader2 size={14} className="animate-spin" /> : <DollarSign size={14} />}
+                    AI Suggest
+                  </button>
+                </div>
+                {item.aiPriceSuggestion && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3 text-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-amber-800">
+                        ${item.aiPriceSuggestion.min} - ${item.aiPriceSuggestion.max}
+                      </span>
+                      <span className="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
+                        {item.aiPriceSuggestion.confidence}
+                      </span>
+                    </div>
+                    <p className="text-amber-700 text-xs">{item.aiPriceSuggestion.reasoning}</p>
+                  </div>
+                )}
+                <div className="space-y-3">
+                  {(item.listingFormat === 'Auction' || item.listingFormat === 'AuctionWithBIN') && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Starting Price ($)</label>
+                      <input
+                        type="number"
+                        value={item.startingPrice || ''}
+                        onChange={(e) => updateField('startingPrice', parseFloat(e.target.value) || 0)}
+                        className="input w-full"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  )}
+                  {(item.listingFormat === 'FixedPrice' || item.listingFormat === 'AuctionWithBIN') && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        {item.listingFormat === 'FixedPrice' ? 'Price ($)' : 'Buy It Now Price ($)'}
+                      </label>
+                      <input
+                        type="number"
+                        value={item.buyNowPrice || ''}
+                        onChange={(e) => updateField('buyNowPrice', parseFloat(e.target.value) || 0)}
+                        className="input w-full"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Shipping Card */}
+              <div className="card p-4">
+                <h3 className="font-semibold text-slate-900 mb-3">Shipping</h3>
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
+                      <div className="flex gap-3">
+                        {['Flat', 'Calculated'].map((t) => (
+                          <label key={t} className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="shippingType"
+                              value={t}
+                              checked={item.shippingType === t}
+                              onChange={(e) => updateField('shippingType', e.target.value)}
+                              className="text-ink-600"
+                            />
+                            <span className="text-sm text-slate-700">{t}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Service</label>
+                    <select
+                      value={item.shippingService}
+                      onChange={(e) => updateField('shippingService', e.target.value)}
+                      className="input w-full"
+                    >
+                      <option value="USPSPriority">USPS Priority Mail</option>
+                      <option value="USPSFirstClass">USPS First Class</option>
+                      <option value="USPSGround">USPS Ground Advantage</option>
+                      <option value="FedExGround">FedEx Ground</option>
+                      <option value="FedExHomeDelivery">FedEx Home Delivery</option>
+                      <option value="UPSGround">UPS Ground</option>
+                      <option value="UPS3Day">UPS 3 Day Select</option>
+                    </select>
+                  </div>
+                  {item.shippingType === 'Flat' && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Cost ($)</label>
+                      <input
+                        type="number"
+                        value={item.shippingCost || ''}
+                        onChange={(e) => updateField('shippingCost', parseFloat(e.target.value) || 0)}
+                        className="input w-full"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  )}
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Weight (oz)</label>
+                      <input
+                        type="number"
+                        value={item.weight || ''}
+                        onChange={(e) => updateField('weight', parseFloat(e.target.value) || null)}
+                        className="input w-full"
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Handling (days)</label>
+                      <input
+                        type="number"
+                        value={item.handlingTime}
+                        onChange={(e) => updateField('handlingTime', parseInt(e.target.value) || 3)}
+                        className="input w-full"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Dimensions (L x W x H inches)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        placeholder="L"
+                        value={item.packageDimensions?.length || ''}
+                        onChange={(e) => updateField('packageDimensions', { ...item.packageDimensions, length: parseFloat(e.target.value) || undefined })}
+                        className="input w-full"
+                        min="0"
+                        step="0.1"
+                      />
+                      <input
+                        type="number"
+                        placeholder="W"
+                        value={item.packageDimensions?.width || ''}
+                        onChange={(e) => updateField('packageDimensions', { ...item.packageDimensions, width: parseFloat(e.target.value) || undefined })}
+                        className="input w-full"
+                        min="0"
+                        step="0.1"
+                      />
+                      <input
+                        type="number"
+                        placeholder="H"
+                        value={item.packageDimensions?.height || ''}
+                        onChange={(e) => updateField('packageDimensions', { ...item.packageDimensions, height: parseFloat(e.target.value) || undefined })}
+                        className="input w-full"
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Returns Card */}
+              <div className="card p-4">
+                <h3 className="font-semibold text-slate-900 mb-3">Returns</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-slate-700">Accepted:</label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="returnsAccepted"
+                        checked={item.returnPolicy?.returnsAccepted !== 'false'}
+                        onChange={() => updateField('returnPolicy', { ...item.returnPolicy, returnsAccepted: 'true' })}
+                        className="text-ink-600"
+                      />
+                      <span className="text-sm">Yes</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="returnsAccepted"
+                        checked={item.returnPolicy?.returnsAccepted === 'false'}
+                        onChange={() => updateField('returnPolicy', { ...item.returnPolicy, returnsAccepted: 'false' })}
+                        className="text-ink-600"
+                      />
+                      <span className="text-sm">No</span>
+                    </label>
+                  </div>
+                  {item.returnPolicy?.returnsAccepted !== 'false' && (
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Period</label>
+                        <select
+                          value={item.returnPolicy?.returnDays || '30'}
+                          onChange={(e) => updateField('returnPolicy', { ...item.returnPolicy, returnDays: e.target.value })}
+                          className="input w-full"
+                        >
+                          <option value="14">14 Days</option>
+                          <option value="30">30 Days</option>
+                          <option value="60">60 Days</option>
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Refund</label>
+                        <select
+                          value={item.returnPolicy?.refundType || 'MoneyBack'}
+                          onChange={(e) => updateField('returnPolicy', { ...item.returnPolicy, refundType: e.target.value })}
+                          className="input w-full"
+                        >
+                          <option value="MoneyBack">Money Back</option>
+                          <option value="Exchange">Exchange</option>
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Return Ship</label>
+                        <select
+                          value={item.returnPolicy?.shippingCostPaidBy || 'Buyer'}
+                          onChange={(e) => updateField('returnPolicy', { ...item.returnPolicy, shippingCostPaidBy: e.target.value })}
+                          className="input w-full"
+                        >
+                          <option value="Buyer">Buyer</option>
+                          <option value="Seller">Seller</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Location Card */}
+              <div className="card p-4">
+                <h3 className="font-semibold text-slate-900 mb-2">Item Location</h3>
+                <input
+                  type="text"
+                  value={item.postalCode}
+                  onChange={(e) => updateField('postalCode', e.target.value)}
+                  placeholder="Postal code (e.g., 10001)"
+                  className="input w-full"
+                />
+              </div>
         </div>
       </div>
 
-      {/* Redo Context Input */}
+      {/* Reanalyze Panel */}
       {showRedoInput && (
-        <div className="card p-4 mt-4 animate-slide-up">
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Additional Context for AI (if redoing):
-          </label>
-          <textarea
-            value={redoContext}
-            onChange={(e) => setRedoContext(e.target.value)}
-            placeholder="This is actually the digital edition, not the disc version..."
-            className="input"
-            rows={2}
-          />
+        <div className="card p-4 mt-4 animate-slide-up space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-slate-700">Re-analyze with Correction</h4>
+            <button onClick={() => { setShowRedoInput(false); setSelectedPhotoIds([]); setRedoContext(''); }} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+          </div>
+
+          {/* Photo selection */}
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">
+              Select photos to send (or leave empty for all):
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {item.photos.map((photo) => {
+                const isSelected = selectedPhotoIds.includes(photo.id);
+                return (
+                  <button
+                    key={photo.id}
+                    onClick={() => setSelectedPhotoIds(prev =>
+                      isSelected ? prev.filter(pid => pid !== photo.id) : [...prev, photo.id]
+                    )}
+                    className={cn(
+                      'relative w-16 h-16 rounded-lg overflow-hidden border-2 transition-all',
+                      isSelected ? 'border-primary-500 ring-2 ring-primary-200' : 'border-slate-200 hover:border-slate-400'
+                    )}
+                  >
+                    <img src={photo.url} alt="" className="w-full h-full object-cover" />
+                    {isSelected && (
+                      <div className="absolute inset-0 bg-primary-500/20 flex items-center justify-center">
+                        <Check size={20} className="text-white drop-shadow" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedPhotoIds.length > 0 && (
+              <p className="text-xs text-slate-500 mt-1">{selectedPhotoIds.length} photo(s) selected</p>
+            )}
+          </div>
+
+          {/* Correction prompt */}
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">
+              Correction / instruction for AI:
+            </label>
+            <textarea
+              value={redoContext}
+              onChange={(e) => setRedoContext(e.target.value)}
+              placeholder='e.g. "The brand is Sony, not Samsung. Look at the label in photo 3."'
+              className="input"
+              rows={2}
+            />
+          </div>
+
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => { setRedoContext(''); setSelectedPhotoIds([]); handleRedo(); }}
+              disabled={isSaving}
+              className="btn-secondary text-sm min-h-[36px]"
+            >
+              {isSaving ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+              Full Re-run
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={isSaving || !redoContext.trim()}
+              className="btn-primary text-sm min-h-[36px]"
+            >
+              {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              Send Correction
+            </button>
+          </div>
         </div>
       )}
 
@@ -722,49 +1229,106 @@ export const ItemDetail: React.FC = () => {
       )}
 
       {/* Action Buttons */}
-      <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
-        <button
-          onClick={() => navigate(-1)}
-          className="btn-secondary"
-        >
-          <ChevronLeft size={18} />
-          Back to Queue
-        </button>
-        <div className="flex items-center gap-3">
+      <div className="mt-4 pt-4 border-t border-slate-200 space-y-3 md:space-y-0">
+        {/* Navigation row on mobile */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className="btn-secondary min-h-[44px]"
+          >
+            <ChevronLeft size={18} />
+            <span className="hidden sm:inline">Back to Queue</span>
+            <span className="sm:hidden">Back</span>
+          </button>
+          {/* Mobile: prev/next here too */}
+          <div className="flex items-center gap-1 md:hidden">
+            <button
+              onClick={() => handleNavigate('prev')}
+              disabled={!navigation.prevId}
+              className="p-2 hover:bg-slate-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <button
+              onClick={() => handleNavigate('next')}
+              disabled={!navigation.nextId}
+              className="p-2 hover:bg-slate-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        </div>
+        {/* Action buttons row */}
+        <div className="flex flex-wrap items-center justify-end gap-2 md:gap-3">
+          {item.currentStep !== 'PUBLISHED' && (
+          <>
           <button
             onClick={handleReject}
             disabled={isSaving}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-coral-200 text-coral-600 font-medium rounded-lg hover:bg-coral-50 disabled:opacity-50 transition-colors"
+            className="inline-flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 border border-coral-200 text-coral-600 font-medium rounded-lg hover:bg-coral-50 disabled:opacity-50 transition-colors min-h-[44px]"
           >
             <X size={18} />
             Reject
           </button>
           <button
             onClick={() => setShowRedoInput(!showRedoInput)}
-            className="btn-secondary"
+            disabled={isSaving}
+            className={cn('btn-secondary min-h-[44px]', showRedoInput && 'ring-2 ring-primary-300')}
           >
             <RotateCcw size={18} />
-            Redo with Context
+            <span className="hidden sm:inline">Re-run AI</span>
+            <span className="sm:hidden">AI</span>
           </button>
-          {showRedoInput && redoContext.trim() && (
+          </>
+          )}
+          {item.currentStep === 'FINAL_REVIEW' && (
+            <>
+              <button
+                onClick={handleExportCsv}
+                disabled={isSaving}
+                className="inline-flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 border border-amber-300 bg-amber-50 text-amber-700 font-medium rounded-lg hover:bg-amber-100 disabled:opacity-50 transition-colors min-h-[44px]"
+              >
+                <Download size={18} />
+                Export CSV
+              </button>
+              <button
+                onClick={handlePushToEbay}
+                disabled={isPushingToEbay || isSaving}
+                className="inline-flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 bg-ink-600 text-white font-medium rounded-lg hover:bg-ink-700 disabled:opacity-50 transition-colors min-h-[44px]"
+              >
+                {isPushingToEbay ? <Loader2 size={16} className="animate-spin" /> : <ExternalLink size={18} />}
+                Push to eBay
+              </button>
+            </>
+          )}
+          {item.currentStep === 'PUBLISHED' ? (
+            <div className="flex items-center gap-3">
+              {item.ebayId && (
+                <a
+                  href={`https://www.ebay.com/itm/${item.ebayId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-3 md:px-4 py-2.5 bg-ink-600 text-white font-medium rounded-lg hover:bg-ink-700 transition-colors min-h-[44px]"
+                >
+                  <ExternalLink size={18} />
+                  View on eBay
+                </a>
+              )}
+              {item.publishedAt && (
+                <span className="text-sm text-slate-500">Published {new Date(item.publishedAt).toLocaleDateString()}</span>
+              )}
+            </div>
+          ) : (
             <button
-              onClick={handleRedo}
+              onClick={handleAccept}
               disabled={isSaving}
-              className="btn-warm disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 bg-sage-600 text-white font-medium rounded-lg hover:bg-sage-700 hover:shadow-md disabled:opacity-50 transition-all duration-150 min-h-[44px]"
             >
               {isSaving && <Loader2 size={16} className="animate-spin" />}
-              Submit Redo
+              Accept & Next
+              <ChevronRight size={18} />
             </button>
           )}
-          <button
-            onClick={handleAccept}
-            disabled={isSaving}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-sage-600 text-white font-medium rounded-lg hover:bg-sage-700 hover:shadow-md disabled:opacity-50 transition-all duration-150"
-          >
-            {isSaving && <Loader2 size={16} className="animate-spin" />}
-            Accept & Next
-            <ChevronRight size={18} />
-          </button>
         </div>
       </div>
     </div>
