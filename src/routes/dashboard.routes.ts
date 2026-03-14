@@ -2345,14 +2345,13 @@ router.get('/listing-defaults', async (req: Request, res: Response) => {
   try {
     const location = await prisma.location.findFirst({
       where: { isActive: true },
-      select: { id: true, settings: true },
     });
 
     if (!location) {
       return res.json({ success: true, data: {} });
     }
 
-    const settings = (location.settings as Record<string, unknown>) || {};
+    const settings = ((location as any).settings as Record<string, unknown>) || {};
     const defaults = (settings.listingDefaults as Record<string, unknown>) || {};
 
     res.json({ success: true, data: defaults });
@@ -2375,7 +2374,7 @@ router.put('/listing-defaults', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'No active location found' });
     }
 
-    const existingSettings = (location.settings as Record<string, unknown>) || {};
+    const existingSettings = ((location as any).settings as Record<string, unknown>) || {};
 
     await prisma.location.update({
       where: { id: location.id },
@@ -2383,7 +2382,7 @@ router.put('/listing-defaults', async (req: Request, res: Response) => {
         settings: {
           ...existingSettings,
           listingDefaults: defaults,
-        },
+        } as any,
       },
     });
 
