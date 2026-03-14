@@ -83,6 +83,7 @@ interface QueueData {
   review: ItemCardProps[];
   price: ItemCardProps[];
   ready: ItemCardProps[];
+  published: ItemCardProps[];
 }
 
 interface QueueCounts {
@@ -90,6 +91,7 @@ interface QueueCounts {
   review: number;
   price: number;
   ready: number;
+  published: number;
 }
 
 interface FilterOptions {
@@ -129,12 +131,14 @@ export const Queue: React.FC = () => {
     review: [],
     price: [],
     ready: [],
+    published: [],
   });
   const [counts, setCounts] = useState<QueueCounts>({
     identify: 0,
     review: 0,
     price: 0,
     ready: 0,
+    published: 0,
   });
 
   const loadQueueData = async () => {
@@ -393,6 +397,7 @@ export const Queue: React.FC = () => {
                       <option value="review">Review</option>
                       <option value="price">Price</option>
                       <option value="ready">Ready</option>
+                      <option value="published">Published</option>
                     </select>
                   </div>
 
@@ -492,6 +497,7 @@ export const Queue: React.FC = () => {
               <Column title="REVIEW" count={counts.review} items={filterItems(queueItems.review, 'review')} />
               <Column title="PRICE" count={counts.price} items={filterItems(queueItems.price, 'price')} />
               <Column title="READY" count={counts.ready} items={filterItems(queueItems.ready, 'ready')} />
+              <Column title="PUBLISHED" count={counts.published} items={filterItems(queueItems.published, 'published')} />
             </div>
           )}
         </div>

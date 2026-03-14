@@ -19,11 +19,15 @@ A comprehensive, AI-powered eBay listing workflow system that automates the list
 - **Photo Import** - Drag-and-drop with automatic AI grouping
 - **Queue/Kanban View** - Visual workflow management
 - **Item Detail/Review** - Full listing editor with AI assistance
+- **Photo Editor** - Crop, rotate, brightness/contrast adjustment with live preview
+- **Photo Management** - Drag-to-reorder, set primary, delete with mobile touch support
 - **Template Manager** - Reusable listing blueprints with placeholders
 - **Reports** - Sales analytics with charts and team performance
 - **Sell Similar** - Create listings from existing eBay items
 - **Price Research** - Sold data lookup with statistics
 - **PIN Authentication** - Quick user switching on shared workstations
+- **UPC/ISBN Detection** - AI reads barcodes from photos, manual entry supported
+- **CSV Export** - eBay Seller Hub Reports compatible batch export
 
 ### Design System ("Warm Industrial")
 - **Typography**: DM Sans (body) + Fraunces (display/headings)
@@ -206,6 +210,8 @@ listflow/
 ├── prisma/
 │   ├── schema.prisma             # Current schema
 │   └── schema.v2.prisma          # V2 multi-tenant schema
+├── docs/
+│   └── EBAY_CSV_REFERENCE.md     # eBay Seller Hub Reports CSV spec
 ├── SPEC.md                       # Full platform specification
 ├── GUI_WIREFRAMES.md             # ASCII wireframes
 └── CLAUDE.md                     # Development guidelines
@@ -257,7 +263,8 @@ listflow/
 - `POST /api/v1/sell-similar/create` - Create item from listing
 
 ### Export
-- `GET /api/v1/export/csv` - Export items as eBay File Exchange CSV
+- `POST /api/v1/export/csv` - Export items as eBay Seller Hub Reports CSV
+- `GET /api/v1/export/preview/:itemId` - Preview CSV data for single item
 
 ### Photo Pool
 - `POST /api/pool/upload` - Upload photos to pool
@@ -266,6 +273,10 @@ listflow/
 
 ### Dashboard (Extended)
 - `POST /api/dashboard/item/:id/photos` - Upload photos to existing items
+- `PATCH /api/dashboard/item/:id/photos/reorder` - Reorder photos
+- `PATCH /api/dashboard/item/:id/photos/:photoId/primary` - Set primary photo
+- `DELETE /api/dashboard/item/:id/photos/:photoId` - Delete photo
+- `POST /api/dashboard/item/:id/photos/:photoId/edit` - Edit photo (crop/rotate/brightness/contrast)
 - `POST /api/dashboard/item/:id/suggest-price` - AI price suggestion
 - `POST /api/dashboard/item/:id/push-to-ebay` - Push single item to eBay
 - `POST /api/dashboard/items/bulk-push-to-ebay` - Batch push to eBay

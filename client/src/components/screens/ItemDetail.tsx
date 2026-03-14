@@ -16,9 +16,12 @@ import {
   DollarSign,
   Package,
   ExternalLink,
+  Pencil,
 } from 'lucide-react';
 import api from '../../api/client';
 import { cn } from '../../utils/cn';
+import { PhotoEditor } from '../PhotoEditor';
+import { SortablePhotoStrip } from '../SortablePhotoStrip';
 
 interface ItemData {
   id: string;
@@ -39,7 +42,7 @@ interface ItemData {
     justification: string;
   };
   suggestedPrice: number;
-  photos: { id: string; url: string; isPrimary: boolean }[];
+  photos: { id: string; url: string; fullUrl?: string; isPrimary: boolean; order?: number }[];
   location: string;
   locationCode: string;
   createdBy: string;
@@ -59,6 +62,8 @@ interface ItemData {
   quantity: number;
   postalCode: string;
   aiPriceSuggestion: { min: number; max: number; confidence: string; reasoning: string } | null;
+  upc: string;
+  isbn: string;
   ebayId: string | null;
   publishedAt: string | null;
   exportedAt: string | null;
@@ -117,6 +122,7 @@ export const ItemDetail: React.FC = () => {
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
   const [isSuggestingPrice, setIsSuggestingPrice] = useState(false);
   const [isPushingToEbay, setIsPushingToEbay] = useState(false);
+  const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
 
   // Load item data
   const loadItem = useCallback(async () => {
@@ -191,6 +197,8 @@ export const ItemDetail: React.FC = () => {
           returnPolicy: item.returnPolicy,
           quantity: item.quantity,
           postalCode: item.postalCode,
+          upc: item.upc,
+          isbn: item.isbn,
         })
       });
 
@@ -302,9 +310,10 @@ export const ItemDetail: React.FC = () => {
       window.URL.revokeObjectURL(url);
       setSuccessMessage('CSV exported');
       setTimeout(() => setSuccessMessage(null), 2000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error exporting CSV:', err);
-      setError('Failed to export CSV');
+      const msg = err?.response?.data?.error || err?.message || 'Failed to export CSV';
+      setError(msg);
     }
     setIsSaving(false);
   };
@@ -343,9 +352,10 @@ export const ItemDetail: React.FC = () => {
       } else {
         setError((result as any).error || 'Failed to push to eBay');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error pushing to eBay:', err);
-      setError('Failed to push to eBay');
+      const msg = err?.response?.data?.error || err?.message || 'Failed to push to eBay';
+      setError(msg);
     }
     setIsPushingToEbay(false);
   };
@@ -371,6 +381,63 @@ export const ItemDetail: React.FC = () => {
     setIsSaving(false);
     e.target.value = '';
   };
+
+  // Photo management handlers
+  const handleReorderPhotos = async (photoIds: string[]) => {
+    if (!item) return;
+    try {
+      await api.reorderPhotos(item.id, photoIds);
+      loadItem();
+    } catch (err) {
+      console.error('Error reordering photos:', err);
+      setError('Failed to reorder photos');
+    }
+  };
+
+  const handleSetPrimary = async (photoId: string) => {
+    if (!item) return;
+    try {
+      await api.setPhotoPrimary(item.id, photoId);
+      setSuccessMessage('Primary photo updated');
+      loadItem();
+      setTimeout(() => setSuccessMessage(null), 2000);
+    } catch (err) {
+      console.error('Error setting primary:', err);
+      setError('Failed to set primary photo');
+    }
+  };
+
+  const handleDeletePhoto = async (photoId: string) => {
+    if (!item) return;
+    if (!window.confirm('Delete this photo?')) return;
+    try {
+      await api.deleteDashboardPhoto(item.id, photoId);
+      // Adjust selected index if needed
+      const deletedIndex = item.photos.findIndex(p => p.id === photoId);
+      if (deletedIndex !== -1 && selectedPhotoIndex >= deletedIndex && selectedPhotoIndex > 0) {
+        setSelectedPhotoIndex(selectedPhotoIndex - 1);
+      }
+      setSuccessMessage('Photo deleted');
+      loadItem();
+      setTimeout(() => setSuccessMessage(null), 2000);
+    } catch (err) {
+      console.error('Error deleting photo:', err);
+      setError('Failed to delete photo');
+    }
+  };
+
+  const handleEditPhoto = (photoId: string) => {
+    setEditingPhotoId(photoId);
+  };
+
+  const handlePhotoEditSaved = () => {
+    setEditingPhotoId(null);
+    setSuccessMessage('Photo edited');
+    loadItem();
+    setTimeout(() => setSuccessMessage(null), 2000);
+  };
+
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   // Reject item
   const handleReject = async () => {
@@ -527,17 +594,26 @@ export const ItemDetail: React.FC = () => {
         <div className="space-y-4 animate-slide-up">
           {/* Photo Gallery */}
           <div className="card p-4">
-            <div className="aspect-square bg-slate-100 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+            <div className="aspect-square bg-slate-100 rounded-lg mb-4 flex items-center justify-center overflow-hidden relative group">
               {item.photos[selectedPhotoIndex]?.url ? (
-                <img
-                  src={item.photos[selectedPhotoIndex].url}
-                  alt={`Photo ${selectedPhotoIndex + 1}`}
-                  className="w-full h-full object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                  }}
-                />
+                <>
+                  <img
+                    src={item.photos[selectedPhotoIndex].fullUrl || item.photos[selectedPhotoIndex].url}
+                    alt={`Photo ${selectedPhotoIndex + 1}`}
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                  {/* Edit button overlay */}
+                  <button
+                    onClick={() => handleEditPhoto(item.photos[selectedPhotoIndex].id)}
+                    className="absolute bottom-3 right-3 p-2 bg-slate-800/70 hover:bg-slate-800/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Edit photo"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                </>
               ) : (
                 <div className="flex flex-col items-center text-slate-400">
                   <Camera size={48} />
@@ -545,38 +621,33 @@ export const ItemDetail: React.FC = () => {
                 </div>
               )}
             </div>
-            <div className="flex gap-2 flex-wrap">
-              {item.photos.map((photo, index) => (
-                <button
-                  key={photo.id}
-                  onClick={() => setSelectedPhotoIndex(index)}
-                  className={cn(
-                    'w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center border-2 transition-all overflow-hidden',
-                    index === selectedPhotoIndex
-                      ? 'border-ink-500 shadow-sm'
-                      : 'border-transparent hover:border-slate-300'
-                  )}
-                >
-                  {photo.url ? (
-                    <img src={photo.url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-xs text-slate-500">{index + 1}</span>
-                  )}
-                </button>
-              ))}
-              {/* Add photo button */}
-              <label className="w-16 h-16 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400 hover:border-ink-500 hover:text-ink-500 cursor-pointer transition-colors">
-                <Plus size={20} />
-                <input
-                  type="file"
-                  multiple
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleUploadMorePhotos}
-                  className="hidden"
-                />
-              </label>
-            </div>
+            <SortablePhotoStrip
+              photos={item.photos}
+              selectedIndex={selectedPhotoIndex}
+              onSelect={setSelectedPhotoIndex}
+              onReorder={handleReorderPhotos}
+              onSetPrimary={handleSetPrimary}
+              onDelete={handleDeletePhoto}
+              onEdit={handleEditPhoto}
+              onUpload={handleUploadMorePhotos}
+              isMobile={isMobile}
+            />
           </div>
+
+          {/* Photo Editor Modal */}
+          {editingPhotoId && (() => {
+            const editingPhoto = item.photos.find(p => p.id === editingPhotoId);
+            if (!editingPhoto) return null;
+            return (
+              <PhotoEditor
+                photoUrl={editingPhoto.fullUrl || editingPhoto.url}
+                photoId={editingPhotoId}
+                itemId={item.id}
+                onSave={handlePhotoEditSaved}
+                onClose={() => setEditingPhotoId(null)}
+              />
+            );
+          })()}
 
           {/* AI Analysis */}
           <div className="card p-4">
@@ -720,6 +791,36 @@ export const ItemDetail: React.FC = () => {
               <option value="Used - Acceptable">Used - Acceptable</option>
               <option value="For Parts">For Parts</option>
             </select>
+          </div>
+
+          {/* UPC / ISBN */}
+          <div className="card p-4">
+            <h3 className="font-semibold text-slate-900 mb-2">Product Identifiers</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm text-slate-500 mb-1 block">UPC</label>
+                <input
+                  type="text"
+                  value={item.upc}
+                  onChange={(e) => updateField('upc', e.target.value)}
+                  placeholder="12-13 digit barcode"
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-slate-500 mb-1 block">ISBN</label>
+                <input
+                  type="text"
+                  value={item.isbn}
+                  onChange={(e) => updateField('isbn', e.target.value)}
+                  placeholder="10 or 13 digit ISBN"
+                  className="input"
+                />
+              </div>
+            </div>
+            {(item.upc || item.isbn) && (
+              <p className="text-xs text-slate-400 mt-2">AI-detected or manually entered. Used in CSV export.</p>
+            )}
           </div>
 
           {/* Item Specifics */}

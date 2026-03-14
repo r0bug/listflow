@@ -261,7 +261,7 @@ router.get('/activity', async (req, res) => {
 router.get('/queue', async (req, res) => {
   try {
     // Get items for each queue stage
-    const [identifyItems, reviewItems, priceItems, readyItems] = await Promise.all([
+    const [identifyItems, reviewItems, priceItems, readyItems, publishedItems] = await Promise.all([
       // Identify = PHOTO_UPLOAD + AI_PROCESSING
       prisma.item.findMany({
         where: {
@@ -315,6 +315,20 @@ router.get('/queue', async (req, res) => {
         orderBy: { createdAt: 'desc' },
         take: 50
       }),
+      // Published = PUBLISHED
+      prisma.item.findMany({
+        where: { status: 'ACTIVE', stage: 'PUBLISHED' },
+        select: {
+          id: true,
+          title: true,
+          startingPrice: true,
+          buyNowPrice: true,
+          ebayId: true,
+          photos: { select: { thumbnailPath: true }, take: 1, orderBy: { isPrimary: 'desc' } }
+        },
+        orderBy: { publishedAt: 'desc' },
+        take: 50
+      }),
     ]);
 
     // Transform to queue format
@@ -335,12 +349,14 @@ router.get('/queue', async (req, res) => {
         review: reviewItems.map(i => transformItem(i, 'review')),
         price: priceItems.map(i => transformItem(i, 'price')),
         ready: readyItems.map(i => transformItem(i, 'ready')),
+        published: publishedItems.map(i => transformItem(i, 'published')),
       },
       counts: {
         identify: identifyItems.length,
         review: reviewItems.length,
         price: priceItems.length,
         ready: readyItems.length,
+        published: publishedItems.length,
       }
     });
   } catch (error) {
@@ -569,11 +585,16 @@ router.get('/item/:id', async (req, res) => {
       },
       suggestedPrice: item.buyNowPrice || item.startingPrice || 0,
       photos: item.photos.map(p => {
-        const rawPath = p.thumbnailPath || p.originalPath;
+        const rawPath = p.editedPath || p.thumbnailPath || p.originalPath;
         return {
           id: p.id,
           url: rawPath?.startsWith('/') ? rawPath : `/${rawPath}`,
-          isPrimary: p.isPrimary
+          fullUrl: (() => {
+            const full = p.editedPath || p.optimizedPath || p.originalPath;
+            return full?.startsWith('/') ? full : `/${full}`;
+          })(),
+          isPrimary: p.isPrimary,
+          order: p.order
         };
       }),
       location: item.location?.name || 'Unassigned',
@@ -595,6 +616,8 @@ router.get('/item/:id', async (req, res) => {
       quantity: item.quantity || 1,
       postalCode: item.postalCode || '',
       aiPriceSuggestion: item.aiPriceSuggestion || null,
+      upc: item.upc || '',
+      isbn: item.isbn || '',
       ebayId: item.ebayId || null,
       publishedAt: item.publishedAt?.toISOString() || null,
       exportedAt: item.exportedAt?.toISOString() || null,
@@ -643,7 +666,9 @@ router.put('/item/:id', async (req, res) => {
       listingDuration,
       returnPolicy,
       quantity,
-      postalCode
+      postalCode,
+      upc,
+      isbn
     } = req.body;
 
     // Build update data
@@ -666,6 +691,8 @@ router.put('/item/:id', async (req, res) => {
     if (returnPolicy !== undefined) updateData.returnPolicy = returnPolicy;
     if (quantity !== undefined) updateData.quantity = quantity;
     if (postalCode !== undefined) updateData.postalCode = postalCode;
+    if (upc !== undefined) updateData.upc = upc;
+    if (isbn !== undefined) updateData.isbn = isbn;
 
     // Store item specifics in aiAnalysis JSON
     if (itemSpecifics !== undefined) {
@@ -757,6 +784,235 @@ router.post('/item/:id/photos', upload.array('photos', 20), async (req: Request,
   } catch (error) {
     console.error('Item photo upload error:', error);
     res.status(500).json({ success: false, error: 'Failed to upload photos' });
+  }
+});
+
+// PATCH /api/dashboard/item/:id/photos/reorder - Reorder photos
+router.patch('/item/:id/photos/reorder', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { photoIds } = req.body;
+
+    if (!Array.isArray(photoIds) || photoIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'photoIds must be a non-empty array' });
+    }
+
+    // Verify all photos belong to this item
+    const photos = await prisma.photo.findMany({
+      where: { itemId: id },
+      select: { id: true }
+    });
+    const itemPhotoIds = new Set(photos.map(p => p.id));
+    for (const pid of photoIds) {
+      if (!itemPhotoIds.has(pid)) {
+        return res.status(400).json({ success: false, error: `Photo ${pid} does not belong to this item` });
+      }
+    }
+
+    // Update order in a transaction
+    await prisma.$transaction(
+      photoIds.map((photoId: string, index: number) =>
+        prisma.photo.update({
+          where: { id: photoId },
+          data: { order: index }
+        })
+      )
+    );
+
+    const updatedPhotos = await prisma.photo.findMany({
+      where: { itemId: id },
+      orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }]
+    });
+
+    res.json({ success: true, data: updatedPhotos });
+  } catch (error) {
+    console.error('Error reordering photos:', error);
+    res.status(500).json({ success: false, error: 'Failed to reorder photos' });
+  }
+});
+
+// PATCH /api/dashboard/item/:id/photos/:photoId/primary - Set primary photo
+router.patch('/item/:id/photos/:photoId/primary', async (req: Request, res: Response) => {
+  try {
+    const { id, photoId } = req.params;
+
+    // Verify photo belongs to item
+    const photo = await prisma.photo.findFirst({
+      where: { id: photoId, itemId: id }
+    });
+    if (!photo) {
+      return res.status(404).json({ success: false, error: 'Photo not found' });
+    }
+
+    await prisma.$transaction([
+      prisma.photo.updateMany({
+        where: { itemId: id },
+        data: { isPrimary: false }
+      }),
+      prisma.photo.update({
+        where: { id: photoId },
+        data: { isPrimary: true }
+      })
+    ]);
+
+    const updatedPhotos = await prisma.photo.findMany({
+      where: { itemId: id },
+      orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }]
+    });
+
+    res.json({ success: true, data: updatedPhotos });
+  } catch (error) {
+    console.error('Error setting primary photo:', error);
+    res.status(500).json({ success: false, error: 'Failed to set primary photo' });
+  }
+});
+
+// DELETE /api/dashboard/item/:id/photos/:photoId - Delete a photo
+router.delete('/item/:id/photos/:photoId', async (req: Request, res: Response) => {
+  try {
+    const { id, photoId } = req.params;
+
+    const photo = await prisma.photo.findFirst({
+      where: { id: photoId, itemId: id }
+    });
+    if (!photo) {
+      return res.status(404).json({ success: false, error: 'Photo not found' });
+    }
+
+    const wasPrimary = photo.isPrimary;
+
+    // Delete files from disk
+    const filePaths = [photo.originalPath, photo.thumbnailPath, photo.optimizedPath, photo.editedPath].filter(Boolean);
+    for (const filePath of filePaths) {
+      try {
+        const fullPath = path.resolve(filePath!);
+        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+      } catch { /* ignore file delete errors */ }
+    }
+
+    // Delete photo record
+    await prisma.photo.delete({ where: { id: photoId } });
+
+    // Reorder remaining photos to close gaps
+    const remaining = await prisma.photo.findMany({
+      where: { itemId: id },
+      orderBy: { order: 'asc' }
+    });
+
+    if (remaining.length > 0) {
+      await prisma.$transaction(
+        remaining.map((p, i) => prisma.photo.update({
+          where: { id: p.id },
+          data: {
+            order: i,
+            // Auto-promote first photo if deleted was primary
+            isPrimary: wasPrimary && i === 0 ? true : p.isPrimary
+          }
+        }))
+      );
+    }
+
+    const updatedPhotos = await prisma.photo.findMany({
+      where: { itemId: id },
+      orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }]
+    });
+
+    res.json({ success: true, data: updatedPhotos });
+  } catch (error) {
+    console.error('Error deleting photo:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete photo' });
+  }
+});
+
+// POST /api/dashboard/item/:id/photos/:photoId/edit - Apply edits to a photo
+router.post('/item/:id/photos/:photoId/edit', async (req: Request, res: Response) => {
+  try {
+    const { id, photoId } = req.params;
+    const { crop, brightness, contrast, rotation } = req.body;
+
+    const photo = await prisma.photo.findFirst({
+      where: { id: photoId, itemId: id }
+    });
+    if (!photo) {
+      return res.status(404).json({ success: false, error: 'Photo not found' });
+    }
+
+    // Use optimized or original as source
+    const sourcePath = photo.optimizedPath || photo.originalPath;
+    const fullSourcePath = path.resolve(sourcePath);
+    if (!fs.existsSync(fullSourcePath)) {
+      return res.status(400).json({ success: false, error: 'Source image file not found' });
+    }
+
+    // Build sharp pipeline
+    let pipeline = sharp(fullSourcePath);
+
+    // 1. Rotate
+    if (rotation && rotation !== 0) {
+      pipeline = pipeline.rotate(rotation);
+    }
+
+    // 2. Crop (extract)
+    if (crop && crop.width > 0 && crop.height > 0) {
+      pipeline = pipeline.extract({
+        left: Math.round(crop.x),
+        top: Math.round(crop.y),
+        width: Math.round(crop.width),
+        height: Math.round(crop.height)
+      });
+    }
+
+    // 3. Brightness
+    if (brightness !== undefined && brightness !== 1.0) {
+      pipeline = pipeline.modulate({ brightness });
+    }
+
+    // 4. Contrast
+    if (contrast !== undefined && contrast !== 1.0) {
+      pipeline = pipeline.linear(contrast, 128 * (1 - contrast));
+    }
+
+    // 5. Resize to max dimensions and output as JPEG
+    pipeline = pipeline
+      .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 });
+
+    // Save edited file
+    const editedFilename = `edited-${photoId}-${Date.now()}.jpg`;
+    const editedDir = path.join(__dirname, '../../uploads/edited');
+    if (!fs.existsSync(editedDir)) fs.mkdirSync(editedDir, { recursive: true });
+    const editedPath = path.join(editedDir, editedFilename);
+    await pipeline.toFile(editedPath);
+
+    // Regenerate thumbnail from edited file
+    const thumbFilename = `thumb-edited-${photoId}-${Date.now()}.jpg`;
+    const thumbPath = path.join(thumbDir, thumbFilename);
+    await sharp(editedPath)
+      .resize(300, 300, { fit: 'cover' })
+      .jpeg({ quality: 70 })
+      .toFile(thumbPath);
+
+    // Delete old edited file if one existed
+    if (photo.editedPath) {
+      try {
+        const oldEditedPath = path.resolve(photo.editedPath);
+        if (fs.existsSync(oldEditedPath)) fs.unlinkSync(oldEditedPath);
+      } catch { /* ignore */ }
+    }
+
+    // Update photo record
+    const updatedPhoto = await prisma.photo.update({
+      where: { id: photoId },
+      data: {
+        editedPath: `uploads/edited/${editedFilename}`,
+        thumbnailPath: `uploads/thumbnails/${thumbFilename}`
+      }
+    });
+
+    res.json({ success: true, data: updatedPhoto });
+  } catch (error) {
+    console.error('Error editing photo:', error);
+    res.status(500).json({ success: false, error: 'Failed to edit photo' });
   }
 });
 
@@ -919,19 +1175,24 @@ router.post('/item/:id/reanalyze', async (req: Request, res: Response) => {
     const analysisJson: any = JSON.parse(JSON.stringify(analysis));
 
     // Update item with corrected AI results
+    const updateData: Record<string, unknown> = {
+      title: listing.title,
+      description: listing.description,
+      category: analysis.category || item.category,
+      condition: analysis.condition || item.condition,
+      brand: analysis.brand,
+      features: analysis.features || [],
+      keywords: listing.tags || [],
+      aiAnalysis: analysisJson,
+      aiCost: { increment: totalCost },
+    };
+    // Persist UPC/ISBN if AI detected them
+    if (analysis.upc) updateData.upc = analysis.upc;
+    if (analysis.isbn) updateData.isbn = analysis.isbn;
+
     await prisma.item.update({
       where: { id },
-      data: {
-        title: listing.title,
-        description: listing.description,
-        category: analysis.category || item.category,
-        condition: analysis.condition || item.condition,
-        brand: analysis.brand,
-        features: analysis.features || [],
-        keywords: listing.tags || [],
-        aiAnalysis: analysisJson,
-        aiCost: { increment: totalCost }
-      }
+      data: updateData,
     });
 
     const updated = await prisma.item.findUnique({

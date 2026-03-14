@@ -367,6 +367,26 @@ class ApiClient {
     return response.data;
   }
 
+  async reorderPhotos(itemId: string, photoIds: string[]) {
+    const response = await this.dashboardClient.patch<ApiResponse<unknown>>(`/dashboard/item/${itemId}/photos/reorder`, { photoIds });
+    return response.data;
+  }
+
+  async setPhotoPrimary(itemId: string, photoId: string) {
+    const response = await this.dashboardClient.patch<ApiResponse<unknown>>(`/dashboard/item/${itemId}/photos/${photoId}/primary`);
+    return response.data;
+  }
+
+  async deleteDashboardPhoto(itemId: string, photoId: string) {
+    const response = await this.dashboardClient.delete<ApiResponse<unknown>>(`/dashboard/item/${itemId}/photos/${photoId}`);
+    return response.data;
+  }
+
+  async editPhoto(itemId: string, photoId: string, edits: { crop?: { x: number; y: number; width: number; height: number }; brightness?: number; contrast?: number; rotation?: number }) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${itemId}/photos/${photoId}/edit`, edits);
+    return response.data;
+  }
+
   async pushToEbay(itemId: string) {
     const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${itemId}/push-to-ebay`);
     return response.data;

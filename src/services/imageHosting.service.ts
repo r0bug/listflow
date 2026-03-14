@@ -40,7 +40,7 @@ export async function hostItemImages(itemId: string): Promise<string[]> {
   for (let i = 0; i < item.photos.length; i++) {
     const photo = item.photos[i];
     // Use optimized path if available, fall back to original
-    const sourcePath = photo.optimizedPath || photo.originalPath;
+    const sourcePath = photo.editedPath || photo.optimizedPath || photo.originalPath;
 
     if (!sourcePath || !fs.existsSync(sourcePath)) {
       console.warn(`Photo ${photo.id}: source file not found at ${sourcePath}`);

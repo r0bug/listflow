@@ -2,29 +2,32 @@ import { prisma } from '../config/database';
 import { WorkflowStage } from '../../src/generated/prisma';
 
 /**
- * eBay File Exchange CSV column headers.
+ * eBay Seller Hub Reports CSV column headers.
+ * Must match eBay's exact expected names — case and spacing matter.
  */
 const CSV_HEADERS = [
   'Action',
-  'Category',
+  'Category ID',
+  'Custom label (SKU)',
   'Title',
+  'P:UPC',
+  'P:ISBN',
+  'Start price',
+  'Quantity',
+  'Item photo URL',
+  'Condition ID',
   'Description',
-  'ConditionID',
   'Format',
   'Duration',
-  'StartPrice',
-  'BuyItNowPrice',
-  'Quantity',
-  'PicURL',
-  'Location',
-  'ShippingType',
-  'ShippingService',
-  'ShippingCost',
-  'HandlingTime',
-  '*ReturnsAcceptedOption',
-  'ReturnsWithinOption',
-  'RefundOption',
-  'ShippingCostPaidByOption',
+  'PostalCode',
+  'Shipping service 1 option',
+  'Shipping service 1 cost',
+  'Shipping service 1 priority',
+  'Max dispatch time',
+  'Returns accepted option',
+  'Returns within option',
+  'Refund option',
+  'Return shipping cost paid by',
   'WeightMajor',
   'WeightMinor',
   'PackageLength',
@@ -38,12 +41,20 @@ const CSV_HEADERS = [
 function getConditionId(condition: string | null): number {
   switch (condition?.toLowerCase()) {
     case 'new': return 1000;
+    case 'new other':
     case 'open box': return 1500;
+    case 'seller refurbished':
+    case 'refurbished': return 2500;
+    case 'used':
     case 'used - like new': return 3000;
+    case 'very good':
     case 'used - good': return 4000;
-    case 'used - acceptable': return 5000;
-    case 'for parts': return 7000;
-    default: return 3000; // Default to Used - Like New
+    case 'good': return 5000;
+    case 'acceptable':
+    case 'used - acceptable': return 6000;
+    case 'for parts':
+    case 'for parts or not working': return 7000;
+    default: return 3000;
   }
 }
 
@@ -62,25 +73,27 @@ function escapeCSV(value: string | number | null | undefined): string {
 interface CsvRowData {
   itemId: string;
   action: string;
-  category: string;
+  categoryId: string;
+  sku: string;
   title: string;
-  description: string;
-  conditionId: number;
-  format: string;
-  duration: string;
+  upc: string;
+  isbn: string;
   startPrice: number;
-  buyItNowPrice: number;
   quantity: number;
   picUrl: string;
-  location: string;
-  shippingType: string;
+  conditionId: number;
+  description: string;
+  format: string;
+  duration: string;
+  postalCode: string;
   shippingService: string;
   shippingCost: number;
-  handlingTime: number;
+  shippingPriority: string;
+  maxDispatchTime: number;
   returnsAccepted: string;
   returnsWithin: string;
   refundOption: string;
-  shippingCostPaidBy: string;
+  returnShippingCostPaidBy: string;
   weightMajor: string;
   weightMinor: string;
   packageLength: string;
@@ -102,22 +115,22 @@ async function buildItemRow(itemId: string): Promise<CsvRowData | null> {
 
   if (!item) return null;
 
-  // Build pipe-delimited PicURL from public URLs
+  // Build pipe-delimited image URLs from public URLs
   const picUrls = item.photos
     .map(p => p.publicUrl)
     .filter(Boolean)
     .join('|');
 
-  const postalCode = item.postalCode || process.env.SELLER_POSTAL_CODE || '10001';
+  const postalCode = item.postalCode || process.env.SELLER_POSTAL_CODE || '98901';
 
   // Parse return policy JSON
   const returnPolicy = (item.returnPolicy as Record<string, string>) || {};
   const returnsAccepted = returnPolicy.returnsAccepted === 'false' ? 'ReturnsNotAccepted' : 'ReturnsAccepted';
   const returnsWithin = returnPolicy.returnDays ? `Days_${returnPolicy.returnDays}` : 'Days_30';
   const refundOption = returnPolicy.refundType || 'MoneyBack';
-  const shippingCostPaidBy = returnPolicy.shippingCostPaidBy || 'Buyer';
+  const returnShippingCostPaidBy = returnPolicy.shippingCostPaidBy || 'Buyer';
 
-  // Use item's listing format/duration instead of deriving from price
+  // Listing format/duration
   const format = item.listingFormat || (item.buyNowPrice ? 'FixedPrice' : 'Auction');
   const duration = item.listingDuration || (format === 'FixedPrice' ? 'GTC' : '7');
 
@@ -129,28 +142,34 @@ async function buildItemRow(itemId: string): Promise<CsvRowData | null> {
   // Package dimensions
   const dims = (item.packageDimensions as Record<string, number>) || {};
 
+  // Extract numeric category ID from AI analysis, fall back to category name
+  const aiAnalysis = (item.aiAnalysis as Record<string, unknown>) || {};
+  const categoryId = aiAnalysis.categoryId ? String(aiAnalysis.categoryId) : (item.category || '');
+
   return {
     itemId: item.id,
     action: 'Add',
-    category: item.category || '',
+    categoryId,
+    sku: item.sku || '',
     title: (item.title || '').substring(0, 80),
-    description: item.description || '',
-    conditionId: getConditionId(item.condition),
-    format,
-    duration,
+    upc: item.upc || 'Does not apply',
+    isbn: item.isbn || '',
     startPrice: item.startingPrice || item.buyNowPrice || 0,
-    buyItNowPrice: format === 'FixedPrice' ? (item.buyNowPrice || item.startingPrice || 0) : (item.buyNowPrice || 0),
     quantity: item.quantity || 1,
     picUrl: picUrls,
-    location: postalCode,
-    shippingType: item.shippingType || 'Flat',
+    conditionId: getConditionId(item.condition),
+    description: item.description || '',
+    format,
+    duration,
+    postalCode,
     shippingService: item.shippingService || 'USPSPriority',
     shippingCost: item.shippingCost || 0,
-    handlingTime: item.handlingTime || 3,
+    shippingPriority: '1',
+    maxDispatchTime: item.handlingTime || 3,
     returnsAccepted,
     returnsWithin,
     refundOption,
-    shippingCostPaidBy,
+    returnShippingCostPaidBy,
     weightMajor: weightLbs > 0 ? String(weightLbs) : '',
     weightMinor: totalOz > 0 ? String(weightOz) : '',
     packageLength: dims.length ? String(dims.length) : '',
@@ -167,7 +186,7 @@ export async function previewExport(itemId: string): Promise<CsvRowData | null> 
 }
 
 /**
- * Generate eBay File Exchange CSV for a batch of item IDs.
+ * Generate eBay Seller Hub Reports CSV for a batch of item IDs.
  * Only items at FINAL_REVIEW stage or later are eligible.
  * Optionally marks items with exportedAt timestamp.
  */
@@ -201,25 +220,27 @@ export async function generateCsv(
 
     const row = [
       rowData.action,
-      rowData.category,
+      rowData.categoryId,
+      rowData.sku,
       rowData.title,
-      rowData.description,
-      rowData.conditionId,
-      rowData.format,
-      rowData.duration,
+      rowData.upc,
+      rowData.isbn,
       rowData.startPrice,
-      rowData.buyItNowPrice,
       rowData.quantity,
       rowData.picUrl,
-      rowData.location,
-      rowData.shippingType,
+      rowData.conditionId,
+      rowData.description,
+      rowData.format,
+      rowData.duration,
+      rowData.postalCode,
       rowData.shippingService,
       rowData.shippingCost,
-      rowData.handlingTime,
+      rowData.shippingPriority,
+      rowData.maxDispatchTime,
       rowData.returnsAccepted,
       rowData.returnsWithin,
       rowData.refundOption,
-      rowData.shippingCostPaidBy,
+      rowData.returnShippingCostPaidBy,
       rowData.weightMajor,
       rowData.weightMinor,
       rowData.packageLength,

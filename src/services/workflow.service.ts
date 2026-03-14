@@ -210,19 +210,24 @@ export class WorkflowService {
       const analysisJson: any = JSON.parse(JSON.stringify(analysis));
 
       // Update item with AI results and increment cumulative AI cost
+      const updateData: Record<string, unknown> = {
+        title: listing.title,
+        description: listing.description,
+        category: analysis.category || item.category,
+        condition: analysis.condition || item.condition,
+        brand: analysis.brand,
+        features: analysis.features || [],
+        keywords: listing.tags || [],
+        aiAnalysis: analysisJson,
+        aiCost: { increment: totalCost },
+      };
+      // Persist UPC/ISBN if AI detected them
+      if (analysis.upc) updateData.upc = analysis.upc;
+      if (analysis.isbn) updateData.isbn = analysis.isbn;
+
       await this.prisma.item.update({
         where: { id: itemId },
-        data: {
-          title: listing.title,
-          description: listing.description,
-          category: analysis.category || item.category,
-          condition: analysis.condition || item.condition,
-          brand: analysis.brand,
-          features: analysis.features || [],
-          keywords: listing.tags || [],
-          aiAnalysis: analysisJson,
-          aiCost: { increment: totalCost }
-        }
+        data: updateData,
       });
 
       // Mark all photos as processed

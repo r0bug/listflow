@@ -77,11 +77,26 @@ The following must ONLY exist in `.env` files and NEVER in committed code:
 - [x] Extended Item schema with shipping, listing format, returns, weight, dimensions fields
 - [x] Add photos to existing items (upload endpoint + UI)
 - [x] Full pricing stage with AI price suggestions (Claude Sonnet 4)
-- [x] CSV export in eBay File Exchange format (25-column)
+- [x] CSV export in eBay Seller Hub Reports format (correct column headers)
 - [x] eBay API push (single + bulk) with Listing record creation
 - [x] Settings page with listing defaults (format, shipping, returns, location)
 - [x] Location-level settings persistence (Json field on Location model)
 - [x] Photo pool: attach ungrouped photos to existing items
+
+### Photo Editing & Management (Completed)
+- [x] Photo editor modal with crop (react-easy-crop), rotate, brightness, contrast
+- [x] Server-side image processing with Sharp (crop, rotate, brightness, contrast)
+- [x] Drag-to-reorder photo thumbnails (@dnd-kit/sortable)
+- [x] Set primary photo
+- [x] Delete individual photos with file cleanup
+- [x] Mobile-friendly touch controls (pinch-to-zoom, arrow reorder)
+- [x] Edited images preferred in CSV export and image hosting
+
+### Product Identifiers & CSV Fix (Completed)
+- [x] UPC and ISBN fields on Item model (AI-detected + manual entry)
+- [x] AI barcode/UPC/ISBN detection in photo analysis prompts
+- [x] CSV export rewritten to match eBay Seller Hub Reports spec exactly
+- [x] eBay CSV reference doc added (docs/EBAY_CSV_REFERENCE.md)
 
 ### Development Commands
 ```bash
@@ -114,10 +129,15 @@ docker-compose down      # Stop all services
 - `GET /api/listings/history` - Get listing history
 - `GET /api/listings/:id` - Get specific listing
 - `POST /api/dashboard/item/:id/photos` - Upload photos to existing item
+- `PATCH /api/dashboard/item/:id/photos/reorder` - Reorder item photos
+- `PATCH /api/dashboard/item/:id/photos/:photoId/primary` - Set primary photo
+- `DELETE /api/dashboard/item/:id/photos/:photoId` - Delete a photo
+- `POST /api/dashboard/item/:id/photos/:photoId/edit` - Edit photo (crop/brightness/contrast/rotate)
 - `POST /api/dashboard/item/:id/suggest-price` - AI price suggestion
 - `POST /api/dashboard/item/:id/push-to-ebay` - Push item to eBay
 - `POST /api/dashboard/items/bulk-push-to-ebay` - Batch push to eBay
-- `GET /api/v1/export/csv` - Export items as eBay CSV
+- `POST /api/v1/export/csv` - Export items as eBay Seller Hub CSV
+- `GET /api/v1/export/preview/:itemId` - Preview CSV data for item
 - `GET/PUT /api/dashboard/listing-defaults` - Listing defaults
 - `POST /api/pool/attach-to-item` - Attach pooled photos to item
 

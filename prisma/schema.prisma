@@ -130,6 +130,10 @@ model Item {
   keywords     String[]
   aiAnalysis   Json?
   
+  // Product identifiers
+  upc          String?   // Universal Product Code (barcode)
+  isbn         String?   // International Standard Book Number
+
   // Pricing (Stage 4)
   startingPrice Float?
   buyNowPrice   Float?
@@ -199,6 +203,7 @@ model Photo {
   originalPath String
   thumbnailPath String?
   optimizedPath String?
+  editedPath   String?   // Path to edited version (crop/brightness/contrast applied)
   
   isPrimary    Boolean  @default(false)
   order        Int      @default(0)

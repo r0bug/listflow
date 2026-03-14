@@ -16,6 +16,8 @@ interface ImageAnalysis {
   rawAnalysis: string;
   model?: string;
   specifics?: Record<string, string>;
+  upc?: string;
+  isbn?: string;
 }
 
 interface ListingOptions {
@@ -166,7 +168,11 @@ Category: [specific eBay category suggestion]
 Value: [$XX-$YY estimated market range]
 Defects: [list any visible wear, damage, missing parts, or "None visible"]
 Keywords: [keyword1, keyword2, keyword3, keyword4, keyword5]
+UPC: [12 or 13 digit barcode number if visible on packaging/label/sticker, or "None"]
+ISBN: [10 or 13 digit ISBN if visible on a book/media item, or "None"]
 Notes: [any additional details that would help a seller write an accurate listing — measurements, materials, era/vintage, compatibility, included accessories]
+
+IMPORTANT: Look carefully at ALL photos for barcodes, UPC codes, ISBN numbers, or EAN codes printed on packaging, labels, stickers, or book covers. These are critical for eBay listings. If you can read any digits from a barcode, report them. UPC barcodes are 12 digits, EAN barcodes are 13 digits, ISBN-10 is 10 digits, ISBN-13 is 13 digits (starts with 978 or 979).
 
 Your goal is to reach 100% confidence in a COMPLETE and ACCURATE identification. Every detail matters — exact brand, model number, variant, generation, color, size, material, included accessories, and condition. A vague identification like "vintage phone" is low confidence; "Western Electric Model 302 Rotary Telephone, Black Bakelite, 1940s, F1 handset" is high confidence. Be thorough and specific.`;
 
@@ -288,6 +294,16 @@ Shipping Cost: $[estimated shipping]`;
     const confMatch = text.match(/confidence[:\s]+(\d+)/i);
     const confidence = confMatch ? parseInt(confMatch[1], 10) : 0;
 
+    // Extract UPC — must be 12-13 digits
+    const rawUpc = this.extractField(text, 'upc', 'None');
+    const upcDigits = rawUpc.replace(/[^0-9]/g, '');
+    const upc = (upcDigits.length === 12 || upcDigits.length === 13) ? upcDigits : undefined;
+
+    // Extract ISBN — must be 10 or 13 digits
+    const rawIsbn = this.extractField(text, 'isbn', 'None');
+    const isbnDigits = rawIsbn.replace(/[^0-9Xx]/g, '');
+    const isbn = (isbnDigits.length === 10 || isbnDigits.length === 13) ? isbnDigits : undefined;
+
     return {
       itemType: this.extractField(text, 'item', 'Unknown Item'),
       brand: this.extractField(text, 'brand', 'Unbranded'),
@@ -297,7 +313,9 @@ Shipping Cost: $[estimated shipping]`;
       category: this.extractField(text, 'category', 'General'),
       estimatedValue: this.extractField(text, 'value', '$10-50'),
       rawAnalysis: text,
-      confidence
+      confidence,
+      upc,
+      isbn,
     } as ImageAnalysis;
   }
 
@@ -382,7 +400,11 @@ Category: [specific eBay category suggestion]
 Value: [$XX-$YY estimated market range]
 Defects: [list any visible wear, damage, missing parts, or "None visible"]
 Keywords: [keyword1, keyword2, keyword3, keyword4, keyword5]
-Notes: [any additional details that would help a seller write an accurate listing]` });
+UPC: [12 or 13 digit barcode number if visible on packaging/label/sticker, or "None"]
+ISBN: [10 or 13 digit ISBN if visible on a book/media item, or "None"]
+Notes: [any additional details that would help a seller write an accurate listing]
+
+IMPORTANT: Look carefully for barcodes, UPC codes, ISBN numbers, or EAN codes on packaging, labels, stickers, or book covers.` });
 
     console.log(`Reanalyzing ${images.length} photo(s) with correction prompt: "${userPrompt.substring(0, 100)}"...`);
 

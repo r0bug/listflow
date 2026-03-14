@@ -49,7 +49,7 @@ class EbayService {
 
   async createListing(data: ListingData) {
     if (!this.isConfigured) {
-      return this.mockCreateListing(data);
+      throw new Error('eBay API is not configured. Set EBAY_APP_ID, EBAY_CERT_ID, and EBAY_SANDBOX in your .env file. Use CSV Export to list items via eBay File Exchange instead.');
     }
 
     try {
