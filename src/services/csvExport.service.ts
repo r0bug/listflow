@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import { WorkflowStage } from '../../src/generated/prisma';
+import { ebayService } from './ebay.service';
 
 /**
  * eBay Seller Hub Reports CSV column headers.
@@ -10,6 +11,9 @@ const CSV_HEADERS = [
   'Category ID',
   'Custom label (SKU)',
   'Title',
+  'C:Brand',
+  'C:Model',
+  'C:Type',
   'P:UPC',
   'P:ISBN',
   'Start price',
@@ -43,15 +47,18 @@ function getConditionId(condition: string | null): number {
     case 'new': return 1000;
     case 'new other':
     case 'open box': return 1500;
+    case 'new with defects': return 1750;
+    case 'remanufactured': return 2000;
     case 'seller refurbished':
     case 'refurbished': return 2500;
     case 'used':
-    case 'used - like new': return 3000;
+    case 'used - like new':
     case 'very good':
-    case 'used - good': return 4000;
-    case 'good': return 5000;
+    case 'used - very good':
+    case 'used - good':
+    case 'good':
     case 'acceptable':
-    case 'used - acceptable': return 6000;
+    case 'used - acceptable': return 3000;
     case 'for parts':
     case 'for parts or not working': return 7000;
     default: return 3000;
@@ -76,6 +83,9 @@ interface CsvRowData {
   categoryId: string;
   sku: string;
   title: string;
+  brand: string;
+  model: string;
+  type: string;
   upc: string;
   isbn: string;
   startPrice: number;
@@ -99,6 +109,48 @@ interface CsvRowData {
   packageLength: string;
   packageWidth: string;
   packageDepth: string;
+}
+
+/**
+ * Look up eBay numeric category ID from item title using GetSuggestedCategories.
+ * Caches the result on the item's ebayCategoryId field.
+ */
+async function resolveEbayCategoryId(item: { id: string; title: string | null; category: string | null; ebayCategoryId: string | null; aiAnalysis: unknown }): Promise<string> {
+  // 1. Already have a numeric ID stored
+  if (item.ebayCategoryId && /^\d+$/.test(item.ebayCategoryId)) {
+    return item.ebayCategoryId;
+  }
+
+  // 2. Check aiAnalysis for a numeric categoryId
+  const ai = (item.aiAnalysis as Record<string, unknown>) || {};
+  if (ai.categoryId && /^\d+$/.test(String(ai.categoryId))) {
+    const catId = String(ai.categoryId);
+    // Cache it
+    await prisma.item.update({ where: { id: item.id }, data: { ebayCategoryId: catId } }).catch(() => {});
+    return catId;
+  }
+
+  // 3. Look up from eBay API using title
+  if (item.title) {
+    try {
+      const categories = await ebayService.getCategories(item.title);
+      if (Array.isArray(categories) && categories.length > 0) {
+        // GetSuggestedCategories returns {Category: {CategoryID, CategoryName}} or {CategoryID, CategoryName}
+        const first = categories[0];
+        const catId = String(first.CategoryID || first.Category?.CategoryID || '');
+        if (catId && /^\d+$/.test(catId)) {
+          // Cache it
+          await prisma.item.update({ where: { id: item.id }, data: { ebayCategoryId: catId } }).catch(() => {});
+          return catId;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to look up eBay category for:', item.title, err);
+    }
+  }
+
+  // 4. Fallback — return whatever we have (may cause eBay rejection)
+  return item.ebayCategoryId || '';
 }
 
 /**
@@ -142,9 +194,16 @@ async function buildItemRow(itemId: string): Promise<CsvRowData | null> {
   // Package dimensions
   const dims = (item.packageDimensions as Record<string, number>) || {};
 
-  // Extract numeric category ID from AI analysis, fall back to category name
-  const aiAnalysis = (item.aiAnalysis as Record<string, unknown>) || {};
-  const categoryId = aiAnalysis.categoryId ? String(aiAnalysis.categoryId) : (item.category || '');
+  // Resolve numeric eBay category ID
+  const categoryId = await resolveEbayCategoryId(item);
+
+  // Extract item specifics from AI analysis
+  const ai = (item.aiAnalysis as Record<string, unknown>) || {};
+  const specifics = (ai.specifics as Record<string, string>) || {};
+  const brand = item.brand || specifics.Brand || specifics.brand || 'Unbranded';
+  const model = specifics.Model || specifics.model || 'Does not apply';
+  // Type: derive from category or item type in AI analysis
+  const itemType = (ai.itemType as string) || item.category || 'Other';
 
   return {
     itemId: item.id,
@@ -152,6 +211,9 @@ async function buildItemRow(itemId: string): Promise<CsvRowData | null> {
     categoryId,
     sku: item.sku || '',
     title: (item.title || '').substring(0, 80),
+    brand,
+    model,
+    type: itemType,
     upc: item.upc || 'Does not apply',
     isbn: item.isbn || '',
     startPrice: item.startingPrice || item.buyNowPrice || 0,
@@ -223,6 +285,9 @@ export async function generateCsv(
       rowData.categoryId,
       rowData.sku,
       rowData.title,
+      rowData.brand,
+      rowData.model,
+      rowData.type,
       rowData.upc,
       rowData.isbn,
       rowData.startPrice,

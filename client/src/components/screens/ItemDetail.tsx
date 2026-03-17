@@ -16,6 +16,8 @@ import {
   DollarSign,
   ExternalLink,
   Pencil,
+  Sparkles,
+  Search,
 } from 'lucide-react';
 import api from '../../api/client';
 import { cn } from '../../utils/cn';
@@ -63,6 +65,7 @@ interface ItemData {
   aiPriceSuggestion: { min: number; max: number; confidence: string; reasoning: string } | null;
   upc: string;
   isbn: string;
+  ebayCategoryId: string;
   ebayId: string | null;
   publishedAt: string | null;
   exportedAt: string | null;
@@ -544,12 +547,61 @@ export const ItemDetail: React.FC = () => {
           <h1 className="text-xl font-bold text-slate-900">
             ITEM: {item.displayId}
           </h1>
-          <p className="text-sm text-slate-500">
-            Step: {item.currentStep}
-            {hasChanges && <span className="ml-2 text-amber-600">• Unsaved changes</span>}
-          </p>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-500">Step:</span>
+            <select
+              value={item.currentStep}
+              onChange={async (e) => {
+                const newStage = e.target.value;
+                try {
+                  const result = await api.setItemStage(item.id, newStage);
+                  if ((result as any).success) {
+                    setSuccessMessage(`Moved to ${newStage}`);
+                    // Reload item
+                    const fresh = await api.getDashboardItem(item.id);
+                    if ((fresh as any).success) setItem((fresh as any).data);
+                  }
+                } catch (err: any) {
+                  setError(err?.response?.data?.error || 'Failed to change stage');
+                }
+              }}
+              className="bg-slate-100 border border-slate-300 rounded px-2 py-0.5 text-sm font-medium text-slate-700 cursor-pointer"
+            >
+              <option value="PHOTO_UPLOAD">PHOTO_UPLOAD</option>
+              <option value="AI_PROCESSING">AI_PROCESSING</option>
+              <option value="REVIEW_EDIT">REVIEW_EDIT</option>
+              <option value="PRICING">PRICING</option>
+              <option value="FINAL_REVIEW">FINAL_REVIEW</option>
+              <option value="PUBLISHED">PUBLISHED</option>
+              <option value="REJECTED">REJECTED</option>
+            </select>
+            {hasChanges && <span className="text-amber-600">• Unsaved changes</span>}
+          </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Process AI button */}
+          <button
+            onClick={async () => {
+              setIsSaving(true);
+              setError(null);
+              try {
+                const result = await api.reprocessAi(item.id);
+                if ((result as any).success) {
+                  setSuccessMessage('AI analysis complete');
+                  const fresh = await api.getDashboardItem(item.id);
+                  if ((fresh as any).success) setItem((fresh as any).data);
+                }
+              } catch (err: any) {
+                setError(err?.response?.data?.error || 'AI processing failed');
+              }
+              setIsSaving(false);
+            }}
+            disabled={isSaving}
+            className="btn bg-violet-100 text-violet-700 hover:bg-violet-200 disabled:opacity-50 text-sm"
+          >
+            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            Process AI
+          </button>
           {/* Save button */}
           {hasChanges && (
             <button
@@ -727,6 +779,37 @@ export const ItemDetail: React.FC = () => {
               </button>
             </div>
             <p className="text-slate-700">{item.category}</p>
+            <div className="flex items-center gap-2 mt-2">
+              <label className="text-xs text-slate-500 shrink-0">eBay Category ID:</label>
+              <input
+                type="text"
+                value={item.ebayCategoryId || ''}
+                onChange={(e) => updateField('ebayCategoryId', e.target.value)}
+                placeholder="e.g. 38034"
+                className="input text-sm py-1 flex-1"
+              />
+              <button
+                onClick={async () => {
+                  try {
+                    const result = await api.lookupCategory(item.id);
+                    if ((result as any).success) {
+                      const catId = (result as any).data.categoryId;
+                      updateField('ebayCategoryId', catId);
+                      setSuccessMessage(`Category: ${catId}`);
+                    } else {
+                      setError((result as any).error || 'No category found');
+                    }
+                  } catch (err: any) {
+                    setError(err?.response?.data?.error || 'Category lookup failed');
+                  }
+                }}
+                className="btn bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs py-1 px-2 shrink-0"
+                title="Find eBay category from item title"
+              >
+                <Search size={14} />
+                Find
+              </button>
+            </div>
           </div>
 
           {/* Category Modal */}
@@ -1106,15 +1189,40 @@ export const ItemDetail: React.FC = () => {
                   )}
                   <div className="flex gap-3">
                     <div className="flex-1">
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Weight (oz)</label>
-                      <input
-                        type="number"
-                        value={item.weight || ''}
-                        onChange={(e) => updateField('weight', parseFloat(e.target.value) || null)}
-                        className="input w-full"
-                        min="0"
-                        step="0.1"
-                      />
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Weight</label>
+                      <div className="flex gap-2">
+                        <div className="flex-1 relative">
+                          <input
+                            type="number"
+                            value={item.weight ? Math.floor(item.weight / 16) : ''}
+                            onChange={(e) => {
+                              const lbs = parseInt(e.target.value) || 0;
+                              const currentOz = (item.weight || 0) % 16;
+                              updateField('weight', lbs * 16 + currentOz);
+                            }}
+                            className="input w-full pr-8"
+                            min="0"
+                            placeholder="0"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">lbs</span>
+                        </div>
+                        <div className="flex-1 relative">
+                          <input
+                            type="number"
+                            value={item.weight ? Math.round(item.weight % 16) : ''}
+                            onChange={(e) => {
+                              const oz = parseFloat(e.target.value) || 0;
+                              const currentLbs = Math.floor((item.weight || 0) / 16);
+                              updateField('weight', currentLbs * 16 + oz);
+                            }}
+                            className="input w-full pr-7"
+                            min="0"
+                            max="15"
+                            placeholder="0"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">oz</span>
+                        </div>
+                      </div>
                     </div>
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-slate-700 mb-1">Handling (days)</label>
@@ -1405,15 +1513,39 @@ export const ItemDetail: React.FC = () => {
           {item.currentStep === 'PUBLISHED' ? (
             <div className="flex items-center gap-3">
               {item.ebayId && (
-                <a
-                  href={`https://www.ebay.com/itm/${item.ebayId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-3 md:px-4 py-2.5 bg-ink-600 text-white font-medium rounded-lg hover:bg-ink-700 transition-colors min-h-[44px]"
-                >
-                  <ExternalLink size={18} />
-                  View on eBay
-                </a>
+                <>
+                  <a
+                    href={`https://www.ebay.com/itm/${item.ebayId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3 md:px-4 py-2.5 bg-ink-600 text-white font-medium rounded-lg hover:bg-ink-700 transition-colors min-h-[44px]"
+                  >
+                    <ExternalLink size={18} />
+                    View on eBay
+                  </a>
+                  <button
+                    onClick={async () => {
+                      if (hasChanges) await saveChanges();
+                      setIsSaving(true);
+                      try {
+                        const result = await api.reviseEbayListing(item.id);
+                        if ((result as any).success) {
+                          setSuccessMessage('eBay listing updated');
+                        } else {
+                          setError((result as any).error || 'Failed to update');
+                        }
+                      } catch (err: any) {
+                        setError(err?.response?.data?.error || 'Failed to update eBay listing');
+                      }
+                      setIsSaving(false);
+                    }}
+                    disabled={isSaving}
+                    className="inline-flex items-center gap-2 px-3 md:px-4 py-2.5 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700 transition-colors min-h-[44px] disabled:opacity-50"
+                  >
+                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <ExternalLink size={16} />}
+                    Update eBay
+                  </button>
+                </>
               )}
               {item.publishedAt && (
                 <span className="text-sm text-slate-500">Published {new Date(item.publishedAt).toLocaleDateString()}</span>

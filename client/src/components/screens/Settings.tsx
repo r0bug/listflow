@@ -672,7 +672,7 @@ export const Settings: React.FC = () => {
                 >
                   <option value="USPSPriority">USPS Priority Mail</option>
                   <option value="USPSFirstClass">USPS First Class</option>
-                  <option value="USPSGround">USPS Ground Advantage</option>
+                  <option value="USPSGroundAdvantage">USPS Ground Advantage</option>
                   <option value="FedExGround">FedEx Ground</option>
                   <option value="FedExHomeDelivery">FedEx Home Delivery</option>
                   <option value="UPSGround">UPS Ground</option>

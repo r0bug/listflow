@@ -130,6 +130,9 @@ model Item {
   keywords     String[]
   aiAnalysis   Json?
   
+  // eBay category
+  ebayCategoryId String?  // Numeric eBay category ID (e.g., "38034")
+
   // Product identifiers
   upc          String?   // Universal Product Code (barcode)
   isbn         String?   // International Standard Book Number

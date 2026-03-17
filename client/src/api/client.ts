@@ -343,6 +343,11 @@ class ApiClient {
     return response.data;
   }
 
+  async setItemStage(id: string, stage: string, notes?: string) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${id}/set-stage`, { stage, notes });
+    return response.data;
+  }
+
   async reprocessAi(id: string) {
     const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${id}/reprocess-ai`);
     return response.data;
@@ -392,8 +397,28 @@ class ApiClient {
     return response.data;
   }
 
+  async reviseEbayListing(itemId: string) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${itemId}/revise-ebay`);
+    return response.data;
+  }
+
   async bulkPushToEbay(itemIds: string[]) {
     const response = await this.dashboardClient.post<ApiResponse<unknown>>('/dashboard/items/bulk-push-to-ebay', { itemIds });
+    return response.data;
+  }
+
+  async lookupCategory(itemId: string) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${itemId}/lookup-category`);
+    return response.data;
+  }
+
+  async cloneItem(itemId: string, overrides?: { title?: string; description?: string; price?: number; condition?: string }) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${itemId}/clone`, overrides || {});
+    return response.data;
+  }
+
+  async searchDashboardItems(query: string) {
+    const response = await this.dashboardClient.get<ApiResponse<unknown[]>>(`/dashboard/items/search`, { params: { q: query } });
     return response.data;
   }
 

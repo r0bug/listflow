@@ -100,6 +100,41 @@ The following must ONLY exist in `.env` files and NEVER in committed code:
 - [x] CSV export rewritten to match eBay Seller Hub Reports spec exactly
 - [x] eBay CSV reference doc added (docs/EBAY_CSV_REFERENCE.md)
 
+### eBay Integration & Push to eBay (Completed)
+- [x] Raw XML Trading API integration (bypasses library serialization issues)
+- [x] eBay category auto-lookup via Browse API (from item title)
+- [x] "Find Category" button on item detail page
+- [x] AI auto-sets eBay category ID after processing
+- [x] Push to eBay with image hosting, business policy auto-mapping
+- [x] ReviseItem support — "Update eBay" button on published items
+- [x] Condition ID mapping (all Used variants → 3000 for electronics)
+- [x] Item Specifics in CSV export (C:Brand, C:Model, C:Type)
+- [x] Detailed eBay error messages surfaced to UI
+
+### Workflow Flexibility (Completed)
+- [x] Stage dropdown on item detail — move items to any stage
+- [x] Flexible set-stage endpoint (POST /api/dashboard/item/:id/set-stage)
+- [x] Rejected items can be moved back into pipeline
+- [x] "Process AI" button on item detail header
+
+### ListFlow Snap PWA (Completed)
+- [x] Installable PWA for mobile photo upload (manifest.json, service worker)
+- [x] Two modes: New Item (creates item, skips AI) and Photo Pool
+- [x] Auth check with returnTo redirect after login
+- [x] PWA icons, standalone display, dark theme
+- [x] Accessible at /snap route and sidebar nav link
+
+### Sell Similar & Clone (Completed)
+- [x] Sell Similar from eBay — paste URL, fetch listing, create item
+- [x] Clone from Inventory — search items, clone with all data + photos
+- [x] Search endpoint (GET /api/dashboard/items/search)
+- [x] Clone endpoint (POST /api/dashboard/item/:id/clone)
+
+### UI Improvements (Completed)
+- [x] Weight field split into lbs + oz (stores total oz internally)
+- [x] Inventory filter: multi-select checkboxes for stage filtering
+- [x] Shipping service code mapping (USPSGround → USPSGroundAdvantage)
+
 ### Development Commands
 ```bash
 # Backend
@@ -142,6 +177,11 @@ docker-compose down      # Stop all services
 - `GET /api/v1/export/preview/:itemId` - Preview CSV data for item
 - `GET/PUT /api/dashboard/listing-defaults` - Listing defaults
 - `POST /api/pool/attach-to-item` - Attach pooled photos to item
+- `POST /api/dashboard/item/:id/set-stage` - Move item to any workflow stage
+- `POST /api/dashboard/item/:id/lookup-category` - Find eBay category from title
+- `POST /api/dashboard/item/:id/revise-ebay` - Update existing eBay listing
+- `POST /api/dashboard/item/:id/clone` - Clone item with photos
+- `GET /api/dashboard/items/search` - Search items by title/SKU/category
 
 ### Testing Checklist
 - [ ] Image upload works with various formats (JPG, PNG, WebP)

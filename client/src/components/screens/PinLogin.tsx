@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Delete } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { cn } from '../../utils/cn';
@@ -88,6 +88,8 @@ const roleColors: Record<string, string> = {
 
 export const PinLogin: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo') || '/';
   const { recentUsers, loginWithPin, login } = useAuthStore();
   const [selectedUser, setSelectedUser] = useState<typeof recentUsers[0] | null>(null);
   const [pin, setPin] = useState('');
@@ -138,7 +140,7 @@ export const PinLogin: React.FC = () => {
     setError('');
     try {
       await loginWithPin(selectedUser.id, pin);
-      navigate('/');
+      navigate(returnTo);
     } catch (err) {
       setError('Invalid PIN. Please try again.');
       setPin('');
@@ -153,7 +155,7 @@ export const PinLogin: React.FC = () => {
     setError('');
     try {
       await login(email, password);
-      navigate('/');
+      navigate(returnTo);
     } catch (err) {
       setError('Invalid email or password.');
     } finally {

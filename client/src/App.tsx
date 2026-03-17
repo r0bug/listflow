@@ -17,6 +17,7 @@ import {
   Reports,
   EbayCallback,
 } from './components/screens';
+import Snap from './components/screens/Snap';
 import { useAuthStore } from './stores/authStore';
 import './index.css';
 
@@ -71,6 +72,7 @@ function AppRoutes() {
     <Routes>
       {/* Public Routes */}
       <Route path="/login" element={<PinLogin />} />
+      <Route path="/snap" element={<Snap />} />
 
       {/* Protected Routes */}
       <Route

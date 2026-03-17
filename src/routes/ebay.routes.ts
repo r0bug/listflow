@@ -17,8 +17,10 @@ const EBAY_OAUTH_SCOPES = [
 ].join(' ');
 
 function getRedirectUri(): string {
-  return process.env.EBAY_REDIRECT_URI ||
-    `${process.env.CLIENT_URL || 'http://localhost:5173'}/settings/ebay/callback`;
+  if (process.env.EBAY_REDIRECT_URI) return process.env.EBAY_REDIRECT_URI;
+  // CLIENT_URL may be comma-separated; use the first one
+  const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
+  return `${clientUrl}/api/v1/ebay/auth/callback`;
 }
 
 // Generate OAuth authorization URL
@@ -68,10 +70,11 @@ router.post('/auth/token', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Authorization code is required' });
     }
 
-    const clientId = reqClientId || process.env.EBAY_CLIENT_ID;
-    const clientSecret = reqClientSecret || process.env.EBAY_CLIENT_SECRET;
+    const creds = getEbayCredentials();
+    const clientId = reqClientId || creds.clientId;
+    const clientSecret = reqClientSecret || creds.clientSecret;
     const redirectUri = getRedirectUri();
-    const sandbox = reqSandbox !== undefined ? reqSandbox : (process.env.EBAY_SANDBOX === 'true');
+    const sandbox = reqSandbox !== undefined ? reqSandbox : creds.sandbox;
 
     if (!clientId || !clientSecret) {
       return res.status(400).json({
@@ -153,10 +156,8 @@ router.get('/auth/callback', async (req: Request, res: Response) => {
       return res.redirect('/settings?ebay_error=No authorization code received');
     }
 
-    const clientId = process.env.EBAY_CLIENT_ID;
-    const clientSecret = process.env.EBAY_CLIENT_SECRET;
+    const { clientId, clientSecret, sandbox } = getEbayCredentials();
     const redirectUri = getRedirectUri();
-    const sandbox = process.env.EBAY_SANDBOX === 'true';
 
     if (!clientId || !clientSecret) {
       return res.redirect('/settings?ebay_error=Server not configured with eBay credentials');
@@ -243,11 +244,18 @@ router.post('/credentials', async (req: Request, res: Response) => {
   }
 });
 
+// Helper: resolve eBay credentials from env (supports both naming conventions)
+function getEbayCredentials() {
+  const clientId = process.env.EBAY_CLIENT_ID || process.env.EBAY_APP_ID || '';
+  const clientSecret = process.env.EBAY_CLIENT_SECRET || process.env.EBAY_CERT_ID || '';
+  const devId = process.env.EBAY_DEV_ID || '';
+  const sandbox = process.env.EBAY_SANDBOX === 'true';
+  return { clientId, clientSecret, devId, sandbox };
+}
+
 // Get OAuth application access token (for Browse API)
 async function getApplicationToken(): Promise<string | null> {
-  const clientId = process.env.EBAY_CLIENT_ID;
-  const clientSecret = process.env.EBAY_CLIENT_SECRET;
-  const sandbox = process.env.EBAY_SANDBOX === 'true';
+  const { clientId, clientSecret, sandbox } = getEbayCredentials();
 
   if (!clientId || !clientSecret) return null;
 
@@ -356,9 +364,10 @@ function formatBrowseApiItem(data: Record<string, unknown>, itemId: string) {
     currency: price?.currency || 'USD',
     condition: data.condition || 'Used',
     category: data.categoryPath || '',
-    imageUrls: image?.imageUrl
-      ? [image.imageUrl]
-      : (additionalImages?.map(img => img.imageUrl).filter(Boolean) || []),
+    imageUrls: [
+      ...(image?.imageUrl ? [image.imageUrl] : []),
+      ...(additionalImages?.map(img => img.imageUrl).filter(Boolean) || []),
+    ],
     specifics: localizedAspects?.reduce((acc: Record<string, string>, aspect) => {
       acc[aspect.name] = aspect.value;
       return acc;
@@ -378,15 +387,13 @@ router.get('/search', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Search query is required' });
     }
 
-    const clientId = process.env.EBAY_CLIENT_ID;
+    const { clientId, sandbox } = getEbayCredentials();
     if (!clientId) {
       return res.status(500).json({
         success: false,
-        error: 'eBay not configured. Add EBAY_CLIENT_ID to .env'
+        error: 'eBay not configured. Add EBAY_CLIENT_ID or EBAY_APP_ID to .env'
       });
     }
-
-    const sandbox = process.env.EBAY_SANDBOX === 'true';
 
     if (type === 'sold') {
       const findingResult = await searchWithFindingAPI(clientId, q, Number(limit), sandbox);
@@ -679,14 +686,10 @@ router.post('/create-item', async (req: Request, res: Response) => {
 // GET /api/v1/ebay/status
 router.get('/status', async (req: Request, res: Response) => {
   try {
-    const isConfigured = !!(
-      process.env.EBAY_CLIENT_ID &&
-      process.env.EBAY_CLIENT_SECRET &&
-      process.env.EBAY_DEV_ID
-    );
-
-    const hasUserToken = !!process.env.EBAY_USER_TOKEN;
-    const isSandbox = process.env.EBAY_SANDBOX === 'true';
+    const creds = getEbayCredentials();
+    const isConfigured = !!(creds.clientId && creds.clientSecret && creds.devId);
+    const hasUserToken = !!process.env.EBAY_USER_TOKEN || !!process.env.EBAY_AUTH_TOKEN;
+    const isSandbox = creds.sandbox;
 
     res.json({
       success: true,

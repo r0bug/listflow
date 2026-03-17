@@ -618,6 +618,7 @@ router.get('/item/:id', async (req, res) => {
       aiPriceSuggestion: item.aiPriceSuggestion || null,
       upc: item.upc || '',
       isbn: item.isbn || '',
+      ebayCategoryId: item.ebayCategoryId || '',
       ebayId: item.ebayId || null,
       publishedAt: item.publishedAt?.toISOString() || null,
       exportedAt: item.exportedAt?.toISOString() || null,
@@ -668,7 +669,8 @@ router.put('/item/:id', async (req, res) => {
       quantity,
       postalCode,
       upc,
-      isbn
+      isbn,
+      ebayCategoryId
     } = req.body;
 
     // Build update data
@@ -693,6 +695,7 @@ router.put('/item/:id', async (req, res) => {
     if (postalCode !== undefined) updateData.postalCode = postalCode;
     if (upc !== undefined) updateData.upc = upc;
     if (isbn !== undefined) updateData.isbn = isbn;
+    if (ebayCategoryId !== undefined) updateData.ebayCategoryId = ebayCategoryId;
 
     // Store item specifics in aiAnalysis JSON
     if (itemSpecifics !== undefined) {
@@ -1053,15 +1056,20 @@ router.post('/item/:id/advance', async (req: Request, res: Response) => {
       'PUBLISHED'
     ];
 
+    let nextStage: string;
     const currentIndex = stageOrder.indexOf(item.stage);
-    if (currentIndex === -1 || currentIndex >= stageOrder.length - 1) {
+
+    if (item.stage === 'REJECTED') {
+      // Rejected items go back to REVIEW_EDIT
+      nextStage = 'REVIEW_EDIT';
+    } else if (currentIndex === -1 || currentIndex >= stageOrder.length - 1) {
       return res.status(400).json({
         success: false,
         error: 'Cannot advance item - already at final stage or invalid stage'
       });
+    } else {
+      nextStage = stageOrder[currentIndex + 1] as string;
     }
-
-    const nextStage = stageOrder[currentIndex + 1] as string;
 
     // Block direct advance to PUBLISHED — must use CSV export or eBay push
     if (nextStage === 'PUBLISHED') {
@@ -1099,6 +1107,246 @@ router.post('/item/:id/advance', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error advancing item:', error);
     res.status(500).json({ success: false, error: 'Failed to advance item' });
+  }
+});
+
+// POST /api/dashboard/item/:id/set-stage - Move item to any stage
+router.post('/item/:id/set-stage', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { stage, notes } = req.body;
+    const userId = await resolveUserId(req);
+
+    const validStages = ['PHOTO_UPLOAD', 'AI_PROCESSING', 'REVIEW_EDIT', 'PRICING', 'FINAL_REVIEW', 'PUBLISHED', 'REJECTED'];
+    if (!stage || !validStages.includes(stage)) {
+      return res.status(400).json({ success: false, error: `Invalid stage. Must be one of: ${validStages.join(', ')}` });
+    }
+
+    const item = await prisma.item.findUnique({ where: { id }, select: { stage: true } });
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    const newStatus = stage === 'REJECTED' ? 'PAUSED' : 'ACTIVE';
+
+    const [updatedItem] = await prisma.$transaction([
+      prisma.item.update({
+        where: { id },
+        data: { stage: stage as any, status: newStatus as any }
+      }),
+      prisma.workflowAction.create({
+        data: {
+          itemId: id,
+          userId,
+          fromStage: item.stage,
+          toStage: stage as any,
+          action: 'set_stage',
+          notes: notes || `Moved from ${item.stage} to ${stage}`
+        }
+      })
+    ]);
+
+    res.json({
+      success: true,
+      data: { id: updatedItem.id, stage: updatedItem.stage, status: updatedItem.status },
+      message: `Item moved to ${stage}`
+    });
+  } catch (error) {
+    console.error('Error setting item stage:', error);
+    res.status(500).json({ success: false, error: 'Failed to set item stage' });
+  }
+});
+
+// GET /api/dashboard/items/search - Search items by title, SKU, or category
+router.get('/items/search', async (req: Request, res: Response) => {
+  try {
+    const q = (req.query.q as string || '').trim();
+    if (!q) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const items = await prisma.item.findMany({
+      where: {
+        OR: [
+          { title: { contains: q, mode: 'insensitive' } },
+          { sku: { contains: q, mode: 'insensitive' } },
+          { category: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        sku: true,
+        title: true,
+        description: true,
+        category: true,
+        condition: true,
+        startingPrice: true,
+        buyNowPrice: true,
+        photos: {
+          select: { id: true, thumbnailPath: true, optimizedPath: true, originalPath: true },
+          orderBy: { order: 'asc' },
+          take: 1,
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 20,
+    });
+
+    const results = items.map(item => ({
+      ...item,
+      displayId: item.sku?.split('-')[1] || item.id.slice(-6),
+      photos: item.photos.map((p: any) => ({
+        id: p.id,
+        url: p.thumbnailPath || p.optimizedPath || p.originalPath || '',
+      })),
+    }));
+
+    res.json({ success: true, data: results });
+  } catch (error) {
+    console.error('Error searching items:', error);
+    res.status(500).json({ success: false, error: 'Search failed' });
+  }
+});
+
+// POST /api/dashboard/item/:id/clone - Clone an item as a new listing
+router.post('/item/:id/clone', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { title, description, price, condition } = req.body;
+    const userId = await resolveUserId(req);
+
+    const source = await prisma.item.findUnique({
+      where: { id },
+      include: {
+        photos: { orderBy: { order: 'asc' } },
+        location: true,
+      },
+    });
+
+    if (!source) {
+      return res.status(404).json({ success: false, error: 'Source item not found' });
+    }
+
+    // Generate new SKU
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const random = Math.random().toString(36).substring(2, 5).toUpperCase();
+    const sku = `LF-${timestamp}-${random}`;
+
+    // Clone the item with overrides
+    const cloned = await prisma.item.create({
+      data: {
+        sku,
+        stage: 'REVIEW_EDIT',
+        status: 'ACTIVE',
+        locationId: source.locationId,
+        createdById: userId,
+        title: title || source.title,
+        description: description || source.description,
+        category: source.category,
+        ebayCategoryId: source.ebayCategoryId,
+        condition: condition || source.condition,
+        brand: source.brand,
+        features: source.features || [],
+        keywords: source.keywords || [],
+        upc: source.upc,
+        isbn: source.isbn,
+        startingPrice: price ? parseFloat(price) : source.startingPrice,
+        buyNowPrice: source.buyNowPrice,
+        shippingCost: source.shippingCost,
+        shippingService: source.shippingService,
+        shippingType: source.shippingType,
+        weight: source.weight,
+        packageDimensions: source.packageDimensions as any || undefined,
+        handlingTime: source.handlingTime,
+        listingFormat: source.listingFormat,
+        listingDuration: source.listingDuration,
+        returnPolicy: source.returnPolicy as any || undefined,
+        quantity: source.quantity,
+        postalCode: source.postalCode,
+        aiAnalysis: {
+          source: 'clone',
+          sourceItemId: source.id,
+          sourceSku: source.sku,
+          clonedAt: new Date().toISOString(),
+          ...(source.aiAnalysis as Record<string, unknown> || {}),
+        },
+        aiPriceSuggestion: source.aiPriceSuggestion as any || undefined,
+      },
+    });
+
+    // Clone photos — copy file references (not files themselves)
+    if (source.photos.length > 0) {
+      await prisma.photo.createMany({
+        data: source.photos.map((photo, idx) => ({
+          itemId: cloned.id,
+          originalPath: photo.originalPath,
+          optimizedPath: photo.optimizedPath,
+          editedPath: photo.editedPath,
+          thumbnailPath: photo.thumbnailPath,
+          publicUrl: photo.publicUrl,
+          isPrimary: photo.isPrimary,
+          order: idx,
+        })),
+      });
+    }
+
+    // Create workflow action
+    await prisma.workflowAction.create({
+      data: {
+        itemId: cloned.id,
+        userId,
+        fromStage: 'PHOTO_UPLOAD',
+        toStage: 'REVIEW_EDIT',
+        action: 'clone',
+        notes: `Cloned from ${source.sku}`,
+        changes: { sourceItemId: source.id, sourceSku: source.sku },
+      },
+    });
+
+    res.json({
+      success: true,
+      data: { id: cloned.id, sku: cloned.sku, title: cloned.title, stage: cloned.stage },
+      message: `Cloned from ${source.sku}`,
+    });
+  } catch (error) {
+    console.error('Error cloning item:', error);
+    res.status(500).json({ success: false, error: 'Failed to clone item' });
+  }
+});
+
+// POST /api/dashboard/item/:id/lookup-category - Find eBay category from item title
+router.post('/item/:id/lookup-category', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const item = await prisma.item.findUnique({ where: { id }, select: { title: true, category: true } });
+    if (!item) return res.status(404).json({ success: false, error: 'Item not found' });
+
+    const query = item.title || item.category || '';
+    if (!query) return res.status(400).json({ success: false, error: 'Item has no title to search with' });
+
+    const suggestions = await ebayService.getCategories(query);
+    if (!suggestions || suggestions.length === 0) {
+      return res.json({ success: false, error: 'No matching eBay categories found' });
+    }
+
+    // Extract category ID from first suggestion
+    const cat = suggestions[0];
+    const categoryId = String(cat.CategoryID || cat.Category?.CategoryID || '');
+    const categoryName = cat.CategoryName || cat.Category?.CategoryName || '';
+
+    if (categoryId && /^\d+$/.test(categoryId)) {
+      await prisma.item.update({ where: { id }, data: { ebayCategoryId: categoryId } });
+      return res.json({
+        success: true,
+        data: { categoryId, categoryName, allSuggestions: suggestions.slice(0, 5) },
+        message: `Category set to ${categoryId} (${categoryName})`,
+      });
+    }
+
+    res.json({ success: false, error: 'Could not determine numeric category ID', suggestions });
+  } catch (error) {
+    console.error('Category lookup error:', error);
+    res.status(500).json({ success: false, error: 'Category lookup failed' });
   }
 });
 
@@ -1276,6 +1524,17 @@ router.post('/item/:id/push-to-ebay', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Item must be at FINAL_REVIEW stage to push to eBay' });
     }
 
+    // Host images first (creates public URLs if missing)
+    try {
+      const { hostItemImages } = require('../services/imageHosting.service');
+      await hostItemImages(id);
+      // Reload photos to get updated public URLs
+      const freshPhotos = await prisma.photo.findMany({ where: { itemId: id }, orderBy: { order: 'asc' } });
+      item.photos = freshPhotos;
+    } catch (hostErr) {
+      console.warn('Image hosting skipped:', (hostErr as Error).message);
+    }
+
     // Build image URLs from public URLs
     const imageUrls = item.photos
       .map(p => p.publicUrl)
@@ -1285,16 +1544,47 @@ router.post('/item/:id/push-to-ebay', async (req: Request, res: Response) => {
     const format = item.listingFormat || 'FixedPrice';
     const isAuction = format === 'Auction' || format === 'AuctionWithBIN';
 
+    // Resolve numeric eBay category ID
+    let categoryId = item.ebayCategoryId || '';
+    if (!categoryId) {
+      // Try to get from eBay suggested categories
+      try {
+        const suggestions = await ebayService.getCategories(item.title || '');
+        if (suggestions?.length > 0) {
+          const firstCat = suggestions[0];
+          categoryId = firstCat.CategoryID || firstCat.Category?.CategoryID || '';
+          // Cache it on the item
+          if (categoryId) {
+            await prisma.item.update({ where: { id }, data: { ebayCategoryId: categoryId } }).catch(() => {});
+          }
+        }
+      } catch (e) {
+        // ignore lookup failure
+      }
+    }
+    if (!categoryId) {
+      return res.status(400).json({ success: false, error: 'Missing eBay Category ID. Set it on the item detail page before pushing to eBay.' });
+    }
+
     const listingData = {
       title: (item.title || 'Item for Sale').substring(0, 80),
       description: item.description || '',
       price: isAuction ? (item.startingPrice || item.buyNowPrice || 0) : (item.buyNowPrice || item.startingPrice || 0),
       buyNowPrice: format === 'AuctionWithBIN' ? item.buyNowPrice || undefined : undefined,
-      category: item.category || '',
+      category: categoryId,
       condition: item.condition || 'Used',
       imageUrls,
       quantity: item.quantity || 1,
       shippingCost: item.shippingCost || undefined,
+      shippingService: item.shippingService || undefined,
+      shippingType: item.shippingType || undefined,
+      listingFormat: item.listingFormat || undefined,
+      listingDuration: item.listingDuration || undefined,
+      handlingTime: item.handlingTime || undefined,
+      returnPolicy: item.returnPolicy as any || undefined,
+      weight: item.weight || undefined,
+      packageDimensions: item.packageDimensions as any || undefined,
+      postalCode: item.postalCode || undefined,
     };
 
     const result = await ebayService.createListing(listingData);
@@ -1304,7 +1594,7 @@ router.post('/item/:id/push-to-ebay', async (req: Request, res: Response) => {
       await prisma.item.update({
         where: { id },
         data: {
-          ebayId: result.listingId,
+          ebayId: String(result.listingId),
           stage: 'PUBLISHED',
           publishedAt: new Date(),
         },
@@ -1317,7 +1607,7 @@ router.post('/item/:id/push-to-ebay', async (req: Request, res: Response) => {
           description: item.description,
           price: listingData.price,
           buyNowPrice: item.buyNowPrice,
-          ebayId: result.listingId,
+          ebayId: String(result.listingId),
           status: 'active',
           imageUrls,
           category: item.category,
@@ -1341,7 +1631,7 @@ router.post('/item/:id/push-to-ebay', async (req: Request, res: Response) => {
       res.json({
         success: true,
         data: {
-          ebayId: result.listingId,
+          ebayId: String(result.listingId),
           listingUrl: result.listingUrl,
         },
       });
@@ -1349,8 +1639,78 @@ router.post('/item/:id/push-to-ebay', async (req: Request, res: Response) => {
       res.status(500).json({ success: false, error: 'eBay listing creation failed' });
     }
   } catch (error: any) {
-    console.error('eBay push error:', error);
-    res.status(500).json({ success: false, error: error.message || 'Failed to push to eBay' });
+    console.error('eBay push error:', JSON.stringify(error?.meta || error?.response?.data || error, null, 2));
+    // Extract detailed eBay error messages
+    const meta = error?.meta;
+    let detail = error.message || 'Failed to push to eBay';
+    if (meta?.Errors) {
+      const errors = Array.isArray(meta.Errors) ? meta.Errors : [meta.Errors];
+      detail = errors.map((e: any) => e.LongMessage || e.ShortMessage || e.message).filter(Boolean).join(' | ');
+    }
+    res.status(500).json({ success: false, error: detail });
+  }
+});
+
+// POST /api/dashboard/item/:id/revise-ebay - Update an existing eBay listing
+router.post('/item/:id/revise-ebay', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = await resolveUserId(req);
+
+    const item = await prisma.item.findUnique({
+      where: { id },
+      include: { photos: { orderBy: { order: 'asc' } } },
+    });
+
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    if (!item.ebayId) {
+      return res.status(400).json({ success: false, error: 'Item has no eBay listing to revise. Push to eBay first.' });
+    }
+
+    const imageUrls = item.photos
+      .map(p => p.publicUrl)
+      .filter((url): url is string => !!url);
+
+    const result = await ebayService.reviseListing(item.ebayId, {
+      title: (item.title || '').substring(0, 80),
+      description: item.description || '',
+      price: item.buyNowPrice || item.startingPrice || undefined,
+      imageUrls,
+      quantity: item.quantity || 1,
+    });
+
+    if (result.success) {
+      await prisma.workflowAction.create({
+        data: {
+          itemId: id,
+          userId,
+          fromStage: item.stage,
+          toStage: item.stage,
+          action: 'revise_ebay',
+          notes: `Revised eBay listing ${item.ebayId}`,
+        },
+      });
+
+      res.json({
+        success: true,
+        data: { ebayId: item.ebayId, listingUrl: `https://www.ebay.com/itm/${item.ebayId}` },
+        message: 'eBay listing updated',
+      });
+    } else {
+      res.status(500).json({ success: false, error: 'eBay revision failed' });
+    }
+  } catch (error: any) {
+    console.error('eBay revise error:', JSON.stringify(error?.meta || error, null, 2));
+    const meta = error?.meta;
+    let detail = error.message || 'Failed to revise eBay listing';
+    if (meta?.Errors) {
+      const errors = Array.isArray(meta.Errors) ? meta.Errors : [meta.Errors];
+      detail = errors.map((e: any) => e.LongMessage || e.ShortMessage || e.message).filter(Boolean).join(' | ');
+    }
+    res.status(500).json({ success: false, error: detail });
   }
 });
 
@@ -1981,7 +2341,7 @@ router.post('/items/bulk-push-to-ebay', async (req: Request, res: Response) => {
           const userId = await resolveUserId(req);
           await prisma.item.update({
             where: { id: itemId },
-            data: { ebayId: result.listingId, stage: 'PUBLISHED', publishedAt: new Date() },
+            data: { ebayId: String(result.listingId), stage: 'PUBLISHED', publishedAt: new Date() },
           });
           await prisma.listing.create({
             data: {
@@ -1989,7 +2349,7 @@ router.post('/items/bulk-push-to-ebay', async (req: Request, res: Response) => {
               description: item.description,
               price: isAuction ? (item.startingPrice || 0) : (item.buyNowPrice || item.startingPrice || 0),
               buyNowPrice: item.buyNowPrice,
-              ebayId: result.listingId,
+              ebayId: String(result.listingId),
               status: 'active',
               imageUrls,
               category: item.category,

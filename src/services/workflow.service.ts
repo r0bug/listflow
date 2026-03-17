@@ -230,6 +230,28 @@ export class WorkflowService {
         data: updateData,
       });
 
+      // Auto-resolve eBay category ID from title
+      try {
+        const { ebayService } = require('./ebay.service');
+        const title = listing.title || analysis.itemType || '';
+        if (title) {
+          const suggestions = await ebayService.getCategories(title);
+          if (suggestions?.length > 0) {
+            const cat = suggestions[0];
+            const catId = cat.CategoryID || cat.Category?.CategoryID || '';
+            if (catId && /^\d+$/.test(String(catId))) {
+              await this.prisma.item.update({
+                where: { id: itemId },
+                data: { ebayCategoryId: String(catId) },
+              });
+            }
+          }
+        }
+      } catch (catErr) {
+        // Non-critical — category lookup failure shouldn't break AI processing
+        console.warn('eBay category auto-lookup failed:', (catErr as Error).message);
+      }
+
       // Mark all photos as processed
       const primaryPhoto = item.photos.find(p => p.isPrimary) || item.photos[0];
       await this.prisma.photo.update({

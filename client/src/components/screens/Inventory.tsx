@@ -24,7 +24,7 @@ interface InventoryItem {
 }
 
 interface FilterOptions {
-  stage: string;
+  stages: string[];
   sortBy: 'recent' | 'sku' | 'price_asc' | 'price_desc';
 }
 
@@ -38,7 +38,7 @@ export const Inventory: React.FC = () => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({
-    stage: 'all',
+    stages: [],
     sortBy: 'recent'
   });
   const filterRef = useRef<HTMLDivElement>(null);
@@ -77,7 +77,7 @@ export const Inventory: React.FC = () => {
                            item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            item.location.toLowerCase().includes(searchQuery.toLowerCase());
       if (!matchesSearch) return false;
-      if (filters.stage !== 'all' && item.stage !== filters.stage) return false;
+      if (filters.stages.length > 0 && !filters.stages.includes(item.stage)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -89,8 +89,17 @@ export const Inventory: React.FC = () => {
       }
     });
 
-  const resetFilters = () => setFilters({ stage: 'all', sortBy: 'recent' });
-  const hasActiveFilters = filters.stage !== 'all' || filters.sortBy !== 'recent';
+  const resetFilters = () => setFilters({ stages: [], sortBy: 'recent' });
+  const hasActiveFilters = filters.stages.length > 0 || filters.sortBy !== 'recent';
+
+  const toggleStage = (stage: string) => {
+    setFilters(prev => ({
+      ...prev,
+      stages: prev.stages.includes(stage)
+        ? prev.stages.filter(s => s !== stage)
+        : [...prev.stages, stage]
+    }));
+  };
 
   const getStageColor = (stage: string) => {
     switch (stage) {
@@ -205,7 +214,7 @@ export const Inventory: React.FC = () => {
             <Filter size={16} />
             Filters
             {hasActiveFilters && (
-              <span className="text-xs bg-ink-600 text-white rounded-full w-4 h-4 flex items-center justify-center">!</span>
+              <span className="text-xs bg-ink-600 text-white rounded-full w-4 h-4 flex items-center justify-center">{filters.stages.length || '!'}</span>
             )}
             <ChevronDown size={14} />
           </button>
@@ -219,21 +228,35 @@ export const Inventory: React.FC = () => {
                 )}
               </div>
               <div className="mb-3">
-                <label className="block text-sm font-medium text-slate-600 mb-1">Stage</label>
-                <select
-                  value={filters.stage}
-                  onChange={(e) => setFilters({ ...filters, stage: e.target.value })}
-                  className="input text-sm"
-                >
-                  <option value="all">All Stages</option>
-                  <option value="PHOTO_UPLOAD">Photo Upload</option>
-                  <option value="AI_PROCESSING">AI Processing</option>
-                  <option value="REVIEW_EDIT">Review Edit</option>
-                  <option value="PRICING">Pricing</option>
-                  <option value="FINAL_REVIEW">Final Review</option>
-                  <option value="PUBLISHED">Published</option>
-                  <option value="REJECTED">Rejected</option>
-                </select>
+                <label className="block text-sm font-medium text-slate-600 mb-2">Stage</label>
+                <div className="space-y-1">
+                  {[
+                    { value: 'PHOTO_UPLOAD', label: 'Photo Upload' },
+                    { value: 'AI_PROCESSING', label: 'AI Processing' },
+                    { value: 'REVIEW_EDIT', label: 'Review / Edit' },
+                    { value: 'PRICING', label: 'Pricing' },
+                    { value: 'FINAL_REVIEW', label: 'Final Review' },
+                    { value: 'PUBLISHED', label: 'Published' },
+                    { value: 'REJECTED', label: 'Rejected' },
+                  ].map(({ value, label }) => (
+                    <label key={value} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-50 cursor-pointer text-sm">
+                      <input
+                        type="checkbox"
+                        checked={filters.stages.includes(value)}
+                        onChange={() => toggleStage(value)}
+                        className="w-4 h-4 rounded border-slate-300 text-ink-600 focus:ring-ink-500"
+                      />
+                      <span className={cn('inline-block w-2 h-2 rounded-full', {
+                        'bg-purple-400': value === 'PHOTO_UPLOAD' || value === 'AI_PROCESSING',
+                        'bg-amber-400': value === 'REVIEW_EDIT',
+                        'bg-blue-400': value === 'PRICING',
+                        'bg-green-400': value === 'FINAL_REVIEW' || value === 'PUBLISHED',
+                        'bg-red-400': value === 'REJECTED',
+                      })} />
+                      <span className="text-slate-700">{label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
               <div className="mb-3">
                 <label className="block text-sm font-medium text-slate-600 mb-1">Sort By</label>

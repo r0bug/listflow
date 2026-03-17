@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Copy,
   BarChart3,
+  Camera,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -108,6 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onNavigate }) =>
     <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
       <NavItem to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" onNavigate={onNavigate} />
       <NavItem to="/import" icon={<Upload size={18} />} label="Import" onNavigate={onNavigate} />
+      <NavItem to="/snap" icon={<Camera size={18} />} label="Snap" onNavigate={onNavigate} />
 
       <NavItem
         to="/queue"
