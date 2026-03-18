@@ -130,6 +130,17 @@ The following must ONLY exist in `.env` files and NEVER in committed code:
 - [x] Search endpoint (GET /api/dashboard/items/search)
 - [x] Clone endpoint (POST /api/dashboard/item/:id/clone)
 
+### eBay Required Item Specifics (Completed)
+- [x] Taxonomy API integration — fetch required/recommended specifics per category
+- [x] `getCategorySpecifics(categoryId)` method on ebayService
+- [x] `GET /api/dashboard/category/:categoryId/specifics` endpoint
+- [x] Category lookup auto-returns required specifics
+- [x] Auto-populate missing required specifics as empty fields on category set
+- [x] UI: required/missing badge, red indicators, "Add Required" button
+- [x] Dropdown selectors for specifics with eBay-provided value lists
+- [x] Quick-add buttons in Add Specific modal for missing required fields
+- [x] Completeness tracking utility (`src/utils/completeness.ts`)
+
 ### UI Improvements (Completed)
 - [x] Weight field split into lbs + oz (stores total oz internally)
 - [x] Inventory filter: multi-select checkboxes for stage filtering
@@ -182,6 +193,7 @@ docker-compose down      # Stop all services
 - `POST /api/dashboard/item/:id/revise-ebay` - Update existing eBay listing
 - `POST /api/dashboard/item/:id/clone` - Clone item with photos
 - `GET /api/dashboard/items/search` - Search items by title/SKU/category
+- `GET /api/dashboard/category/:categoryId/specifics` - Fetch required/recommended eBay item specifics for category
 
 ### Testing Checklist
 - [ ] Image upload works with various formats (JPG, PNG, WebP)

@@ -3,7 +3,6 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Upload,
-  ListTodo,
   Package,
   Warehouse,
   Search,
@@ -107,22 +106,10 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onNavigate }) => {
   const navContent = (
     <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-      <NavItem to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" onNavigate={onNavigate} />
+      <NavItem to="/" icon={<Warehouse size={18} />} label="Inventory" onNavigate={onNavigate} />
+      <NavItem to="/dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" onNavigate={onNavigate} />
       <NavItem to="/import" icon={<Upload size={18} />} label="Import" onNavigate={onNavigate} />
       <NavItem to="/snap" icon={<Camera size={18} />} label="Snap" onNavigate={onNavigate} />
-
-      <NavItem
-        to="/queue"
-        icon={<ListTodo size={18} />}
-        label="Queue"
-        onNavigate={onNavigate}
-        children={[
-          { to: '/queue/identify', label: 'Identify', badge: 12 },
-          { to: '/queue/review', label: 'Review', badge: 18 },
-          { to: '/queue/price', label: 'Price', badge: 9 },
-          { to: '/queue/ready', label: 'Ready', badge: 8 },
-        ]}
-      />
 
       <NavItem
         to="/listings"
@@ -134,8 +121,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onNavigate }) =>
           { to: '/listings/sold', label: 'Sold' },
         ]}
       />
-
-      <NavItem to="/inventory" icon={<Warehouse size={18} />} label="Inventory" onNavigate={onNavigate} />
       <NavItem to="/templates" icon={<FileText size={18} />} label="Templates" onNavigate={onNavigate} />
       <NavItem to="/sell-similar" icon={<Copy size={18} />} label="Sell Similar" onNavigate={onNavigate} />
       <NavItem to="/research" icon={<Search size={18} />} label="Research" onNavigate={onNavigate} />

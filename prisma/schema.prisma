@@ -159,9 +159,22 @@ model Item {
   // AI price suggestion
   aiPriceSuggestion Json?     // {min, max, confidence, reasoning}
 
+  // eBay Business Policy Profiles
+  shippingProfileId String?   // eBay shipping policy profile ID
+  returnProfileId   String?   // eBay return policy profile ID
+
   // eBay Integration (Stage 5)
   ebayId       String?  @unique
   publishedAt  DateTime?
+
+  // Context notes (per-section free-text notes)
+  contextNotes  Json?    // { photos, category, description, pricing, shipping, general }
+
+  // AI interaction journal
+  aiJournal     Json?    // Array of [{id, timestamp, type, prompt, response}]
+
+  // Completeness cache
+  completeness  Json?    // { hasPhotos, aiProcessed, categorySet, specificsPopulated, priceSet, shippingPolicyChosen, weightEntered, readyToList, score, percentage }
 
   // AI cost tracking (cumulative across all AI calls for this item)
   aiCost       Float    @default(0)

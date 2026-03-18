@@ -28,6 +28,7 @@ A comprehensive, AI-powered eBay listing workflow system that automates the list
 - **PIN Authentication** - Quick user switching on shared workstations
 - **UPC/ISBN Detection** - AI reads barcodes from photos, manual entry supported
 - **CSV Export** - eBay Seller Hub Reports compatible batch export
+- **Required Specifics** - Auto-fetches eBay-required item specifics per category with value dropdowns
 
 ### Design System ("Warm Industrial")
 - **Typography**: DM Sans (body) + Fraunces (display/headings)
@@ -211,7 +212,8 @@ listflow/
 │   ├── schema.prisma             # Current schema
 │   └── schema.v2.prisma          # V2 multi-tenant schema
 ├── docs/
-│   └── EBAY_CSV_REFERENCE.md     # eBay Seller Hub Reports CSV spec
+│   ├── EBAY_CSV_REFERENCE.md     # eBay Seller Hub Reports CSV spec
+│   └── BUG_JOURNAL.md            # Bug tracking and fix log
 ├── SPEC.md                       # Full platform specification
 ├── GUI_WIREFRAMES.md             # ASCII wireframes
 └── CLAUDE.md                     # Development guidelines
@@ -282,6 +284,7 @@ listflow/
 - `POST /api/dashboard/items/bulk-push-to-ebay` - Batch push to eBay
 - `GET /api/dashboard/listing-defaults` - Get location listing defaults
 - `PUT /api/dashboard/listing-defaults` - Save location listing defaults
+- `GET /api/dashboard/category/:categoryId/specifics` - Fetch required eBay item specifics for category
 
 ### Research
 - `POST /api/v1/research/sold` - Search sold items

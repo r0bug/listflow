@@ -18,6 +18,9 @@ import {
   Pencil,
   Sparkles,
   Search,
+  ChevronDown,
+  BookOpen,
+  MessageSquare,
 } from 'lucide-react';
 import api from '../../api/client';
 import { cn } from '../../utils/cn';
@@ -67,14 +70,67 @@ interface ItemData {
   isbn: string;
   ebayCategoryId: string;
   ebayId: string | null;
+  shippingProfileId: string | null;
+  returnProfileId: string | null;
   publishedAt: string | null;
   exportedAt: string | null;
+  contextNotes: Record<string, string> | null;
+  aiJournal: AiJournalEntry[];
+  completeness: {
+    hasPhotos: boolean;
+    aiProcessed: boolean;
+    categorySet: boolean;
+    specificsPopulated: boolean;
+    priceSet: boolean;
+    shippingPolicyChosen: boolean;
+    weightEntered: boolean;
+    readyToList: boolean;
+    score: number;
+    percentage: number;
+  };
+}
+
+interface AiJournalEntry {
+  id: string;
+  timestamp: string;
+  type: string;
+  prompt: {
+    systemPrompt?: string;
+    contextNotes?: Record<string, string> | null;
+    photoCount?: number;
+    existingData?: Record<string, unknown> | null;
+  };
+  response: {
+    raw?: string;
+    parsed?: Record<string, unknown>;
+    model?: string;
+    tokens?: { input: number; output: number };
+    cost?: number;
+  };
 }
 
 interface NavigationData {
   prevId: string | null;
   nextId: string | null;
 }
+
+// eBay Business Policy Profiles
+const SHIPPING_PROFILES = [
+  { id: '323050634021', label: 'Calculated USPS Ground Advantage' },
+  { id: '323061009021', label: 'Calculated USPSParcel, 1 day' },
+  { id: '323311715021', label: 'Calculated USPSMedia, 1 day' },
+  { id: '324166003021', label: 'Calculated USPSMedia free, 1 day' },
+  { id: '323361705021', label: 'Free Ground Advantage, 1 day' },
+  { id: '324166001021', label: 'Flat USPSMedia free, 1 day' },
+];
+
+const RETURN_PROFILES = [
+  { id: '323050657021', label: '30 day returns' },
+  { id: '324166002021', label: '30 day + intl 30 day' },
+  { id: '324166000021', label: '30 day + intl 14 day' },
+  { id: '323061008021', label: 'Free 30 day money back' },
+  { id: '324166011021', label: 'No returns' },
+];
 
 // Common eBay categories
 const COMMON_CATEGORIES = [
@@ -121,10 +177,37 @@ export const ItemDetail: React.FC = () => {
   // Redo / reanalyze context
   const [redoContext, setRedoContext] = useState('');
   const [showRedoInput, setShowRedoInput] = useState(false);
+
+  // AI Journal & Context Notes
+  const [showAiJournal, setShowAiJournal] = useState(false);
+  const [expandedJournalId, setExpandedJournalId] = useState<string | null>(null);
+  const [showContextNote, setShowContextNote] = useState<string | null>(null);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
   const [isSuggestingPrice, setIsSuggestingPrice] = useState(false);
   const [isPushingToEbay, setIsPushingToEbay] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<{ valid: boolean; errors: string[]; warnings: string[]; fees: { name: string; amount: string }[] } | null>(null);
   const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
+  const [requiredSpecifics, setRequiredSpecifics] = useState<{ name: string; values?: string[] }[]>([]);
+  const [isLoadingSpecifics, setIsLoadingSpecifics] = useState(false);
+
+  // Fetch required specifics when category ID changes
+  const fetchRequiredSpecifics = useCallback(async (categoryId: string) => {
+    if (!categoryId || !/^\d+$/.test(categoryId)) {
+      setRequiredSpecifics([]);
+      return;
+    }
+    setIsLoadingSpecifics(true);
+    try {
+      const result = await api.getCategorySpecifics(categoryId);
+      if (result.success && result.data) {
+        setRequiredSpecifics(result.data.required || []);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch category specifics:', err);
+    }
+    setIsLoadingSpecifics(false);
+  }, []);
 
   // Load item data
   const loadItem = useCallback(async () => {
@@ -170,6 +253,18 @@ export const ItemDetail: React.FC = () => {
     loadItem();
   }, [loadItem]);
 
+  // Fetch required specifics on initial item load (only once per item)
+  const [lastFetchedCategoryId, setLastFetchedCategoryId] = useState<string | null>(null);
+  useEffect(() => {
+    if (item?.ebayCategoryId && item.ebayCategoryId !== lastFetchedCategoryId && !isLoading) {
+      // Only auto-fetch on initial load, not on every keystroke
+      if (lastFetchedCategoryId === null && /^\d{3,}$/.test(item.ebayCategoryId)) {
+        setLastFetchedCategoryId(item.ebayCategoryId);
+        fetchRequiredSpecifics(item.ebayCategoryId);
+      }
+    }
+  }, [item?.ebayCategoryId, isLoading, lastFetchedCategoryId, fetchRequiredSpecifics]);
+
   // Save changes to API
   const saveChanges = async () => {
     if (!item || !hasChanges) return;
@@ -201,6 +296,10 @@ export const ItemDetail: React.FC = () => {
           postalCode: item.postalCode,
           upc: item.upc,
           isbn: item.isbn,
+          ebayCategoryId: item.ebayCategoryId,
+          shippingProfileId: item.shippingProfileId,
+          returnProfileId: item.returnProfileId,
+          contextNotes: item.contextNotes,
         })
       });
 
@@ -224,6 +323,45 @@ export const ItemDetail: React.FC = () => {
     if (!item) return;
     setItem({ ...item, [field]: value });
     setHasChanges(true);
+  };
+
+  // Update a context note section
+  const updateContextNote = (section: string, value: string) => {
+    if (!item) return;
+    const notes = { ...(item.contextNotes || {}) };
+    if (value.trim()) {
+      notes[section] = value;
+    } else {
+      delete notes[section];
+    }
+    setItem({ ...item, contextNotes: Object.keys(notes).length > 0 ? notes : null });
+    setHasChanges(true);
+  };
+
+  // Render context note toggle for a section
+  const renderContextNote = (section: string) => {
+    if (!item) return null;
+    const noteValue = item.contextNotes?.[section] || '';
+    const isOpen = showContextNote === section;
+    return (
+      <div className="mt-2">
+        <button
+          onClick={() => setShowContextNote(isOpen ? null : section)}
+          className={cn('flex items-center gap-1 text-xs', noteValue ? 'text-amber-600' : 'text-slate-400 hover:text-slate-600')}
+        >
+          <MessageSquare size={12} />
+          {noteValue ? 'Note' : 'Add note'}
+        </button>
+        {isOpen && (
+          <textarea
+            value={noteValue}
+            onChange={(e) => updateContextNote(section, e.target.value)}
+            placeholder={`Notes for AI about ${section}...`}
+            className="mt-1 w-full text-xs input min-h-[60px]"
+          />
+        )}
+      </div>
+    );
   };
 
   // Accept and advance to next stage
@@ -338,6 +476,29 @@ export const ItemDetail: React.FC = () => {
       setError('Failed to get AI price suggestion');
     }
     setIsSuggestingPrice(false);
+  };
+
+  // Verify listing with eBay (dry run)
+  const handleVerifyEbay = async () => {
+    if (!item) return;
+    setIsVerifying(true);
+    setVerifyResult(null);
+    setError(null);
+    try {
+      const result = await api.verifyEbay(item.id) as any;
+      if (result.success) {
+        setVerifyResult(result.data);
+        if (result.data.valid) {
+          setSuccessMessage('eBay validation passed!');
+        }
+      } else {
+        setError(result.error || 'Verification failed');
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Verification failed';
+      setError(msg);
+    }
+    setIsVerifying(false);
   };
 
   // Push to eBay
@@ -579,13 +740,13 @@ export const ItemDetail: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* Process AI button */}
+          {/* Send to AI button */}
           <button
             onClick={async () => {
               setIsSaving(true);
               setError(null);
               try {
-                const result = await api.reprocessAi(item.id);
+                const result = await api.sendToAI(item.id);
                 if ((result as any).success) {
                   setSuccessMessage('AI analysis complete');
                   const fresh = await api.getDashboardItem(item.id);
@@ -600,7 +761,7 @@ export const ItemDetail: React.FC = () => {
             className="btn bg-violet-100 text-violet-700 hover:bg-violet-200 disabled:opacity-50 text-sm"
           >
             {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-            Process AI
+            Send to AI
           </button>
           {/* Save button */}
           {hasChanges && (
@@ -639,6 +800,53 @@ export const ItemDetail: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Completeness Bar */}
+      {item.completeness && (
+        <div className="card p-3 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium text-slate-600">
+                  {item.completeness.readyToList ? 'Ready to list' : `${item.completeness.score}/7 complete`}
+                </span>
+                <span className="text-xs text-slate-400">{item.completeness.percentage}%</span>
+              </div>
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className={cn('h-full rounded-full transition-all duration-500', {
+                    'bg-green-500': item.completeness.readyToList,
+                    'bg-amber-400': item.completeness.percentage >= 50 && !item.completeness.readyToList,
+                    'bg-red-400': item.completeness.percentage < 50,
+                  })}
+                  style={{ width: `${item.completeness.percentage}%` }}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {[
+                { key: 'hasPhotos', label: 'Photos', done: item.completeness.hasPhotos },
+                { key: 'aiProcessed', label: 'AI', done: item.completeness.aiProcessed },
+                { key: 'categorySet', label: 'Category', done: item.completeness.categorySet },
+                { key: 'specificsPopulated', label: 'Specifics', done: item.completeness.specificsPopulated },
+                { key: 'priceSet', label: 'Price', done: item.completeness.priceSet },
+                { key: 'shippingPolicyChosen', label: 'Shipping', done: item.completeness.shippingPolicyChosen },
+                { key: 'weightEntered', label: 'Weight', done: item.completeness.weightEntered },
+              ].map(({ key, label, done }) => (
+                <span
+                  key={key}
+                  className={cn('text-xs px-1.5 py-0.5 rounded', {
+                    'bg-green-100 text-green-700': done,
+                    'bg-slate-100 text-slate-400': !done,
+                  })}
+                >
+                  {done ? '\u2713' : '\u2717'} {label}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-auto">
         {/* Left Column - Photos & AI Analysis */}
@@ -683,6 +891,7 @@ export const ItemDetail: React.FC = () => {
               onUpload={handleUploadMorePhotos}
               isMobile={isMobile}
             />
+            {renderContextNote('photos')}
           </div>
 
           {/* Photo Editor Modal */}
@@ -728,6 +937,53 @@ export const ItemDetail: React.FC = () => {
               </span>
             </div>
           </div>
+
+          {/* AI Journal */}
+          {item.aiJournal && item.aiJournal.length > 0 && (
+            <div className="card p-4">
+              <button
+                onClick={() => setShowAiJournal(!showAiJournal)}
+                className="w-full flex items-center justify-between"
+              >
+                <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                  <BookOpen size={16} />
+                  AI Journal ({item.aiJournal.length})
+                </h3>
+                <ChevronDown size={16} className={cn('text-slate-400 transition-transform', showAiJournal && 'rotate-180')} />
+              </button>
+              {showAiJournal && (
+                <div className="mt-3 space-y-3 max-h-80 overflow-y-auto">
+                  {[...item.aiJournal].reverse().map((entry) => (
+                    <div key={entry.id} className="border border-slate-100 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-slate-700">{entry.type}</span>
+                        <span className="text-xs text-slate-400">{new Date(entry.timestamp).toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-slate-500">
+                        <span>{entry.prompt?.photoCount || 0} photos</span>
+                        {entry.response?.tokens && (
+                          <span>{entry.response.tokens.input + entry.response.tokens.output} tokens</span>
+                        )}
+                        {entry.response?.cost != null && (
+                          <span className="text-amber-600">${entry.response.cost.toFixed(4)}</span>
+                        )}
+                      </div>
+                      {expandedJournalId === entry.id ? (
+                        <div className="mt-2">
+                          <button onClick={() => setExpandedJournalId(null)} className="text-xs text-ink-600 mb-1">Hide details</button>
+                          <pre className="text-xs bg-slate-50 p-2 rounded max-h-48 overflow-y-auto whitespace-pre-wrap text-slate-600">
+                            {entry.response?.raw || 'No response data'}
+                          </pre>
+                        </div>
+                      ) : (
+                        <button onClick={() => setExpandedJournalId(entry.id)} className="text-xs text-ink-600 mt-1">Show details</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Column - Listing Details */}
@@ -796,6 +1052,26 @@ export const ItemDetail: React.FC = () => {
                       const catId = (result as any).data.categoryId;
                       updateField('ebayCategoryId', catId);
                       setSuccessMessage(`Category: ${catId}`);
+
+                      // If the response includes required specifics, use them directly
+                      const reqSpecifics = (result as any).data.requiredSpecifics;
+                      if (reqSpecifics?.length > 0) {
+                        setRequiredSpecifics(reqSpecifics);
+                        // Auto-add missing required specifics as empty fields
+                        const currentNames = new Set(item.itemSpecifics.map(s => s.name.toLowerCase()));
+                        const newSpecifics = [...item.itemSpecifics];
+                        let added = 0;
+                        for (const req of reqSpecifics) {
+                          if (!currentNames.has(req.name.toLowerCase())) {
+                            newSpecifics.push({ name: req.name, value: '' });
+                            added++;
+                          }
+                        }
+                        if (added > 0) {
+                          updateField('itemSpecifics', newSpecifics);
+                          setSuccessMessage(`Category: ${catId} — ${added} required specifics added`);
+                        }
+                      }
                     } else {
                       setError((result as any).error || 'No category found');
                     }
@@ -810,6 +1086,18 @@ export const ItemDetail: React.FC = () => {
                 Find
               </button>
             </div>
+            {item.ebayCategoryId && /^\d{3,}$/.test(item.ebayCategoryId) && requiredSpecifics.length === 0 && !isLoadingSpecifics && (
+              <button
+                onClick={() => {
+                  setLastFetchedCategoryId(item.ebayCategoryId);
+                  fetchRequiredSpecifics(item.ebayCategoryId);
+                }}
+                className="text-xs text-ink-600 hover:text-ink-800 mt-1 transition-colors"
+              >
+                Load required specifics for this category
+              </button>
+            )}
+            {renderContextNote('category')}
           </div>
 
           {/* Category Modal */}
@@ -909,41 +1197,111 @@ export const ItemDetail: React.FC = () => {
           {/* Item Specifics */}
           <div className="card p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-slate-900">Item Specifics</h3>
-              <button
-                onClick={() => setShowAddSpecificModal(true)}
-                className="flex items-center gap-1 text-ink-600 text-sm hover:text-ink-800 transition-colors"
-              >
-                <Plus size={14} />
-                Add Specific
-              </button>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-slate-900">Item Specifics</h3>
+                {requiredSpecifics.length > 0 && (() => {
+                  const currentNames = new Set(item.itemSpecifics.map(s => s.name.toLowerCase()));
+                  const missingCount = requiredSpecifics.filter(r => {
+                    const existing = item.itemSpecifics.find(s => s.name.toLowerCase() === r.name.toLowerCase());
+                    return !existing || !existing.value.trim();
+                  }).length;
+                  return missingCount > 0 ? (
+                    <span className="text-xs bg-coral-100 text-coral-700 px-2 py-0.5 rounded-full font-medium">
+                      {missingCount} required missing
+                    </span>
+                  ) : (
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                      All required filled
+                    </span>
+                  );
+                })()}
+                {isLoadingSpecifics && <Loader2 size={14} className="animate-spin text-slate-400" />}
+              </div>
+              <div className="flex items-center gap-2">
+                {item.ebayCategoryId && requiredSpecifics.length > 0 && (() => {
+                  const currentNames = new Set(item.itemSpecifics.map(s => s.name.toLowerCase()));
+                  const missing = requiredSpecifics.filter(r => !currentNames.has(r.name.toLowerCase()));
+                  return missing.length > 0 ? (
+                    <button
+                      onClick={() => {
+                        const newSpecifics = [...item.itemSpecifics];
+                        for (const req of missing) {
+                          newSpecifics.push({ name: req.name, value: '' });
+                        }
+                        updateField('itemSpecifics', newSpecifics);
+                        setSuccessMessage(`Added ${missing.length} required specifics`);
+                      }}
+                      className="flex items-center gap-1 text-amber-600 text-xs hover:text-amber-800 transition-colors"
+                    >
+                      <Plus size={12} />
+                      Add Required
+                    </button>
+                  ) : null;
+                })()}
+                <button
+                  onClick={() => setShowAddSpecificModal(true)}
+                  className="flex items-center gap-1 text-ink-600 text-sm hover:text-ink-800 transition-colors"
+                >
+                  <Plus size={14} />
+                  Add Specific
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               {item.itemSpecifics.length === 0 ? (
                 <p className="text-slate-500 text-sm">No item specifics added</p>
               ) : (
-                item.itemSpecifics.map((specific, index) => (
-                  <div key={index} className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
-                    <span className="text-slate-500 md:w-28 flex-shrink-0 text-sm">
-                      {specific.name}:
-                    </span>
-                    <div className="flex items-center gap-2 flex-1">
-                      <input
-                        type="text"
-                        value={specific.value}
-                        onChange={(e) => handleUpdateSpecific(index, e.target.value)}
-                        className="flex-1 px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-ink-500/20 focus:border-ink-500 transition-colors min-h-[44px]"
-                      />
-                      <button
-                        onClick={() => handleRemoveSpecific(index)}
-                        className="text-slate-400 hover:text-coral-500 p-1 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-                        title="Remove"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                item.itemSpecifics.map((specific, index) => {
+                  const isRequired = requiredSpecifics.some(r => r.name.toLowerCase() === specific.name.toLowerCase());
+                  const isMissing = isRequired && !specific.value.trim();
+                  const suggestedValues = requiredSpecifics.find(r => r.name.toLowerCase() === specific.name.toLowerCase())?.values;
+                  return (
+                    <div key={index} className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+                      <span className={cn(
+                        "md:w-32 flex-shrink-0 text-sm flex items-center gap-1",
+                        isMissing ? "text-coral-600 font-medium" : isRequired ? "text-slate-700" : "text-slate-500"
+                      )}>
+                        {specific.name}:
+                        {isRequired && <span className="text-coral-500 text-xs" title="Required by eBay">*</span>}
+                      </span>
+                      <div className="flex items-center gap-2 flex-1">
+                        {suggestedValues && suggestedValues.length > 0 && suggestedValues.length <= 30 ? (
+                          <select
+                            value={specific.value}
+                            onChange={(e) => handleUpdateSpecific(index, e.target.value)}
+                            className={cn(
+                              "flex-1 px-2.5 py-1.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-ink-500/20 focus:border-ink-500 transition-colors min-h-[44px]",
+                              isMissing ? "border-coral-300 bg-coral-50 text-slate-800" : "border-slate-300 text-slate-800"
+                            )}
+                          >
+                            <option value="">— Select —</option>
+                            {suggestedValues.map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={specific.value}
+                            onChange={(e) => handleUpdateSpecific(index, e.target.value)}
+                            placeholder={isMissing ? 'Required — fill before pushing to eBay' : ''}
+                            className={cn(
+                              "flex-1 px-2.5 py-1.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-ink-500/20 focus:border-ink-500 transition-colors min-h-[44px]",
+                              isMissing ? "border-coral-300 bg-coral-50 text-slate-800 placeholder:text-coral-400" : "border-slate-300 text-slate-800"
+                            )}
+                          />
+                        )}
+                        <button
+                          onClick={() => handleRemoveSpecific(index)}
+                          className="text-slate-400 hover:text-coral-500 p-1 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                          title="Remove"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -954,6 +1312,27 @@ export const ItemDetail: React.FC = () => {
               <div className="card p-6 w-full max-w-sm animate-slide-up">
                 <h3 className="font-semibold text-slate-900 mb-4">Add Item Specific</h3>
                 <div className="space-y-3">
+                  {/* Quick-add buttons for missing required specifics */}
+                  {(() => {
+                    const currentNames = new Set(item.itemSpecifics.map(s => s.name.toLowerCase()));
+                    const missingRequired = requiredSpecifics.filter(r => !currentNames.has(r.name.toLowerCase()));
+                    return missingRequired.length > 0 ? (
+                      <div>
+                        <label className="block text-xs font-medium text-coral-600 mb-1">Required by eBay:</label>
+                        <div className="flex flex-wrap gap-1">
+                          {missingRequired.slice(0, 10).map(req => (
+                            <button
+                              key={req.name}
+                              onClick={() => setNewSpecific({ ...newSpecific, name: req.name })}
+                              className="text-xs px-2 py-1 bg-coral-50 text-coral-700 border border-coral-200 rounded hover:bg-coral-100 transition-colors"
+                            >
+                              {req.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
                     <input
@@ -1022,6 +1401,7 @@ export const ItemDetail: React.FC = () => {
                 dangerouslySetInnerHTML={{ __html: item.description || '<em>No description</em>' }}
               />
             )}
+            {renderContextNote('description')}
           </div>
 
           {/* Pricing & Listing Form - always visible so details can be set at any stage */}
@@ -1132,61 +1512,37 @@ export const ItemDetail: React.FC = () => {
                     </div>
                   )}
                 </div>
+                {renderContextNote('pricing')}
               </div>
 
               {/* Shipping Card */}
               <div className="card p-4">
-                <h3 className="font-semibold text-slate-900 mb-3">Shipping</h3>
+                <h3 className="font-semibold text-slate-900 mb-3">Shipping & Policies</h3>
                 <div className="space-y-3">
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
-                      <div className="flex gap-3">
-                        {['Flat', 'Calculated'].map((t) => (
-                          <label key={t} className="flex items-center gap-1.5 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="shippingType"
-                              value={t}
-                              checked={item.shippingType === t}
-                              onChange={(e) => updateField('shippingType', e.target.value)}
-                              className="text-ink-600"
-                            />
-                            <span className="text-sm text-slate-700">{t}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Service</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Shipping Policy</label>
                     <select
-                      value={item.shippingService}
-                      onChange={(e) => updateField('shippingService', e.target.value)}
+                      value={item.shippingProfileId || '323050634021'}
+                      onChange={(e) => updateField('shippingProfileId', e.target.value)}
                       className="input w-full"
                     >
-                      <option value="USPSPriority">USPS Priority Mail</option>
-                      <option value="USPSFirstClass">USPS First Class</option>
-                      <option value="USPSGround">USPS Ground Advantage</option>
-                      <option value="FedExGround">FedEx Ground</option>
-                      <option value="FedExHomeDelivery">FedEx Home Delivery</option>
-                      <option value="UPSGround">UPS Ground</option>
-                      <option value="UPS3Day">UPS 3 Day Select</option>
+                      {SHIPPING_PROFILES.map(p => (
+                        <option key={p.id} value={p.id}>{p.label}</option>
+                      ))}
                     </select>
                   </div>
-                  {item.shippingType === 'Flat' && (
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Cost ($)</label>
-                      <input
-                        type="number"
-                        value={item.shippingCost || ''}
-                        onChange={(e) => updateField('shippingCost', parseFloat(e.target.value) || 0)}
-                        className="input w-full"
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
-                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Return Policy</label>
+                    <select
+                      value={item.returnProfileId || '323050657021'}
+                      onChange={(e) => updateField('returnProfileId', e.target.value)}
+                      className="input w-full"
+                    >
+                      {RETURN_PROFILES.map(p => (
+                        <option key={p.id} value={p.id}>{p.label}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="flex gap-3">
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-slate-700 mb-1">Weight</label>
@@ -1268,6 +1624,7 @@ export const ItemDetail: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                {renderContextNote('shipping')}
               </div>
 
               {/* Returns Card */}
@@ -1501,6 +1858,14 @@ export const ItemDetail: React.FC = () => {
                 Export CSV
               </button>
               <button
+                onClick={handleVerifyEbay}
+                disabled={isVerifying || isSaving}
+                className="inline-flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 border border-slate-300 bg-white text-slate-700 font-medium rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-colors min-h-[44px]"
+              >
+                {isVerifying ? <Loader2 size={16} className="animate-spin" /> : <Check size={18} />}
+                Verify
+              </button>
+              <button
                 onClick={handlePushToEbay}
                 disabled={isPushingToEbay || isSaving}
                 className="inline-flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 bg-ink-600 text-white font-medium rounded-lg hover:bg-ink-700 disabled:opacity-50 transition-colors min-h-[44px]"
@@ -1511,8 +1876,8 @@ export const ItemDetail: React.FC = () => {
             </>
           )}
           {item.currentStep === 'PUBLISHED' ? (
-            <div className="flex items-center gap-3">
-              {item.ebayId && (
+            <div className="flex items-center gap-3 flex-wrap">
+              {item.ebayId ? (
                 <>
                   <a
                     href={`https://www.ebay.com/itm/${item.ebayId}`}
@@ -1546,6 +1911,31 @@ export const ItemDetail: React.FC = () => {
                     Update eBay
                   </button>
                 </>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="eBay Item ID or URL"
+                    className="input text-sm py-2 w-64"
+                    onKeyDown={async (e) => {
+                      if (e.key !== 'Enter') return;
+                      const val = (e.target as HTMLInputElement).value.trim();
+                      const idMatch = val.match(/(\d{10,})/);
+                      if (!idMatch) { setError('Enter a valid eBay item ID or URL'); return; }
+                      const ebayId = idMatch[1];
+                      try {
+                        await api.updateDashboardItem(item.id, { ebayId });
+                        updateField('ebayId', ebayId);
+                        setSuccessMessage(`Linked to eBay item ${ebayId}`);
+                        const fresh = await api.getDashboardItem(item.id);
+                        if ((fresh as any).success) setItem((fresh as any).data);
+                      } catch (err: any) {
+                        setError(err?.response?.data?.error || 'Failed to save eBay ID');
+                      }
+                    }}
+                  />
+                  <span className="text-xs text-slate-400">Press Enter to link</span>
+                </div>
               )}
               {item.publishedAt && (
                 <span className="text-sm text-slate-500">Published {new Date(item.publishedAt).toLocaleDateString()}</span>
@@ -1563,6 +1953,57 @@ export const ItemDetail: React.FC = () => {
             </button>
           )}
         </div>
+
+        {/* Verify Result Panel */}
+        {verifyResult && (
+          <div className={cn('mt-3 p-3 rounded-lg border text-sm', verifyResult.valid ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200')}>
+            <div className="flex items-center justify-between mb-2">
+              <span className={cn('font-semibold', verifyResult.valid ? 'text-green-700' : 'text-red-700')}>
+                {verifyResult.valid ? 'Listing is valid — ready to push' : 'Listing has errors'}
+              </span>
+              <button onClick={() => setVerifyResult(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={14} />
+              </button>
+            </div>
+            {verifyResult.errors.length > 0 && (
+              <div className="space-y-2 mb-2">
+                {verifyResult.errors.map((err, i) => {
+                  // Parse "The item specific X is missing" to offer quick-add
+                  const missingMatch = err.match(/item specific (\w[\w\s]*?) is missing/i);
+                  const specificName = missingMatch?.[1]?.trim();
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <p className="text-red-600 text-xs flex-1">{err}</p>
+                      {specificName && (
+                        <button
+                          onClick={() => {
+                            setNewSpecific({ name: specificName, value: '' });
+                            setShowAddSpecificModal(true);
+                          }}
+                          className="shrink-0 text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                        >
+                          + Add {specificName}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {verifyResult.warnings.length > 0 && (
+              <div className="space-y-1 mb-2">
+                {verifyResult.warnings.map((warn, i) => (
+                  <p key={i} className="text-amber-600 text-xs">{warn}</p>
+                ))}
+              </div>
+            )}
+            {verifyResult.fees.length > 0 && (
+              <div className="text-xs text-slate-600">
+                Fees: {verifyResult.fees.filter(f => parseFloat(f.amount) > 0).map(f => `${f.name}: $${f.amount}`).join(', ') || 'None'}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

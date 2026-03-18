@@ -4,7 +4,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MainLayout } from './components/layout';
 import {
   Dashboard,
-  Queue,
   PhotoImport,
   Templates,
   ItemDetail,
@@ -83,14 +82,17 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Dashboard />} />
+        <Route index element={<Inventory />} />
+
+        {/* Dashboard */}
+        <Route path="dashboard" element={<Dashboard />} />
 
         {/* Import */}
         <Route path="import" element={<PhotoImport />} />
 
-        {/* Queue */}
-        <Route path="queue" element={<Queue />} />
-        <Route path="queue/:step" element={<Queue />} />
+        {/* Queue → redirects to Inventory */}
+        <Route path="queue" element={<Navigate to="/inventory" replace />} />
+        <Route path="queue/:step" element={<Navigate to="/inventory" replace />} />
 
         {/* Item Detail */}
         <Route path="item/:id" element={<ItemDetail />} />

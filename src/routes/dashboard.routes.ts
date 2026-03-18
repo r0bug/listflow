@@ -9,6 +9,7 @@ import path from 'path';
 import fs from 'fs';
 import sharp from 'sharp';
 import { ebayService } from '../services/ebay.service';
+import { computeCompleteness } from '../utils/completeness';
 
 // Ensure upload directories exist
 const uploadDir = path.join(__dirname, '../../uploads');
@@ -620,6 +621,11 @@ router.get('/item/:id', async (req, res) => {
       isbn: item.isbn || '',
       ebayCategoryId: item.ebayCategoryId || '',
       ebayId: item.ebayId || null,
+      shippingProfileId: (item as any).shippingProfileId || null,
+      returnProfileId: (item as any).returnProfileId || null,
+      contextNotes: item.contextNotes || null,
+      aiJournal: item.aiJournal || [],
+      completeness: computeCompleteness(item),
       publishedAt: item.publishedAt?.toISOString() || null,
       exportedAt: item.exportedAt?.toISOString() || null,
       createdAt: item.createdAt.toISOString(),
@@ -670,7 +676,11 @@ router.put('/item/:id', async (req, res) => {
       postalCode,
       upc,
       isbn,
-      ebayCategoryId
+      ebayCategoryId,
+      ebayId,
+      shippingProfileId,
+      returnProfileId,
+      contextNotes
     } = req.body;
 
     // Build update data
@@ -696,6 +706,10 @@ router.put('/item/:id', async (req, res) => {
     if (upc !== undefined) updateData.upc = upc;
     if (isbn !== undefined) updateData.isbn = isbn;
     if (ebayCategoryId !== undefined) updateData.ebayCategoryId = ebayCategoryId;
+    if (ebayId !== undefined) updateData.ebayId = ebayId;
+    if (shippingProfileId !== undefined) updateData.shippingProfileId = shippingProfileId;
+    if (returnProfileId !== undefined) updateData.returnProfileId = returnProfileId;
+    if (contextNotes !== undefined) updateData.contextNotes = contextNotes;
 
     // Store item specifics in aiAnalysis JSON
     if (itemSpecifics !== undefined) {
@@ -715,12 +729,20 @@ router.put('/item/:id', async (req, res) => {
 
     const item = await prisma.item.update({
       where: { id },
-      data: updateData
+      data: updateData,
+      include: { photos: { select: { id: true } } }
+    });
+
+    // Recompute and cache completeness
+    const completeness = computeCompleteness(item);
+    await prisma.item.update({
+      where: { id },
+      data: { completeness: completeness as any }
     });
 
     res.json({
       success: true,
-      data: item,
+      data: { ...item, completeness },
       message: 'Item updated successfully'
     });
   } catch (error) {
@@ -1122,9 +1144,14 @@ router.post('/item/:id/set-stage', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: `Invalid stage. Must be one of: ${validStages.join(', ')}` });
     }
 
-    const item = await prisma.item.findUnique({ where: { id }, select: { stage: true } });
+    const item = await prisma.item.findUnique({ where: { id }, select: { stage: true, ebayId: true } });
     if (!item) {
       return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    // Block stage changes on items already listed on eBay
+    if (item.ebayId) {
+      return res.status(400).json({ success: false, error: 'Cannot change stage on an item that is listed on eBay. End the listing first.' });
     }
 
     const newStatus = stage === 'REJECTED' ? 'PAUSED' : 'ACTIVE';
@@ -1336,9 +1363,17 @@ router.post('/item/:id/lookup-category', async (req: Request, res: Response) => 
 
     if (categoryId && /^\d+$/.test(categoryId)) {
       await prisma.item.update({ where: { id }, data: { ebayCategoryId: categoryId } });
+
+      // Also fetch required specifics for this category
+      let requiredSpecifics: { name: string; values?: string[] }[] = [];
+      try {
+        const catSpecifics = await ebayService.getCategorySpecifics(categoryId);
+        requiredSpecifics = catSpecifics.required;
+      } catch { /* non-fatal */ }
+
       return res.json({
         success: true,
-        data: { categoryId, categoryName, allSuggestions: suggestions.slice(0, 5) },
+        data: { categoryId, categoryName, allSuggestions: suggestions.slice(0, 5), requiredSpecifics },
         message: `Category set to ${categoryId} (${categoryName})`,
       });
     }
@@ -1347,6 +1382,21 @@ router.post('/item/:id/lookup-category', async (req: Request, res: Response) => 
   } catch (error) {
     console.error('Category lookup error:', error);
     res.status(500).json({ success: false, error: 'Category lookup failed' });
+  }
+});
+
+// GET /api/dashboard/category/:categoryId/specifics - Fetch required/recommended specifics for eBay category
+router.get('/category/:categoryId/specifics', async (req: Request, res: Response) => {
+  try {
+    const { categoryId } = req.params;
+    if (!/^\d+$/.test(categoryId)) {
+      return res.status(400).json({ success: false, error: 'Invalid category ID' });
+    }
+    const specifics = await ebayService.getCategorySpecifics(categoryId);
+    res.json({ success: true, data: specifics });
+  } catch (error: any) {
+    console.error('Category specifics error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch category specifics' });
   }
 });
 
@@ -1467,6 +1517,55 @@ router.post('/item/:id/reanalyze', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/dashboard/item/:id/unified-ai - Unified AI call with full context
+router.post('/item/:id/unified-ai', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const item = await prisma.item.findUnique({
+      where: { id },
+      include: { photos: { orderBy: { order: 'asc' } } }
+    });
+
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    if (item.photos.length === 0) {
+      return res.status(400).json({ success: false, error: 'Item has no photos. Upload photos first.' });
+    }
+
+    const result = await workflowService.unifiedProcessWithAI(id);
+
+    // Fetch updated item for response
+    const updated = await prisma.item.findUnique({
+      where: { id },
+      select: {
+        title: true,
+        description: true,
+        brand: true,
+        condition: true,
+        category: true,
+        ebayCategoryId: true,
+        aiAnalysis: true,
+        aiCost: true,
+        aiJournal: true,
+        completeness: true,
+      }
+    });
+
+    res.json({
+      success: true,
+      data: updated,
+      journalEntry: result.journalEntry,
+      cost: result.cost
+    });
+  } catch (error: any) {
+    console.error('Unified AI error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Unified AI processing failed' });
+  }
+});
+
 // POST /api/dashboard/item/:id/suggest-price - Get AI price suggestion
 router.post('/item/:id/suggest-price', async (req: Request, res: Response) => {
   try {
@@ -1500,6 +1599,110 @@ router.post('/item/:id/suggest-price', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Price suggestion error:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to get price suggestion' });
+  }
+});
+
+// POST /api/dashboard/item/:id/verify-ebay - Validate listing with eBay without creating it
+router.post('/item/:id/verify-ebay', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const item = await prisma.item.findUnique({
+      where: { id },
+      include: { photos: { orderBy: { order: 'asc' } } },
+    });
+
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    // Host images first (eBay needs URLs to validate)
+    try {
+      const { hostItemImages } = require('../services/imageHosting.service');
+      await hostItemImages(id);
+      const freshPhotos = await prisma.photo.findMany({ where: { itemId: id }, orderBy: { order: 'asc' } });
+      item.photos = freshPhotos;
+    } catch (hostErr) {
+      console.warn('Image hosting skipped:', (hostErr as Error).message);
+    }
+
+    const imageUrls = item.photos
+      .map(p => p.publicUrl)
+      .filter((url): url is string => !!url);
+
+    // Resolve category
+    let categoryId = item.ebayCategoryId || '';
+    if (!categoryId) {
+      try {
+        const suggestions = await ebayService.getCategories(item.title || '');
+        if (suggestions?.length > 0) {
+          const firstCat = suggestions[0];
+          categoryId = firstCat.CategoryID || firstCat.Category?.CategoryID || '';
+          if (categoryId) {
+            await prisma.item.update({ where: { id }, data: { ebayCategoryId: categoryId } }).catch(() => {});
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    if (!categoryId) {
+      return res.status(400).json({ success: false, error: 'Missing eBay Category ID.' });
+    }
+
+    // Build item specifics
+    const aiData = (item.aiAnalysis as Record<string, unknown>) || {};
+    const specifics: { name: string; value: string }[] = [];
+    if (item.brand) specifics.push({ name: 'Brand', value: item.brand });
+    if (aiData.model && aiData.model !== 'Unknown') specifics.push({ name: 'Model', value: String(aiData.model) });
+    if (aiData.specifics && typeof aiData.specifics === 'object') {
+      Object.entries(aiData.specifics).forEach(([name, value]) => {
+        if (!specifics.some(s => s.name.toLowerCase() === name.toLowerCase()) && value) {
+          specifics.push({ name, value: String(value) });
+        }
+      });
+    }
+
+    const format = item.listingFormat || 'FixedPrice';
+    const isAuction = format === 'Auction' || format === 'AuctionWithBIN';
+
+    const listingData = {
+      title: (item.title || 'Item for Sale').substring(0, 80),
+      description: item.description || '',
+      price: isAuction ? (item.startingPrice || item.buyNowPrice || 0) : (item.buyNowPrice || item.startingPrice || 0),
+      buyNowPrice: format === 'AuctionWithBIN' ? item.buyNowPrice || undefined : undefined,
+      category: categoryId,
+      condition: item.condition || 'Used',
+      imageUrls,
+      quantity: item.quantity || 1,
+      shippingCost: item.shippingCost || undefined,
+      shippingService: item.shippingService || undefined,
+      shippingType: item.shippingType || undefined,
+      listingFormat: item.listingFormat || undefined,
+      listingDuration: item.listingDuration || undefined,
+      handlingTime: item.handlingTime || undefined,
+      returnPolicy: item.returnPolicy as any || undefined,
+      weight: item.weight || undefined,
+      itemSpecifics: specifics.length > 0 ? specifics : undefined,
+      packageDimensions: item.packageDimensions as any || undefined,
+      postalCode: item.postalCode || undefined,
+      shippingProfileId: (item as any).shippingProfileId || undefined,
+      returnProfileId: (item as any).returnProfileId || undefined,
+    };
+
+    const result = await ebayService.verifyListing(listingData);
+
+    res.json({
+      success: true,
+      data: {
+        valid: result.valid,
+        errors: result.errors,
+        warnings: result.warnings,
+        fees: result.fees,
+        specifics, // show what specifics were sent
+      },
+    });
+  } catch (error: any) {
+    console.error('eBay verify error:', error);
+    res.status(500).json({ success: false, error: error.message || 'eBay verification failed' });
   }
 });
 
@@ -1566,6 +1769,20 @@ router.post('/item/:id/push-to-ebay', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Missing eBay Category ID. Set it on the item detail page before pushing to eBay.' });
     }
 
+    // Build item specifics from item fields and aiAnalysis
+    const aiData = (item.aiAnalysis as Record<string, unknown>) || {};
+    const specifics: { name: string; value: string }[] = [];
+    if (item.brand) specifics.push({ name: 'Brand', value: item.brand });
+    if (aiData.model && aiData.model !== 'Unknown') specifics.push({ name: 'Model', value: String(aiData.model) });
+    if (aiData.specifics && typeof aiData.specifics === 'object') {
+      Object.entries(aiData.specifics).forEach(([name, value]) => {
+        // Don't duplicate Brand/Model
+        if (!specifics.some(s => s.name.toLowerCase() === name.toLowerCase()) && value) {
+          specifics.push({ name, value: String(value) });
+        }
+      });
+    }
+
     const listingData = {
       title: (item.title || 'Item for Sale').substring(0, 80),
       description: item.description || '',
@@ -1583,8 +1800,11 @@ router.post('/item/:id/push-to-ebay', async (req: Request, res: Response) => {
       handlingTime: item.handlingTime || undefined,
       returnPolicy: item.returnPolicy as any || undefined,
       weight: item.weight || undefined,
+      itemSpecifics: specifics.length > 0 ? specifics : undefined,
       packageDimensions: item.packageDimensions as any || undefined,
       postalCode: item.postalCode || undefined,
+      shippingProfileId: (item as any).shippingProfileId || undefined,
+      returnProfileId: (item as any).returnProfileId || undefined,
     };
 
     const result = await ebayService.createListing(listingData);
@@ -1674,12 +1894,26 @@ router.post('/item/:id/revise-ebay', async (req: Request, res: Response) => {
       .map(p => p.publicUrl)
       .filter((url): url is string => !!url);
 
+    // Build item specifics for revision
+    const reviseAiData = (item.aiAnalysis as Record<string, unknown>) || {};
+    const reviseSpecifics: { name: string; value: string }[] = [];
+    if (item.brand) reviseSpecifics.push({ name: 'Brand', value: item.brand });
+    if (reviseAiData.model && reviseAiData.model !== 'Unknown') reviseSpecifics.push({ name: 'Model', value: String(reviseAiData.model) });
+    if (reviseAiData.specifics && typeof reviseAiData.specifics === 'object') {
+      Object.entries(reviseAiData.specifics).forEach(([name, value]) => {
+        if (!reviseSpecifics.some(s => s.name.toLowerCase() === name.toLowerCase()) && value) {
+          reviseSpecifics.push({ name, value: String(value) });
+        }
+      });
+    }
+
     const result = await ebayService.reviseListing(item.ebayId, {
       title: (item.title || '').substring(0, 80),
       description: item.description || '',
       price: item.buyNowPrice || item.startingPrice || undefined,
       imageUrls,
       quantity: item.quantity || 1,
+      itemSpecifics: reviseSpecifics.length > 0 ? reviseSpecifics : undefined,
     });
 
     if (result.success) {
@@ -1853,23 +2087,28 @@ router.get('/inventory/items', async (req, res) => {
       },
       include: {
         location: { select: { code: true, name: true } },
-        photos: { select: { thumbnailPath: true }, take: 1 }
+        photos: { select: { id: true, thumbnailPath: true }, take: 5 }
       },
       orderBy: { createdAt: 'desc' },
       take: 200
     });
 
-    const formattedItems = items.map(item => ({
-      id: item.id,
-      sku: item.sku || `TMP-${item.id.slice(-8).toUpperCase()}`,
-      title: item.title || 'Untitled Item',
-      location: item.location?.code || 'UNASSIGNED',
-      locationName: item.location?.name || 'Unassigned',
-      stage: item.stage,
-      price: item.buyNowPrice || item.startingPrice || undefined,
-      createdAt: item.createdAt.toISOString().split('T')[0],
-      thumbnail: item.photos?.[0]?.thumbnailPath || null
-    }));
+    const formattedItems = items.map(item => {
+      const comp = computeCompleteness(item);
+      return {
+        id: item.id,
+        sku: item.sku || `TMP-${item.id.slice(-8).toUpperCase()}`,
+        title: item.title || 'Untitled Item',
+        location: item.location?.code || 'UNASSIGNED',
+        locationName: item.location?.name || 'Unassigned',
+        stage: item.stage,
+        price: item.buyNowPrice || item.startingPrice || undefined,
+        createdAt: item.createdAt.toISOString().split('T')[0],
+        thumbnail: item.photos?.[0]?.thumbnailPath || null,
+        completeness: comp.score,
+        completenessPercent: comp.percentage,
+      };
+    });
 
     res.json({
       success: true,

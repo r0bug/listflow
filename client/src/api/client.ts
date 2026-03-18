@@ -353,6 +353,11 @@ class ApiClient {
     return response.data;
   }
 
+  async sendToAI(id: string) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${id}/unified-ai`, {}, { timeout: 120000 });
+    return response.data;
+  }
+
   async reanalyzeItem(id: string, prompt: string, photoIds?: string[]) {
     const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${id}/reanalyze`, { prompt, photoIds });
     return response.data;
@@ -392,6 +397,11 @@ class ApiClient {
     return response.data;
   }
 
+  async verifyEbay(itemId: string) {
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${itemId}/verify-ebay`, {}, { timeout: 60000 });
+    return response.data;
+  }
+
   async pushToEbay(itemId: string) {
     const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${itemId}/push-to-ebay`);
     return response.data;
@@ -409,6 +419,11 @@ class ApiClient {
 
   async lookupCategory(itemId: string) {
     const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${itemId}/lookup-category`);
+    return response.data;
+  }
+
+  async getCategorySpecifics(categoryId: string) {
+    const response = await this.dashboardClient.get<ApiResponse<{ required: { name: string; values?: string[] }[]; recommended: { name: string; values?: string[] }[] }>>(`/dashboard/category/${categoryId}/specifics`);
     return response.data;
   }
 

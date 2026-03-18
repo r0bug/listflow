@@ -23,6 +23,9 @@ interface ListingData {
   weight?: number;
   packageDimensions?: { length?: number; width?: number; height?: number };
   postalCode?: string;
+  shippingProfileId?: string;
+  returnProfileId?: string;
+  itemSpecifics?: { name: string; value: string }[];
 }
 
 class EbayService {
@@ -47,49 +50,40 @@ class EbayService {
     }
   }
 
-  async createListing(data: ListingData) {
-    if (!this.isConfigured) {
-      throw new Error('eBay API is not configured. Set EBAY_APP_ID, EBAY_CERT_ID, and EBAY_SANDBOX in your .env file. Use CSV Export to list items via eBay File Exchange instead.');
-    }
+  /**
+   * Build the Item XML block shared by AddItem and VerifyAddItem.
+   */
+  private buildItemXml(data: ListingData) {
+    const format = data.listingFormat || (data.buyNowPrice ? 'FixedPrice' : 'Auction');
+    const ebayListingType = format === 'FixedPrice' ? 'FixedPriceItem' : 'Chinese';
+    const ebayDuration = data.listingDuration === 'GTC' ? 'GTC'
+      : data.listingDuration ? `Days_${data.listingDuration}`
+      : (format === 'FixedPrice' ? 'GTC' : 'Days_7');
 
-    try {
-      // Determine eBay listing type
-      const format = data.listingFormat || (data.buyNowPrice ? 'FixedPrice' : 'Auction');
-      const ebayListingType = format === 'FixedPrice' ? 'FixedPriceItem' : 'Chinese';
-      const ebayDuration = data.listingDuration === 'GTC' ? 'GTC'
-        : data.listingDuration ? `Days_${data.listingDuration}`
-        : (format === 'FixedPrice' ? 'GTC' : 'Days_7');
+    const postalCode = data.postalCode || process.env.SELLER_POSTAL_CODE || '98902';
+    const pictureUrls = (data.imageUrls || []).map(u => `<PictureURL>${u}</PictureURL>`).join('\n    ');
 
-      // Build return policy
-      const returnPol = data.returnPolicy || {};
-      const returnsAccepted = returnPol.returnsAccepted === 'false' ? 'ReturnsNotAccepted' : 'ReturnsAccepted';
+    const paymentProfileId = process.env.EBAY_PAYMENT_PROFILE_ID || '323050659021';
+    const returnProfileId = data.returnProfileId || process.env.EBAY_RETURN_PROFILE_ID || '323050657021';
+    const shippingProfileId = data.shippingProfileId || process.env.EBAY_SHIPPING_PROFILE_ID || '323050634021';
 
-      const postalCode = data.postalCode || process.env.SELLER_POSTAL_CODE || '98902';
+    const weightXml = data.weight ? `<ShippingPackageDetails>
+    <WeightMajor unit="lbs">${Math.floor(data.weight / 16)}</WeightMajor>
+    <WeightMinor unit="oz">${Math.round(data.weight % 16)}</WeightMinor>
+  </ShippingPackageDetails>` : '';
 
-      const pictureUrls = (data.imageUrls || []).map(u => `<PictureURL>${u}</PictureURL>`).join('\n    ');
+    const policyXml = `<SellerProfiles>
+    <SellerPaymentProfile><PaymentProfileID>${paymentProfileId}</PaymentProfileID></SellerPaymentProfile>
+    <SellerReturnProfile><ReturnProfileID>${returnProfileId}</ReturnProfileID></SellerReturnProfile>
+    <SellerShippingProfile><ShippingProfileID>${shippingProfileId}</ShippingProfileID></SellerShippingProfile>
+  </SellerProfiles>`;
 
-      // Always use Flat/USPSPriority/free — eBay auto-maps to seller's business policies
-      const shippingXml = `<ShippingDetails>
-    <ShippingType>Flat</ShippingType>
-    <ShippingServiceOptions>
-      <ShippingServicePriority>1</ShippingServicePriority>
-      <ShippingService>USPSPriority</ShippingService>
-      <ShippingServiceCost>0</ShippingServiceCost>
-    </ShippingServiceOptions>
-  </ShippingDetails>`;
+    const specificsXml = data.itemSpecifics && data.itemSpecifics.length > 0
+      ? `<ItemSpecifics>\n${data.itemSpecifics.map(s =>
+        `    <NameValueList>\n      <Name>${this.escapeXml(s.name)}</Name>\n      <Value>${this.escapeXml(s.value)}</Value>\n    </NameValueList>`
+      ).join('\n')}\n  </ItemSpecifics>` : '';
 
-      const authToken = process.env.EBAY_AUTH_TOKEN || '';
-      const apiUrl = process.env.EBAY_SANDBOX === 'true'
-        ? 'https://api.sandbox.ebay.com/ws/api.dll'
-        : 'https://api.ebay.com/ws/api.dll';
-      const { clientId } = this.getCredentials();
-
-      const xmlBody = `<?xml version="1.0" encoding="utf-8"?>
-<AddItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
-  <RequesterCredentials>
-    <eBayAuthToken>${authToken}</eBayAuthToken>
-  </RequesterCredentials>
-  <Item>
+    return `<Item>
     <Title>${this.escapeXml(data.title)}</Title>
     <Description><![CDATA[${data.description || ''}]]></Description>
     <PrimaryCategory>
@@ -107,43 +101,95 @@ class EbayService {
     </PictureDetails>
     <PostalCode>${postalCode}</PostalCode>
     <Quantity>${data.quantity || 1}</Quantity>
-    <ReturnPolicy>
-      <ReturnsAcceptedOption>${returnsAccepted}</ReturnsAcceptedOption>
-      <RefundOption>${returnPol.refundType || 'MoneyBack'}</RefundOption>
-      <ReturnsWithinOption>${returnPol.returnDays ? `Days_${returnPol.returnDays}` : 'Days_30'}</ReturnsWithinOption>
-      <ShippingCostPaidByOption>${returnPol.shippingCostPaidBy || 'Buyer'}</ShippingCostPaidByOption>
-    </ReturnPolicy>
-    ${shippingXml}
+    ${policyXml}
+    ${weightXml}
     <ConditionID>${this.mapCondition(data.condition)}</ConditionID>
-  </Item>
+    ${specificsXml}
+  </Item>`;
+  }
+
+  /**
+   * Send a Trading API request (AddItem, VerifyAddItem, etc.)
+   */
+  private async callTradingApi(callName: string, xmlBody: string): Promise<string> {
+    const apiUrl = process.env.EBAY_SANDBOX === 'true'
+      ? 'https://api.sandbox.ebay.com/ws/api.dll'
+      : 'https://api.ebay.com/ws/api.dll';
+    const { clientId } = this.getCredentials();
+
+    const resp = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/xml',
+        'X-EBAY-API-COMPATIBILITY-LEVEL': '1271',
+        'X-EBAY-API-CALL-NAME': callName,
+        'X-EBAY-API-SITEID': '0',
+        'X-EBAY-API-APP-NAME': clientId,
+      },
+      body: xmlBody,
+    });
+    return resp.text();
+  }
+
+  /**
+   * Parse errors and warnings from an eBay Trading API response.
+   */
+  private parseEbayResponse(respText: string): { ack: string; errors: string[]; warnings: string[]; fees: { name: string; amount: string }[] } {
+    const ackMatch = respText.match(/<Ack>(.*?)<\/Ack>/);
+    const ack = ackMatch?.[1] || '';
+
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    // Parse all error/warning blocks
+    const severityRegex = /<SeverityCode>(.*?)<\/SeverityCode>/g;
+    const longMsgRegex = /<LongMessage>(.*?)<\/LongMessage>/g;
+    const severities: string[] = [];
+    const messages: string[] = [];
+    let m;
+    while ((m = severityRegex.exec(respText)) !== null) severities.push(m[1]);
+    while ((m = longMsgRegex.exec(respText)) !== null) messages.push(m[1]);
+
+    messages.forEach((msg, i) => {
+      if (severities[i] === 'Warning') warnings.push(msg);
+      else errors.push(msg);
+    });
+
+    // Parse fees
+    const fees: { name: string; amount: string }[] = [];
+    const feeRegex = /<Fee>\s*<Name>(.*?)<\/Name>\s*<Fee[^>]*>(.*?)<\/Fee>/g;
+    while ((m = feeRegex.exec(respText)) !== null) {
+      fees.push({ name: m[1], amount: m[2] });
+    }
+
+    return { ack, errors, warnings, fees };
+  }
+
+  async createListing(data: ListingData) {
+    if (!this.isConfigured) {
+      throw new Error('eBay API is not configured. Set EBAY_APP_ID, EBAY_CERT_ID, and EBAY_SANDBOX in your .env file. Use CSV Export to list items via eBay File Exchange instead.');
+    }
+
+    try {
+      const authToken = process.env.EBAY_AUTH_TOKEN || '';
+      const itemXml = this.buildItemXml(data);
+
+      const xmlBody = `<?xml version="1.0" encoding="utf-8"?>
+<AddItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials>
+    <eBayAuthToken>${authToken}</eBayAuthToken>
+  </RequesterCredentials>
+  ${itemXml}
 </AddItemRequest>`;
 
-      console.log('eBay AddItem: category=' + data.category + ' images=' + (data.imageUrls?.length || 0) + ' shipping=' + data.shippingType);
+      console.log('eBay AddItem: category=' + data.category + ' images=' + (data.imageUrls?.length || 0) + ' specifics=' + (data.itemSpecifics?.length || 0));
 
-      const resp = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/xml',
-          'X-EBAY-API-COMPATIBILITY-LEVEL': '1271',
-          'X-EBAY-API-CALL-NAME': 'AddItem',
-          'X-EBAY-API-SITEID': '0',
-          'X-EBAY-API-APP-NAME': clientId,
-        },
-        body: xmlBody,
-      });
-      const respText = await resp.text();
+      const respText = await this.callTradingApi('AddItem', xmlBody);
+      const { ack, errors } = this.parseEbayResponse(respText);
 
-      const ackMatch = respText.match(/<Ack>(.*?)<\/Ack>/);
-      const ack = ackMatch?.[1] || '';
       if (ack === 'Failure') {
-        const errMessages: string[] = [];
-        const longMsgRegex = /<LongMessage>(.*?)<\/LongMessage>/g;
-        let match;
-        while ((match = longMsgRegex.exec(respText)) !== null) {
-          errMessages.push(match[1]);
-        }
-        console.error('eBay AddItem failed:', errMessages.join(' | '));
-        throw new Error(errMessages.join(' | ') || 'eBay listing creation failed');
+        console.error('eBay AddItem failed:', errors.join(' | '));
+        throw new Error(errors.join(' | ') || 'eBay listing creation failed');
       }
 
       const itemIdMatch = respText.match(/<ItemID>(.*?)<\/ItemID>/);
@@ -160,6 +206,44 @@ class EbayService {
       console.error('Error creating eBay listing:', error);
       throw error;
     }
+  }
+
+  /**
+   * Validate a listing with eBay without actually creating it.
+   * Returns errors, warnings, and estimated fees.
+   */
+  async verifyListing(data: ListingData): Promise<{
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+    fees: { name: string; amount: string }[];
+  }> {
+    if (!this.isConfigured) {
+      throw new Error('eBay API is not configured.');
+    }
+
+    const authToken = process.env.EBAY_AUTH_TOKEN || '';
+    const itemXml = this.buildItemXml(data);
+
+    const xmlBody = `<?xml version="1.0" encoding="utf-8"?>
+<VerifyAddItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials>
+    <eBayAuthToken>${authToken}</eBayAuthToken>
+  </RequesterCredentials>
+  ${itemXml}
+</VerifyAddItemRequest>`;
+
+    console.log('eBay VerifyAddItem: category=' + data.category + ' specifics=' + (data.itemSpecifics?.length || 0));
+
+    const respText = await this.callTradingApi('VerifyAddItem', xmlBody);
+    const { ack, errors, warnings, fees } = this.parseEbayResponse(respText);
+
+    return {
+      valid: ack === 'Success' || ack === 'Warning',
+      errors,
+      warnings,
+      fees,
+    };
   }
 
   async reviseListing(ebayItemId: string, data: Partial<ListingData>) {
@@ -197,6 +281,7 @@ class EbayService {
     ${data.price ? `<StartPrice>${data.price}</StartPrice>` : ''}
     ${data.quantity ? `<Quantity>${data.quantity}</Quantity>` : ''}
     ${data.imageUrls && data.imageUrls.length > 0 ? `<PictureDetails>${data.imageUrls.map(u => `<PictureURL>${u}</PictureURL>`).join('')}</PictureDetails>` : ''}
+    ${data.itemSpecifics && data.itemSpecifics.length > 0 ? `<ItemSpecifics>${data.itemSpecifics.map(s => `<NameValueList><Name>${this.escapeXml(s.name)}</Name><Value>${this.escapeXml(s.value)}</Value></NameValueList>`).join('')}</ItemSpecifics>` : ''}
   </Item>
 </ReviseItemRequest>`;
 
@@ -308,6 +393,86 @@ class EbayService {
     }
 
     return [];
+  }
+
+  /**
+   * Fetch required and recommended item specifics for a given eBay category.
+   * Uses the Taxonomy API (getItemAspectsForCategory).
+   */
+  async getCategorySpecifics(categoryId: string): Promise<{
+    required: { name: string; values?: string[] }[];
+    recommended: { name: string; values?: string[] }[];
+  }> {
+    try {
+      const clientId = process.env.EBAY_APP_ID || process.env.EBAY_CLIENT_ID || '';
+      const clientSecret = process.env.EBAY_CERT_ID || process.env.EBAY_CLIENT_SECRET || '';
+      if (!clientId || !clientSecret) return { required: [], recommended: [] };
+
+      const sandbox = process.env.EBAY_SANDBOX === 'true';
+      const tokenUrl = sandbox
+        ? 'https://api.sandbox.ebay.com/identity/v1/oauth2/token'
+        : 'https://api.ebay.com/identity/v1/oauth2/token';
+
+      const tokenResp = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
+        },
+        body: new URLSearchParams({ grant_type: 'client_credentials', scope: 'https://api.ebay.com/oauth/api_scope' }),
+      });
+      const tokenData = await tokenResp.json() as { access_token?: string };
+      if (!tokenData.access_token) return { required: [], recommended: [] };
+
+      const apiBase = sandbox ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com';
+      // eBay US category tree ID = 0
+      const url = `${apiBase}/commerce/taxonomy/v1/category_tree/0/get_item_aspects_for_category?category_id=${categoryId}`;
+      const resp = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!resp.ok) {
+        console.warn(`Taxonomy API returned ${resp.status} for category ${categoryId}`);
+        return { required: [], recommended: [] };
+      }
+
+      const data = await resp.json() as {
+        aspects?: {
+          localizedAspectName: string;
+          aspectConstraint?: {
+            aspectRequired?: boolean;
+            aspectUsage?: string;
+            aspectApplicableTo?: string[];
+          };
+          aspectValues?: { localizedValue: string }[];
+        }[];
+      };
+
+      const required: { name: string; values?: string[] }[] = [];
+      const recommended: { name: string; values?: string[] }[] = [];
+
+      for (const aspect of data.aspects || []) {
+        const name = aspect.localizedAspectName;
+        const values = aspect.aspectValues?.map(v => v.localizedValue).slice(0, 50); // cap at 50 suggestions
+        const isRequired = aspect.aspectConstraint?.aspectRequired === true;
+        const usage = aspect.aspectConstraint?.aspectUsage || '';
+
+        if (isRequired) {
+          required.push({ name, values });
+        } else if (usage === 'RECOMMENDED') {
+          recommended.push({ name, values });
+        }
+      }
+
+      console.log(`Category ${categoryId} specifics: ${required.length} required, ${recommended.length} recommended`);
+      return { required, recommended };
+    } catch (err) {
+      console.warn('getCategorySpecifics failed:', (err as Error).message);
+      return { required: [], recommended: [] };
+    }
   }
 
   async validateListing(data: ListingData) {

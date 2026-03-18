@@ -493,6 +493,143 @@ Reasoning: [1-2 sentence explanation of how you arrived at this range]`;
     }
   }
 
+  /**
+   * Unified AI call: one comprehensive call that fills all item fields.
+   * Takes all context (photos, notes, existing data) and returns everything needed.
+   */
+  async unifiedAnalyze(params: {
+    imagePaths: string[];
+    contextNotes?: Record<string, string>;
+    existingData?: {
+      title?: string;
+      description?: string;
+      brand?: string;
+      condition?: string;
+      category?: string;
+      features?: string[];
+      ebayCategoryId?: string;
+    };
+  }): Promise<{
+    analysis: ImageAnalysis;
+    listing: ReturnType<AIService['parseListing']>;
+    raw: string;
+    tokens: { input: number; output: number };
+    cost: number;
+  }> {
+    if (!this.anthropicKey) {
+      const mockAnalysis = this.mockAnalyzeImage();
+      const mockListing = this.mockGenerateListing({ imageAnalysis: mockAnalysis });
+      return { analysis: mockAnalysis, listing: mockListing, raw: 'Mock - no API key', tokens: { input: 0, output: 0 }, cost: 0 };
+    }
+
+    // Load images
+    const loaded = await Promise.all(params.imagePaths.map(p => this.loadImage(p)));
+    const images = loaded.filter((img): img is { base64: string; mediaType: string } => img !== null);
+
+    if (images.length === 0) {
+      const mockAnalysis = this.mockAnalyzeImage();
+      const mockListing = this.mockGenerateListing({ imageAnalysis: mockAnalysis });
+      return { analysis: mockAnalysis, listing: mockListing, raw: 'No images loaded', tokens: { input: 0, output: 0 }, cost: 0 };
+    }
+
+    // Build context sections
+    const contextParts: string[] = [];
+    if (params.contextNotes) {
+      const notes = Object.entries(params.contextNotes)
+        .filter(([, v]) => v && v.trim())
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('\n');
+      if (notes) contextParts.push(`USER NOTES:\n${notes}`);
+    }
+
+    if (params.existingData) {
+      const ed = params.existingData;
+      const parts: string[] = [];
+      if (ed.title) parts.push(`Title: ${ed.title}`);
+      if (ed.brand) parts.push(`Brand: ${ed.brand}`);
+      if (ed.condition) parts.push(`Condition: ${ed.condition}`);
+      if (ed.category) parts.push(`Category: ${ed.category}`);
+      if (ed.features?.length) parts.push(`Features: ${ed.features.join(', ')}`);
+      if (parts.length) contextParts.push(`EXISTING DATA:\n${parts.join('\n')}`);
+    }
+
+    const contextBlock = contextParts.length > 0
+      ? `\n\nADDITIONAL CONTEXT:\n${contextParts.join('\n\n')}\n\nUse this context to improve your analysis. If user notes correct or clarify something, trust them over what you see in photos.`
+      : '';
+
+    const prompt = `You are an expert eBay seller analyzing ${images.length} photo(s) of a single item. Provide a COMPLETE identification and listing in one response.${contextBlock}
+
+Respond in this exact format:
+
+ANALYSIS:
+Confidence: [0-100]%
+Item: [specific item name with model/version]
+Brand: [brand name or "Unbranded"]
+Model: [model number/name or "Unknown"]
+Condition: [New/Used - Like New/Used - Good/Used - Fair/For Parts]
+Features: [feature1, feature2, feature3, feature4, feature5]
+Category: [specific eBay category]
+Value: [$XX-$YY estimated market range]
+Defects: [visible wear/damage or "None visible"]
+Keywords: [keyword1, keyword2, keyword3, keyword4, keyword5]
+UPC: [12-13 digit barcode if visible, or "None"]
+ISBN: [10-13 digit ISBN if visible, or "None"]
+Notes: [measurements, materials, era, compatibility, accessories]
+
+LISTING:
+Title: [max 80 chars, SEO optimized]
+Description: [detailed HTML description with specs, features, condition details]
+Tags: [comma separated keywords for search]
+Starting Price: $[competitive starting price]
+Buy Now Price: $[reasonable buy-it-now price]
+Shipping Cost: $[estimated shipping cost]
+
+Be thorough — exact brand, model, variant, color, size, material, included accessories, and condition.`;
+
+    // Build content array
+    const content: any[] = [];
+    // Only send up to BATCH_SIZE images in a single call
+    const imagesToSend = images.slice(0, BATCH_SIZE);
+    for (const img of imagesToSend) {
+      content.push({
+        type: 'image',
+        source: { type: 'base64', media_type: img.mediaType, data: img.base64 }
+      });
+    }
+    content.push({ type: 'text', text: prompt });
+
+    console.log(`Unified AI analysis: ${imagesToSend.length} photo(s)...`);
+
+    const response = await axios.post('https://api.anthropic.com/v1/messages', {
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 3000,
+      system: 'You are an expert eBay seller. Create comprehensive, accurate item identifications and compelling listings. Always respond in the exact format requested.',
+      messages: [{ role: 'user', content }]
+    }, {
+      headers: {
+        'x-api-key': this.anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json'
+      },
+      timeout: 120000,
+      maxContentLength: 100 * 1024 * 1024,
+      maxBodyLength: 100 * 1024 * 1024
+    });
+
+    const responseText = response.data.content?.[0]?.text || '';
+    const usage = response.data.usage || {};
+    const cost = calcCost(usage);
+    const tokens = { input: usage.input_tokens || 0, output: usage.output_tokens || 0 };
+
+    console.log(`  Unified analysis complete (${tokens.input}in/${tokens.output}out, $${cost.toFixed(6)})`);
+
+    // Parse the combined response
+    const analysis = this.parseAnalysis(responseText);
+    const listing = this.parseListing(responseText);
+
+    return { analysis, listing, raw: responseText, tokens, cost };
+  }
+
   private mockAnalyzeImage(): ImageAnalysis {
     return {
       itemType: 'Sample Item',

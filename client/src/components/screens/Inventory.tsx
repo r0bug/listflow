@@ -21,11 +21,13 @@ interface InventoryItem {
   price?: number;
   createdAt: string;
   thumbnail?: string;
+  completeness?: number;
+  completenessPercent?: number;
 }
 
 interface FilterOptions {
   stages: string[];
-  sortBy: 'recent' | 'sku' | 'price_asc' | 'price_desc';
+  sortBy: 'recent' | 'sku' | 'price_asc' | 'price_desc' | 'completeness';
 }
 
 export const Inventory: React.FC = () => {
@@ -39,7 +41,7 @@ export const Inventory: React.FC = () => {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({
     stages: [],
-    sortBy: 'recent'
+    sortBy: 'completeness'
   });
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -85,12 +87,19 @@ export const Inventory: React.FC = () => {
         case 'sku': return a.sku.localeCompare(b.sku);
         case 'price_asc': return (a.price || 0) - (b.price || 0);
         case 'price_desc': return (b.price || 0) - (a.price || 0);
+        case 'completeness': {
+          // Published items go last, then sort by completeness ascending (least complete first)
+          const aPub = a.stage === 'PUBLISHED' ? 1 : 0;
+          const bPub = b.stage === 'PUBLISHED' ? 1 : 0;
+          if (aPub !== bPub) return aPub - bPub;
+          return (a.completeness || 0) - (b.completeness || 0);
+        }
         default: return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
     });
 
-  const resetFilters = () => setFilters({ stages: [], sortBy: 'recent' });
-  const hasActiveFilters = filters.stages.length > 0 || filters.sortBy !== 'recent';
+  const resetFilters = () => setFilters({ stages: [], sortBy: 'completeness' });
+  const hasActiveFilters = filters.stages.length > 0 || filters.sortBy !== 'completeness';
 
   const toggleStage = (stage: string) => {
     setFilters(prev => ({
@@ -265,6 +274,7 @@ export const Inventory: React.FC = () => {
                   onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as FilterOptions['sortBy'] })}
                   className="input text-sm"
                 >
+                  <option value="completeness">Completeness (least first)</option>
                   <option value="recent">Most Recent</option>
                   <option value="sku">SKU (A-Z)</option>
                   <option value="price_asc">Price: Low to High</option>
@@ -291,6 +301,7 @@ export const Inventory: React.FC = () => {
               <th className="px-4 py-3 text-left table-header">Title</th>
               <th className="px-4 py-3 text-left table-header">Location</th>
               <th className="px-4 py-3 text-left table-header">Stage</th>
+              <th className="px-4 py-3 text-left table-header">Ready</th>
               <th className="px-4 py-3 text-left table-header">Price</th>
               <th className="px-4 py-3 text-left table-header">Created</th>
             </tr>
@@ -298,13 +309,13 @@ export const Inventory: React.FC = () => {
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center">
+                <td colSpan={7} className="px-4 py-8 text-center">
                   <Loader2 className="w-6 h-6 animate-spin text-ink-600 mx-auto" />
                 </td>
               </tr>
             ) : filteredItems.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
                   <Package size={36} className="mx-auto mb-2 text-slate-300" />
                   <p className="text-sm">No items found</p>
                 </td>
@@ -323,6 +334,21 @@ export const Inventory: React.FC = () => {
                     <span className={cn('badge', getStageColor(item.stage))}>
                       {item.stage.replace('_', ' ')}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={cn('h-full rounded-full transition-all', {
+                            'bg-green-500': (item.completenessPercent || 0) === 100,
+                            'bg-amber-400': (item.completenessPercent || 0) >= 50 && (item.completenessPercent || 0) < 100,
+                            'bg-red-400': (item.completenessPercent || 0) < 50,
+                          })}
+                          style={{ width: `${item.completenessPercent || 0}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-slate-500">{item.completeness || 0}/7</span>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-800">
                     {item.price ? `$${item.price.toFixed(2)}` : '-'}

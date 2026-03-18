@@ -1,6 +1,8 @@
 import { PrismaClient, WorkflowStage, UserRole, ItemStatus } from '../../src/generated/prisma';
 import { prisma as sharedPrisma } from '../config/database';
 import { aiService } from './ai.service';
+import { computeCompleteness } from '../utils/completeness';
+import { randomUUID } from 'crypto';
 
 interface WorkflowTransition {
   fromStage: WorkflowStage;
@@ -271,6 +273,136 @@ export class WorkflowService {
         data: { status: ItemStatus.ERROR }
       });
       
+      throw error;
+    }
+  }
+
+  async unifiedProcessWithAI(itemId: string) {
+    const item = await this.prisma.item.findUnique({
+      where: { id: itemId },
+      include: { photos: { orderBy: { order: 'asc' } } }
+    });
+
+    if (!item || item.photos.length === 0) {
+      throw new Error('Item not found or has no photos');
+    }
+
+    try {
+      const contextNotes = (item.contextNotes as Record<string, string>) || {};
+      const existingData = {
+        title: item.title || undefined,
+        description: item.description || undefined,
+        brand: item.brand || undefined,
+        condition: item.condition || undefined,
+        category: item.category || undefined,
+        features: item.features || [],
+        ebayCategoryId: item.ebayCategoryId || undefined,
+      };
+
+      const allPhotoPaths = item.photos.map(p => p.originalPath);
+      const result = await aiService.unifiedAnalyze({
+        imagePaths: allPhotoPaths,
+        contextNotes,
+        existingData,
+      });
+
+      const { analysis, listing, raw, tokens, cost } = result;
+
+      // Create journal entry
+      const journalEntry = {
+        id: randomUUID(),
+        timestamp: new Date().toISOString(),
+        type: 'unified',
+        prompt: {
+          systemPrompt: 'unified-analyze',
+          contextNotes: Object.keys(contextNotes).length > 0 ? contextNotes : null,
+          photoCount: allPhotoPaths.length,
+          existingData: item.title ? { title: item.title, brand: item.brand } : null,
+        },
+        response: {
+          raw: raw.substring(0, 2000), // Truncate for storage
+          parsed: { title: listing.title, brand: analysis.brand, condition: analysis.condition },
+          model: 'claude-sonnet-4',
+          tokens,
+          cost,
+        },
+      };
+
+      // Append to existing journal
+      const existingJournal = Array.isArray(item.aiJournal) ? item.aiJournal : [];
+      const updatedJournal = [...existingJournal, journalEntry];
+
+      const analysisJson: any = JSON.parse(JSON.stringify(analysis));
+
+      // Update item with all results
+      const updateData: Record<string, unknown> = {
+        title: listing.title,
+        description: listing.description,
+        category: analysis.category || item.category,
+        condition: analysis.condition || item.condition,
+        brand: analysis.brand,
+        features: analysis.features || [],
+        keywords: listing.tags || [],
+        aiAnalysis: analysisJson,
+        aiCost: { increment: cost },
+        aiJournal: updatedJournal as any,
+      };
+      if (analysis.upc) updateData.upc = analysis.upc;
+      if (analysis.isbn) updateData.isbn = analysis.isbn;
+
+      await this.prisma.item.update({
+        where: { id: itemId },
+        data: updateData,
+      });
+
+      // Auto-resolve eBay category
+      try {
+        const { ebayService } = require('./ebay.service');
+        const title = listing.title || analysis.itemType || '';
+        if (title) {
+          const suggestions = await ebayService.getCategories(title);
+          if (suggestions?.length > 0) {
+            const cat = suggestions[0];
+            const catId = cat.CategoryID || cat.Category?.CategoryID || '';
+            if (catId && /^\d+$/.test(String(catId))) {
+              await this.prisma.item.update({
+                where: { id: itemId },
+                data: { ebayCategoryId: String(catId) },
+              });
+            }
+          }
+        }
+      } catch (catErr) {
+        console.warn('eBay category auto-lookup failed:', (catErr as Error).message);
+      }
+
+      // Recompute completeness
+      const updatedItem = await this.prisma.item.findUnique({
+        where: { id: itemId },
+        include: { photos: { select: { id: true } } }
+      });
+      if (updatedItem) {
+        const completeness = computeCompleteness(updatedItem);
+        await this.prisma.item.update({
+          where: { id: itemId },
+          data: { completeness: completeness as any },
+        });
+      }
+
+      // Mark primary photo as processed
+      const primaryPhoto = item.photos.find(p => p.isPrimary) || item.photos[0];
+      await this.prisma.photo.update({
+        where: { id: primaryPhoto.id },
+        data: { analysis: analysisJson, processedAt: new Date() }
+      });
+
+      return { journalEntry, cost };
+    } catch (error) {
+      console.error('Unified AI processing failed:', error);
+      await this.prisma.item.update({
+        where: { id: itemId },
+        data: { status: ItemStatus.ERROR }
+      });
       throw error;
     }
   }
