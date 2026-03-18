@@ -1049,28 +1049,20 @@ export const ItemDetail: React.FC = () => {
                   try {
                     const result = await api.lookupCategory(item.id);
                     if ((result as any).success) {
-                      const catId = (result as any).data.categoryId;
-                      updateField('ebayCategoryId', catId);
-                      setSuccessMessage(`Category: ${catId}`);
+                      const data = (result as any).data;
+                      const msg = (result as any).message || `Category: ${data.categoryId}`;
+                      setSuccessMessage(msg);
 
-                      // If the response includes required specifics, use them directly
-                      const reqSpecifics = (result as any).data.requiredSpecifics;
-                      if (reqSpecifics?.length > 0) {
-                        setRequiredSpecifics(reqSpecifics);
-                        // Auto-add missing required specifics as empty fields
-                        const currentNames = new Set(item.itemSpecifics.map(s => s.name.toLowerCase()));
-                        const newSpecifics = [...item.itemSpecifics];
-                        let added = 0;
-                        for (const req of reqSpecifics) {
-                          if (!currentNames.has(req.name.toLowerCase())) {
-                            newSpecifics.push({ name: req.name, value: '' });
-                            added++;
-                          }
-                        }
-                        if (added > 0) {
-                          updateField('itemSpecifics', newSpecifics);
-                          setSuccessMessage(`Category: ${catId} — ${added} required specifics added`);
-                        }
+                      // Reload item to get AI-filled specifics from backend
+                      const fresh = await api.getDashboardItem(item.id);
+                      if ((fresh as any).success) {
+                        setItem((fresh as any).data);
+                        setHasChanges(false);
+                      }
+
+                      // Store required specifics for UI indicators
+                      if (data.requiredSpecifics?.length > 0) {
+                        setRequiredSpecifics(data.requiredSpecifics);
                       }
                     } else {
                       setError((result as any).error || 'No category found');
@@ -1200,7 +1192,6 @@ export const ItemDetail: React.FC = () => {
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-slate-900">Item Specifics</h3>
                 {requiredSpecifics.length > 0 && (() => {
-                  const currentNames = new Set(item.itemSpecifics.map(s => s.name.toLowerCase()));
                   const missingCount = requiredSpecifics.filter(r => {
                     const existing = item.itemSpecifics.find(s => s.name.toLowerCase() === r.name.toLowerCase());
                     return !existing || !existing.value.trim();

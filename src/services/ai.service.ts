@@ -642,6 +642,94 @@ Be thorough — exact brand, model, variant, color, size, material, included acc
     };
   }
 
+  /**
+   * Fill in missing eBay-required item specifics using AI.
+   * Given item context and a list of required specifics (with optional valid values),
+   * returns best-guess values for each.
+   */
+  async fillItemSpecifics(
+    title: string,
+    description: string,
+    brand: string,
+    model: string,
+    category: string,
+    requiredSpecifics: { name: string; values?: string[] }[]
+  ): Promise<{ specifics: { name: string; value: string }[]; cost: number }> {
+    if (!this.anthropicKey || requiredSpecifics.length === 0) {
+      return { specifics: [], cost: 0 };
+    }
+
+    const specificsInfo = requiredSpecifics.map(r => {
+      if (r.values && r.values.length > 0 && r.values.length <= 50) {
+        return `- ${r.name} (valid values: ${r.values.slice(0, 30).join(', ')})`;
+      }
+      return `- ${r.name}`;
+    }).join('\n');
+
+    const prompt = `You are an expert eBay seller. An item is being listed and eBay requires specific item attributes for this category. Based on the item information below, provide the best value for each required item specific.
+
+Item Title: ${title}
+Brand: ${brand || 'Unknown'}
+Model: ${model || 'Unknown'}
+Category: ${category || 'Unknown'}
+Description: ${(description || '').substring(0, 500)}
+
+Required item specifics to fill:
+${specificsInfo}
+
+For each specific, respond with EXACTLY this format (one per line):
+SpecificName: value
+
+Rules:
+- If valid values are listed, you MUST pick from that list
+- If you cannot determine a value with reasonable confidence, respond with: SpecificName: Does Not Apply
+- "Does Not Apply" is an accepted eBay value for most specifics
+- Be specific and accurate — wrong values cause listing issues
+- Do not add any other text, explanations, or formatting`;
+
+    try {
+      const response = await axios.post('https://api.anthropic.com/v1/messages', {
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: prompt }]
+      }, {
+        headers: {
+          'x-api-key': this.anthropicKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000,
+      });
+
+      const text = response.data.content?.[0]?.text || '';
+      const usage = response.data.usage || {};
+      const cost = calcCost(usage);
+
+      // Parse responses
+      const specifics: { name: string; value: string }[] = [];
+      const lines = text.split('\n').filter((l: string) => l.trim());
+
+      for (const line of lines) {
+        const colonIdx = line.indexOf(':');
+        if (colonIdx > 0) {
+          const name = line.substring(0, colonIdx).trim();
+          const value = line.substring(colonIdx + 1).trim();
+          // Match against our required list (case-insensitive)
+          const match = requiredSpecifics.find(r => r.name.toLowerCase() === name.toLowerCase());
+          if (match && value) {
+            specifics.push({ name: match.name, value });
+          }
+        }
+      }
+
+      console.log(`AI fillItemSpecifics: ${specifics.length}/${requiredSpecifics.length} filled ($${cost.toFixed(6)})`);
+      return { specifics, cost };
+    } catch (err) {
+      console.error('fillItemSpecifics failed:', (err as Error).message);
+      return { specifics: [], cost: 0 };
+    }
+  }
+
   private mockGenerateListing(options: ListingOptions) {
     return {
       title: `${options.imageAnalysis.itemType} - ${options.imageAnalysis.condition}`,

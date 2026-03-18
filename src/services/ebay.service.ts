@@ -425,21 +425,36 @@ class EbayService {
       if (!tokenData.access_token) return { required: [], recommended: [] };
 
       const apiBase = sandbox ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com';
-      // eBay US category tree ID = 0
-      const url = `${apiBase}/commerce/taxonomy/v1/category_tree/0/get_item_aspects_for_category?category_id=${categoryId}`;
-      const resp = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${tokenData.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
 
-      if (!resp.ok) {
-        console.warn(`Taxonomy API returned ${resp.status} for category ${categoryId}`);
+      // Try eBay US category tree (0) first, then eBay Motors (100)
+      // Motors categories (Parts & Accessories, Vehicles) live under tree 100
+      let data: any = null;
+      for (const treeId of ['0', '100']) {
+        const url = `${apiBase}/commerce/taxonomy/v1/category_tree/${treeId}/get_item_aspects_for_category?category_id=${categoryId}`;
+        const resp = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (resp.ok) {
+          const parsed = await resp.json();
+          if (parsed.aspects && parsed.aspects.length > 0) {
+            data = parsed;
+            console.log(`Category ${categoryId} found in tree ${treeId}`);
+            break;
+          }
+        }
+      }
+
+      if (!data) {
+        console.warn(`Taxonomy API: no aspects found for category ${categoryId} in any tree`);
         return { required: [], recommended: [] };
       }
 
-      const data = await resp.json() as {
+      // data is already typed from the loop above
+      const typedData = data as {
         aspects?: {
           localizedAspectName: string;
           aspectConstraint?: {
@@ -454,7 +469,7 @@ class EbayService {
       const required: { name: string; values?: string[] }[] = [];
       const recommended: { name: string; values?: string[] }[] = [];
 
-      for (const aspect of data.aspects || []) {
+      for (const aspect of typedData.aspects || []) {
         const name = aspect.localizedAspectName;
         const values = aspect.aspectValues?.map(v => v.localizedValue).slice(0, 50); // cap at 50 suggestions
         const isRequired = aspect.aspectConstraint?.aspectRequired === true;

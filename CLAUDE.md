@@ -109,13 +109,19 @@ The following must ONLY exist in `.env` files and NEVER in committed code:
 - [x] ReviseItem support — "Update eBay" button on published items
 - [x] Condition ID mapping (all Used variants → 3000 for electronics)
 - [x] Item Specifics in CSV export (C:Brand, C:Model, C:Type)
+- [x] Item Specifics sent in AddItem/ReviseItem XML (Brand, Model, all aiAnalysis.specifics)
 - [x] Detailed eBay error messages surfaced to UI
+- [x] VerifyAddItem pre-check — "Verify" button validates listing before pushing
+- [x] Verify errors show quick-add buttons for missing required specifics
+- [x] eBay Motors support — Taxonomy API tries tree 0 (US) then tree 100 (Motors)
+- [x] Auto-fill required specifics via AI on category lookup
 
 ### Workflow Flexibility (Completed)
 - [x] Stage dropdown on item detail — move items to any stage
 - [x] Flexible set-stage endpoint (POST /api/dashboard/item/:id/set-stage)
 - [x] Rejected items can be moved back into pipeline
-- [x] "Process AI" button on item detail header
+- [x] "Send to AI" button — unified AI call with full context (replaces "Process AI")
+- [x] Published items locked — cannot change stage on items with ebayId
 
 ### ListFlow Snap PWA (Completed)
 - [x] Installable PWA for mobile photo upload (manifest.json, service worker)
@@ -140,6 +146,18 @@ The following must ONLY exist in `.env` files and NEVER in committed code:
 - [x] Dropdown selectors for specifics with eBay-provided value lists
 - [x] Quick-add buttons in Add Specific modal for missing required fields
 - [x] Completeness tracking utility (`src/utils/completeness.ts`)
+
+### Completeness Model & Inventory-Centric Refactor (Completed)
+- [x] Completeness calculator (`src/utils/completeness.ts`) — 7 checks: photos, AI, category, specifics, price, shipping, weight
+- [x] Completeness bar on item detail with per-check indicators
+- [x] Completeness score/percentage on inventory table rows
+- [x] Default sort: completeness ascending (least complete first, published last)
+- [x] Context notes — per-section free-text notes for AI context (photos, category, description, pricing, shipping)
+- [x] Unified AI call — one Claude call with photos + context notes + existing data
+- [x] AI Journal — logged per-item with prompt context, response, tokens, cost
+- [x] Inventory is default route (`/` → Inventory, `/queue` → redirects to `/inventory`)
+- [x] Queue removed from sidebar navigation
+- [x] Schema: `contextNotes`, `aiJournal`, `completeness` Json fields on Item model
 
 ### UI Improvements (Completed)
 - [x] Weight field split into lbs + oz (stores total oz internally)
@@ -182,6 +200,8 @@ docker-compose down      # Stop all services
 - `DELETE /api/dashboard/item/:id/photos/:photoId` - Delete a photo
 - `POST /api/dashboard/item/:id/photos/:photoId/edit` - Edit photo (crop/brightness/contrast/rotate)
 - `POST /api/dashboard/item/:id/suggest-price` - AI price suggestion
+- `POST /api/dashboard/item/:id/unified-ai` - Unified AI analysis (one call, full context, journals result)
+- `POST /api/dashboard/item/:id/verify-ebay` - Validate listing with eBay (VerifyAddItem) without creating it
 - `POST /api/dashboard/item/:id/push-to-ebay` - Push item to eBay
 - `POST /api/dashboard/items/bulk-push-to-ebay` - Batch push to eBay
 - `POST /api/v1/export/csv` - Export items as eBay Seller Hub CSV

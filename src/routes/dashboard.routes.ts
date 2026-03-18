@@ -1362,8 +1362,6 @@ router.post('/item/:id/lookup-category', async (req: Request, res: Response) => 
     const categoryName = cat.CategoryName || cat.Category?.CategoryName || '';
 
     if (categoryId && /^\d+$/.test(categoryId)) {
-      await prisma.item.update({ where: { id }, data: { ebayCategoryId: categoryId } });
-
       // Also fetch required specifics for this category
       let requiredSpecifics: { name: string; values?: string[] }[] = [];
       try {
@@ -1371,10 +1369,76 @@ router.post('/item/:id/lookup-category', async (req: Request, res: Response) => 
         requiredSpecifics = catSpecifics.required;
       } catch { /* non-fatal */ }
 
+      // Auto-fill required specifics using AI
+      let filledSpecifics: { name: string; value: string }[] = [];
+      if (requiredSpecifics.length > 0) {
+        try {
+          // Load full item for context
+          const fullItem = await prisma.item.findUnique({
+            where: { id },
+            select: { title: true, description: true, brand: true, aiAnalysis: true }
+          });
+          const aiData = (fullItem?.aiAnalysis as Record<string, unknown>) || {};
+          const existingSpecifics = (aiData.specifics as Record<string, string>) || {};
+
+          // Filter out specifics we already have
+          const missing = requiredSpecifics.filter(r => {
+            const lowerName = r.name.toLowerCase();
+            // Check if we already have this specific
+            if (lowerName === 'brand' && fullItem?.brand) return false;
+            if (existingSpecifics[r.name]) return false;
+            return true;
+          });
+
+          if (missing.length > 0) {
+            const result = await aiService.fillItemSpecifics(
+              fullItem?.title || '',
+              fullItem?.description || '',
+              fullItem?.brand || '',
+              String(aiData.model || ''),
+              categoryName || '',
+              missing
+            );
+            filledSpecifics = result.specifics;
+
+            // Merge filled specifics into existing aiAnalysis.specifics
+            if (filledSpecifics.length > 0) {
+              const mergedSpecifics = { ...existingSpecifics };
+              for (const s of filledSpecifics) {
+                mergedSpecifics[s.name] = s.value;
+              }
+              await prisma.item.update({
+                where: { id },
+                data: {
+                  ebayCategoryId: categoryId,
+                  aiAnalysis: { ...aiData, specifics: mergedSpecifics },
+                  aiCost: { increment: result.cost },
+                },
+              });
+            } else {
+              await prisma.item.update({ where: { id }, data: { ebayCategoryId: categoryId } });
+            }
+          } else {
+            await prisma.item.update({ where: { id }, data: { ebayCategoryId: categoryId } });
+          }
+        } catch (fillErr) {
+          console.warn('Auto-fill specifics failed:', (fillErr as Error).message);
+          await prisma.item.update({ where: { id }, data: { ebayCategoryId: categoryId } });
+        }
+      } else {
+        await prisma.item.update({ where: { id }, data: { ebayCategoryId: categoryId } });
+      }
+
       return res.json({
         success: true,
-        data: { categoryId, categoryName, allSuggestions: suggestions.slice(0, 5), requiredSpecifics },
-        message: `Category set to ${categoryId} (${categoryName})`,
+        data: {
+          categoryId,
+          categoryName,
+          allSuggestions: suggestions.slice(0, 5),
+          requiredSpecifics,
+          filledSpecifics,
+        },
+        message: `Category set to ${categoryId} (${categoryName})${filledSpecifics.length > 0 ? ` — auto-filled ${filledSpecifics.length} specifics` : ''}`,
       });
     }
 
@@ -1661,6 +1725,21 @@ router.post('/item/:id/verify-ebay', async (req: Request, res: Response) => {
       });
     }
 
+    // Check required specifics and warn about missing ones
+    let missingSpecificsWarnings: string[] = [];
+    try {
+      const catSpecifics = await ebayService.getCategorySpecifics(categoryId);
+      if (catSpecifics.required.length > 0) {
+        const missing = catSpecifics.required.filter(req => {
+          const existing = specifics.find(s => s.name.toLowerCase() === req.name.toLowerCase());
+          return !existing || !existing.value.trim();
+        });
+        if (missing.length > 0) {
+          missingSpecificsWarnings = missing.map(r => `Required item specific "${r.name}" is missing — eBay will reject this listing`);
+        }
+      }
+    } catch { /* non-fatal */ }
+
     const format = item.listingFormat || 'FixedPrice';
     const isAuction = format === 'Auction' || format === 'AuctionWithBIN';
 
@@ -1693,8 +1772,8 @@ router.post('/item/:id/verify-ebay', async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        valid: result.valid,
-        errors: result.errors,
+        valid: result.valid && missingSpecificsWarnings.length === 0,
+        errors: [...result.errors, ...missingSpecificsWarnings],
         warnings: result.warnings,
         fees: result.fees,
         specifics, // show what specifics were sent
@@ -1781,6 +1860,86 @@ router.post('/item/:id/push-to-ebay', async (req: Request, res: Response) => {
           specifics.push({ name, value: String(value) });
         }
       });
+    }
+
+    // Fetch required specifics for this category and check for missing ones
+    try {
+      const catSpecifics = await ebayService.getCategorySpecifics(categoryId);
+      if (catSpecifics.required.length > 0) {
+        const missingRequired = catSpecifics.required.filter(req => {
+          const existing = specifics.find(s => s.name.toLowerCase() === req.name.toLowerCase());
+          return !existing || !existing.value.trim();
+        });
+
+        if (missingRequired.length > 0) {
+          // Try to auto-fill using AI — ask Claude to provide values for missing specifics
+          try {
+            const missingNames = missingRequired.map(r => r.name);
+            const filledSpecifics = await aiService.fillItemSpecifics(
+              item.title || '',
+              item.description || '',
+              item.brand || '',
+              aiData.model ? String(aiData.model) : '',
+              item.category || '',
+              missingRequired.map(r => ({ name: r.name, values: r.values }))
+            );
+
+            // Merge AI-filled specifics
+            for (const filled of filledSpecifics.specifics) {
+              if (filled.value && filled.value.trim()) {
+                const existingIdx = specifics.findIndex(s => s.name.toLowerCase() === filled.name.toLowerCase());
+                if (existingIdx >= 0) {
+                  specifics[existingIdx].value = filled.value;
+                } else {
+                  specifics.push(filled);
+                }
+              }
+            }
+
+            // Save the AI-filled specifics back to the item
+            const existingAnalysis = (item.aiAnalysis as Record<string, unknown>) || {};
+            const existingSpecifics = (existingAnalysis.specifics as Record<string, string>) || {};
+            for (const filled of filledSpecifics.specifics) {
+              if (filled.value && filled.value.trim()) {
+                existingSpecifics[filled.name] = filled.value;
+              }
+            }
+            await prisma.item.update({
+              where: { id },
+              data: {
+                aiAnalysis: { ...existingAnalysis, specifics: existingSpecifics },
+                aiCost: { increment: filledSpecifics.cost },
+              },
+            });
+
+            console.log(`AI auto-filled ${filledSpecifics.specifics.filter(s => s.value).length}/${missingNames.length} missing specifics for item ${id}`);
+
+            // Re-check if any are still missing after AI fill
+            const stillMissing = missingRequired.filter(req => {
+              const existing = specifics.find(s => s.name.toLowerCase() === req.name.toLowerCase());
+              return !existing || !existing.value.trim();
+            });
+
+            if (stillMissing.length > 0) {
+              return res.status(400).json({
+                success: false,
+                error: `eBay requires these item specifics for this category: ${stillMissing.map(r => r.name).join(', ')}. AI couldn't determine them — please fill them in on the item detail page.`,
+                missingSpecifics: stillMissing.map(r => ({ name: r.name, values: r.values?.slice(0, 20) })),
+              });
+            }
+          } catch (aiErr) {
+            console.warn('AI specifics fill failed, returning missing list:', (aiErr as Error).message);
+            return res.status(400).json({
+              success: false,
+              error: `eBay requires these item specifics for this category: ${missingRequired.map(r => r.name).join(', ')}. Please fill them in on the item detail page.`,
+              missingSpecifics: missingRequired.map(r => ({ name: r.name, values: r.values?.slice(0, 20) })),
+            });
+          }
+        }
+      }
+    } catch (specErr) {
+      console.warn('Could not check required specifics:', (specErr as Error).message);
+      // Non-fatal — proceed without the check
     }
 
     const listingData = {
