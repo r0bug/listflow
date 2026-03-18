@@ -1767,13 +1767,17 @@ router.post('/item/:id/verify-ebay', async (req: Request, res: Response) => {
       returnProfileId: (item as any).returnProfileId || undefined,
     };
 
+    // Detect if this is an eBay Motors category
+    const siteId = await ebayService.detectSiteId(categoryId);
+    (listingData as any).siteId = siteId;
+
     const result = await ebayService.verifyListing(listingData);
 
     res.json({
       success: true,
       data: {
-        valid: result.valid && missingSpecificsWarnings.length === 0,
-        errors: [...result.errors, ...missingSpecificsWarnings],
+        valid: result.valid,
+        errors: result.errors,
         warnings: result.warnings,
         fees: result.fees,
         specifics, // show what specifics were sent
@@ -1965,6 +1969,10 @@ router.post('/item/:id/push-to-ebay', async (req: Request, res: Response) => {
       shippingProfileId: (item as any).shippingProfileId || undefined,
       returnProfileId: (item as any).returnProfileId || undefined,
     };
+
+    // Detect if this is an eBay Motors category
+    const pushSiteId = await ebayService.detectSiteId(categoryId);
+    (listingData as any).siteId = pushSiteId;
 
     const result = await ebayService.createListing(listingData);
 

@@ -26,6 +26,7 @@ interface ListingData {
   shippingProfileId?: string;
   returnProfileId?: string;
   itemSpecifics?: { name: string; value: string }[];
+  siteId?: string; // '0' for US (default), '100' for eBay Motors
 }
 
 class EbayService {
@@ -111,7 +112,7 @@ class EbayService {
   /**
    * Send a Trading API request (AddItem, VerifyAddItem, etc.)
    */
-  private async callTradingApi(callName: string, xmlBody: string): Promise<string> {
+  private async callTradingApi(callName: string, xmlBody: string, siteId: string = '0'): Promise<string> {
     const apiUrl = process.env.EBAY_SANDBOX === 'true'
       ? 'https://api.sandbox.ebay.com/ws/api.dll'
       : 'https://api.ebay.com/ws/api.dll';
@@ -123,7 +124,7 @@ class EbayService {
         'Content-Type': 'text/xml',
         'X-EBAY-API-COMPATIBILITY-LEVEL': '1271',
         'X-EBAY-API-CALL-NAME': callName,
-        'X-EBAY-API-SITEID': '0',
+        'X-EBAY-API-SITEID': siteId,
         'X-EBAY-API-APP-NAME': clientId,
       },
       body: xmlBody,
@@ -184,7 +185,7 @@ class EbayService {
 
       console.log('eBay AddItem: category=' + data.category + ' images=' + (data.imageUrls?.length || 0) + ' specifics=' + (data.itemSpecifics?.length || 0));
 
-      const respText = await this.callTradingApi('AddItem', xmlBody);
+      const respText = await this.callTradingApi('AddItem', xmlBody, data.siteId || '0');
       const { ack, errors } = this.parseEbayResponse(respText);
 
       if (ack === 'Failure') {
@@ -235,7 +236,7 @@ class EbayService {
 
     console.log('eBay VerifyAddItem: category=' + data.category + ' specifics=' + (data.itemSpecifics?.length || 0));
 
-    const respText = await this.callTradingApi('VerifyAddItem', xmlBody);
+    const respText = await this.callTradingApi('VerifyAddItem', xmlBody, data.siteId || '0');
     const { ack, errors, warnings, fees } = this.parseEbayResponse(respText);
 
     return {
@@ -285,19 +286,7 @@ class EbayService {
   </Item>
 </ReviseItemRequest>`;
 
-      const { clientId } = this.getCredentials();
-      const resp = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/xml',
-          'X-EBAY-API-COMPATIBILITY-LEVEL': '1271',
-          'X-EBAY-API-CALL-NAME': 'ReviseItem',
-          'X-EBAY-API-SITEID': '0',
-          'X-EBAY-API-APP-NAME': clientId,
-        },
-        body: xmlBody,
-      });
-      const respText = await resp.text();
+      const respText = await this.callTradingApi('ReviseItem', xmlBody, data.siteId || '0');
       console.log('eBay ReviseItem response:', respText.substring(0, 500));
 
       const ackMatch = respText.match(/<Ack>(.*?)<\/Ack>/);
@@ -343,16 +332,17 @@ class EbayService {
     }
 
     // Fallback: use Browse API search to infer category from real listings
+    const clientId = process.env.EBAY_APP_ID || process.env.EBAY_CLIENT_ID || '';
+    const clientSecret = process.env.EBAY_CERT_ID || process.env.EBAY_CLIENT_SECRET || '';
+    if (!clientId || !clientSecret) return [];
+
+    const sandbox = process.env.EBAY_SANDBOX === 'true';
+    const tokenUrl = sandbox
+      ? 'https://api.sandbox.ebay.com/identity/v1/oauth2/token'
+      : 'https://api.ebay.com/identity/v1/oauth2/token';
+
+    let accessToken = '';
     try {
-      const clientId = process.env.EBAY_APP_ID || process.env.EBAY_CLIENT_ID || '';
-      const clientSecret = process.env.EBAY_CERT_ID || process.env.EBAY_CLIENT_SECRET || '';
-      if (!clientId || !clientSecret) return [];
-
-      const sandbox = process.env.EBAY_SANDBOX === 'true';
-      const tokenUrl = sandbox
-        ? 'https://api.sandbox.ebay.com/identity/v1/oauth2/token'
-        : 'https://api.ebay.com/identity/v1/oauth2/token';
-
       const tokenResp = await fetch(tokenUrl, {
         method: 'POST',
         headers: {
@@ -363,33 +353,53 @@ class EbayService {
       });
       const tokenData = await tokenResp.json() as { access_token?: string };
       if (!tokenData.access_token) return [];
+      accessToken = tokenData.access_token;
+    } catch {
+      return [];
+    }
 
-      const apiBase = sandbox ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com';
-      const searchUrl = `${apiBase}/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query.substring(0, 100))}&limit=3`;
-      const searchResp = await fetch(searchUrl, {
-        headers: {
-          'Authorization': `Bearer ${tokenData.access_token}`,
-          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-        },
-      });
-      const searchData = await searchResp.json() as { itemSummaries?: { leafCategoryIds?: string[]; categories?: { categoryId?: string; categoryName?: string }[] }[] };
-      const items = searchData.itemSummaries || [];
-      if (items.length > 0) {
-        // Use leafCategoryIds (most specific) from first result
-        const first = items[0];
-        const leafId = first.leafCategoryIds?.[0];
-        const cats = first.categories || [];
-        const leafCat = cats.find(c => c.categoryId === leafId) || cats[0];
-        if (leafId) {
-          return [{
-            CategoryID: leafId,
-            CategoryName: leafCat?.categoryName || '',
-            Category: { CategoryID: leafId, CategoryName: leafCat?.categoryName || '' },
-          }];
+    const apiBase = sandbox ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com';
+
+    // Try multiple marketplaces and query variations
+    // eBay Motors items are in EBAY_MOTORS marketplace
+    const marketplaces = ['EBAY_US', 'EBAY_MOTORS'];
+    // Try full query first, then simplified (first 5 words)
+    const words = query.split(/\s+/);
+    const queries = [query.substring(0, 100)];
+    if (words.length > 5) {
+      queries.push(words.slice(0, 5).join(' '));
+    }
+
+    for (const marketplace of marketplaces) {
+      for (const q of queries) {
+        try {
+          const searchUrl = `${apiBase}/buy/browse/v1/item_summary/search?q=${encodeURIComponent(q)}&limit=3`;
+          const searchResp = await fetch(searchUrl, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'X-EBAY-C-MARKETPLACE-ID': marketplace,
+            },
+          });
+          const searchData = await searchResp.json() as { itemSummaries?: { leafCategoryIds?: string[]; categories?: { categoryId?: string; categoryName?: string }[] }[] };
+          const items = searchData.itemSummaries || [];
+          if (items.length > 0) {
+            const first = items[0];
+            const leafId = first.leafCategoryIds?.[0];
+            const cats = first.categories || [];
+            const leafCat = cats.find(c => c.categoryId === leafId) || cats[0];
+            if (leafId) {
+              console.log(`Browse API found category ${leafId} (${leafCat?.categoryName}) via ${marketplace} for "${q.substring(0, 50)}"`);
+              return [{
+                CategoryID: leafId,
+                CategoryName: leafCat?.categoryName || '',
+                Category: { CategoryID: leafId, CategoryName: leafCat?.categoryName || '' },
+              }];
+            }
+          }
+        } catch (err) {
+          console.warn(`Browse API search failed (${marketplace}):`, (err as Error).message);
         }
       }
-    } catch (err) {
-      console.warn('Browse API category fallback failed:', (err as Error).message);
     }
 
     return [];
@@ -593,6 +603,53 @@ class EbayService {
       'Other': 'Other',
     };
     return map[service] || service;
+  }
+
+  /**
+   * Detect whether a category ID belongs to eBay Motors (tree 100) or US (tree 0).
+   * Returns '100' for Motors categories, '0' for US categories.
+   */
+  async detectSiteId(categoryId: string): Promise<string> {
+    try {
+      const clientId = process.env.EBAY_APP_ID || process.env.EBAY_CLIENT_ID || '';
+      const clientSecret = process.env.EBAY_CERT_ID || process.env.EBAY_CLIENT_SECRET || '';
+      if (!clientId || !clientSecret) return '0';
+
+      const sandbox = process.env.EBAY_SANDBOX === 'true';
+      const tokenUrl = sandbox
+        ? 'https://api.sandbox.ebay.com/identity/v1/oauth2/token'
+        : 'https://api.ebay.com/identity/v1/oauth2/token';
+
+      const tokenResp = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
+        },
+        body: new URLSearchParams({ grant_type: 'client_credentials', scope: 'https://api.ebay.com/oauth/api_scope' }),
+      });
+      const tokenData = await tokenResp.json() as { access_token?: string };
+      if (!tokenData.access_token) return '0';
+
+      const apiBase = sandbox ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com';
+
+      // Try tree 0 (US) first
+      const resp0 = await fetch(
+        `${apiBase}/commerce/taxonomy/v1/category_tree/0/get_item_aspects_for_category?category_id=${categoryId}`,
+        { headers: { 'Authorization': `Bearer ${tokenData.access_token}` } }
+      );
+      if (resp0.ok) return '0';
+
+      // If tree 0 fails, try tree 100 (Motors)
+      const resp100 = await fetch(
+        `${apiBase}/commerce/taxonomy/v1/category_tree/100/get_item_aspects_for_category?category_id=${categoryId}`,
+        { headers: { 'Authorization': `Bearer ${tokenData.access_token}` } }
+      );
+      if (resp100.ok) return '100';
+    } catch {
+      // Default to US
+    }
+    return '0';
   }
 
   private mapCondition(condition: string): number {
