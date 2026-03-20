@@ -27,6 +27,8 @@ interface ListingData {
   returnProfileId?: string;
   itemSpecifics?: { name: string; value: string }[];
   siteId?: string; // '0' for US (default), '100' for eBay Motors
+  upc?: string;
+  isbn?: string;
 }
 
 class EbayService {
@@ -106,6 +108,10 @@ class EbayService {
     ${weightXml}
     <ConditionID>${this.mapCondition(data.condition)}</ConditionID>
     ${specificsXml}
+    ${data.upc || data.isbn ? `<ProductListingDetails>
+      ${data.upc ? `<UPC>${this.escapeXml(data.upc)}</UPC>` : '<UPC>Does not apply</UPC>'}
+      ${data.isbn ? `<ISBN>${this.escapeXml(data.isbn)}</ISBN>` : ''}
+    </ProductListingDetails>` : `<ProductListingDetails><UPC>Does not apply</UPC></ProductListingDetails>`}
   </Item>`;
   }
 

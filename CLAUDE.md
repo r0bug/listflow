@@ -164,6 +164,12 @@ The following must ONLY exist in `.env` files and NEVER in committed code:
 - [x] Inventory filter: multi-select checkboxes for stage filtering
 - [x] Shipping service code mapping (USPSGround → USPSGroundAdvantage)
 
+### Upload & Listing Fixes (Completed)
+- [x] HEIC/HEIF photo support — accepted in all upload routes (dashboard, pool, upload)
+- [x] Upload file size limit raised to 25MB for large phone photos
+- [x] Fix multipart upload boundary bug — removed explicit Content-Type header on FormData uploads
+- [x] UPC/ISBN sent in eBay ProductListingDetails XML (push + verify endpoints)
+
 ### Development Commands
 ```bash
 # Backend

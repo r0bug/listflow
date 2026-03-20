@@ -25,13 +25,14 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB for large phone photos
   fileFilter: (_req, file, cb) => {
-    const allowed = /jpeg|jpg|png|gif|webp/;
-    if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype)) {
+    const allowedExt = /jpeg|jpg|png|gif|webp|heic|heif/;
+    const allowedMime = /jpeg|jpg|png|gif|webp|heic|heif|octet-stream/;
+    if (allowedExt.test(path.extname(file.originalname).toLowerCase()) && allowedMime.test(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new Error('Only image files are allowed (jpg, png, webp, heic)'));
     }
   },
 });

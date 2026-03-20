@@ -16,7 +16,7 @@ A comprehensive, AI-powered eBay listing workflow system that automates the list
 
 ### Web Client (React)
 - **Dashboard** - Real-time queue overview, stats, and alerts
-- **Photo Import** - Drag-and-drop with automatic AI grouping
+- **Photo Import** - Drag-and-drop with automatic AI grouping (JPG, PNG, WebP, HEIC)
 - **Queue/Kanban View** - Visual workflow management
 - **Item Detail/Review** - Full listing editor with AI assistance
 - **Photo Editor** - Crop, rotate, brightness/contrast adjustment with live preview

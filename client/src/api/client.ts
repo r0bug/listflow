@@ -122,9 +122,7 @@ class ApiClient {
     const formData = new FormData();
     files.forEach((file) => formData.append('photos', file));
 
-    const response = await this.client.post<ApiResponse<unknown>>(`/items/${itemId}/photos`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await this.client.post<ApiResponse<unknown>>(`/items/${itemId}/photos`, formData);
     return response.data;
   }
 
@@ -371,9 +369,7 @@ class ApiClient {
   async uploadPhotosToItem(itemId: string, files: File[]) {
     const formData = new FormData();
     files.forEach((file) => formData.append('photos', file));
-    const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${itemId}/photos`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await this.dashboardClient.post<ApiResponse<unknown>>(`/dashboard/item/${itemId}/photos`, formData);
     return response.data;
   }
 
@@ -556,9 +552,7 @@ class ApiClient {
   async uploadToPool(files: File[]) {
     const formData = new FormData();
     files.forEach((file) => formData.append('photos', file));
-    const response = await this.dashboardClient.post<ApiResponse<unknown[]>>('/pool/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await this.dashboardClient.post<ApiResponse<unknown[]>>('/pool/upload', formData);
     return response.data;
   }
 

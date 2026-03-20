@@ -86,3 +86,10 @@ Known issues and their fixes. Check here FIRST before debugging.
 **Root cause:** Push endpoint didn't run image hosting to create public URLs before sending to eBay. Photos had null `publicUrl`.
 **Fix:** Call `hostItemImages(id)` before building the image URL array in the push-to-ebay endpoint.
 **Files:** `src/routes/dashboard.routes.ts`
+
+## Photo Upload: Spinner Stuck / Upload Silently Fails
+**Date:** 2026-03-19
+**Symptom:** "Uploading..." spinner spins forever on Import Photos page. No error shown.
+**Root cause:** Axios upload methods explicitly set `headers: { 'Content-Type': 'multipart/form-data' }`. In the browser, this strips the auto-generated **boundary** parameter from the header. Without the boundary, multer on the server returns 500 because it can't parse the multipart data. The error was swallowed by the catch block.
+**Fix:** Remove explicit `Content-Type` header from all FormData upload calls. The browser auto-sets `Content-Type: multipart/form-data; boundary=...` when you don't override it.
+**Files:** `client/src/api/client.ts` (3 methods: `uploadPhotos`, `uploadPhotosToItem`, `uploadToPool`)
