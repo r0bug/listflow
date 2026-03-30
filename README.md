@@ -24,7 +24,9 @@ A comprehensive, AI-powered eBay listing workflow system that automates the list
 - **Template Manager** - Reusable listing blueprints with placeholders
 - **Reports** - Sales analytics with charts and team performance
 - **Sell Similar** - Create listings from existing eBay items
-- **Price Research** - Sold data lookup with statistics
+- **Price Research** - Sold data lookup with statistics + comptool sold comp integration
+- **Analytics Dashboard** - Stage funnel, daily throughput, AI costs, per-lister metrics
+- **Platform Adapters** - Multi-platform push (eBay + Yakcat, extensible to Amazon/Etsy)
 - **PIN Authentication** - Quick user switching on shared workstations
 - **UPC/ISBN Detection** - AI reads barcodes from photos, manual entry supported
 - **CSV Export** - eBay Seller Hub Reports compatible batch export
@@ -187,12 +189,18 @@ listflow/
 ├── src/                          # Backend source code
 │   ├── controllers/              # Request handlers
 │   ├── services/                 # Business logic
-│   │   ├── ebay.service.ts       # eBay API integration
-│   │   ├── ai.service.ts         # AI/vision models (+ price suggestions)
+│   │   ├── ebay.service.ts       # eBay API integration (PlatformAdapter)
+│   │   ├── ai.service.ts         # AI/vision models (+ price suggestions + Zod validation)
+│   │   ├── comptool.service.ts   # Comptool sold comp pricing integration
 │   │   ├── csvExport.service.ts  # eBay File Exchange CSV export
 │   │   ├── imageHosting.service.ts # Public image hosting for exports
 │   │   ├── soldData.service.ts   # Sold data scraping
 │   │   └── cleanup.service.ts    # File maintenance
+│   ├── adapters/                 # Platform adapter interface
+│   │   ├── platform.adapter.ts   # PlatformAdapter interface
+│   │   └── yakcat.adapter.ts     # Yakcat consignment mall adapter
+│   ├── queues/                   # Async job queues (Bull/Redis)
+│   │   └── push.queue.ts         # Platform push queue (eBay, Yakcat)
 │   ├── routes/                   # API routes
 │   ├── middleware/               # Auth, rate limiting
 │   └── server.ts                 # Express server
@@ -209,8 +217,7 @@ listflow/
 ├── scripts/
 │   └── ebay-sold-lookup.ts      # Playwright eBay sold price lookup tool
 ├── prisma/
-│   ├── schema.prisma             # Current schema
-│   └── schema.v2.prisma          # V2 multi-tenant schema
+│   └── schema.prisma             # Database schema
 ├── docs/
 │   ├── EBAY_CSV_REFERENCE.md     # eBay Seller Hub Reports CSV spec
 │   └── BUG_JOURNAL.md            # Bug tracking and fix log
@@ -235,6 +242,7 @@ listflow/
 | `/listings/active` | Active Listings | Live eBay listings |
 | `/listings/sold` | Sold Listings | Completed sales |
 | `/research` | Price Research | Sold data lookup |
+| `/analytics` | Analytics | Throughput, costs, stage funnel |
 | `/settings` | Settings | Configuration |
 
 ## API Endpoints
@@ -285,6 +293,9 @@ listflow/
 - `GET /api/dashboard/listing-defaults` - Get location listing defaults
 - `PUT /api/dashboard/listing-defaults` - Save location listing defaults
 - `GET /api/dashboard/category/:categoryId/specifics` - Fetch required eBay item specifics for category
+- `GET /api/dashboard/analytics` - Analytics dashboard data (stage funnel, throughput, AI costs)
+- `GET /api/dashboard/item/:id/comps` - Get comptool sold comp pricing data
+- `GET /api/dashboard/queue/push-status` - Bull queue job status (waiting/active/completed/failed)
 
 ### Research
 - `POST /api/v1/research/sold` - Search sold items
@@ -308,6 +319,16 @@ EBAY_CLIENT_SECRET=your-client-secret
 
 # AI
 SEGMIND_API_KEY=your-api-key
+
+# Comptool pricing integration (optional)
+DATABASE_URL_COMPTOOL=postgresql://user:pass@localhost:5432/comptool
+
+# Yakcat platform adapter (optional)
+YAKCAT_API_URL=https://webcat.yakimafinds.com
+YAKCAT_API_KEY=your-yakcat-api-key
+
+# Image hosting (set to public URL for eBay)
+PUBLIC_IMAGE_BASE_URL=https://your-server.com
 ```
 
 ## Development

@@ -66,9 +66,9 @@ The following must ONLY exist in `.env` files and NEVER in committed code:
 - [ ] Implement drag-and-drop with react-dropzone
 - [x] Set up PostgreSQL database with Prisma
 - [ ] Create Docker compose for local development
-- [ ] Implement queue system with Bull for batch processing
+- [x] Implement queue system with Bull for batch processing
 - [x] Add comprehensive error handling
-- [ ] Set up testing infrastructure
+- [x] Set up testing infrastructure
 - [x] Create API documentation
 - [x] Implement rate limiting for API calls
 - [x] Add image optimization pipeline (Sharp)
