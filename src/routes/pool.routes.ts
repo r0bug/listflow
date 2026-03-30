@@ -5,8 +5,10 @@ import fs from 'fs';
 import sharp from 'sharp';
 import { prisma } from '../config/database';
 import { workflowService } from '../services/workflow.service';
+import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
+router.use(authMiddleware);
 
 // Ensure upload directories exist
 const uploadDir = path.join(__dirname, '../../uploads');

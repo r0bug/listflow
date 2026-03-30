@@ -10,6 +10,7 @@ import fs from 'fs';
 import sharp from 'sharp';
 import { ebayService } from '../services/ebay.service';
 import { computeCompleteness } from '../utils/completeness';
+import { pushQueue } from '../queues/push.queue';
 
 // Ensure upload directories exist
 const uploadDir = path.join(__dirname, '../../uploads');
@@ -41,6 +42,7 @@ const upload = multer({
 });
 
 const router = Router();
+router.use(authMiddleware);
 
 // Helper: extract userId from auth token or fall back to first admin
 async function resolveUserId(req: Request): Promise<string> {
@@ -1217,7 +1219,7 @@ router.get('/items/search', async (req: Request, res: Response) => {
         },
       },
       orderBy: { updatedAt: 'desc' },
-      take: 20,
+      take: Math.min(parseInt(req.query.limit as string) || 20, 100),
     });
 
     const results = items.map(item => ({
@@ -1631,6 +1633,34 @@ router.post('/item/:id/unified-ai', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/dashboard/item/:id/comps - Get sold comps from comptool DB
+router.get('/item/:id/comps', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const item = await prisma.item.findUnique({
+      where: { id },
+      select: { title: true }
+    });
+
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    if (!item.title) {
+      return res.json({ success: true, data: null, message: 'Item has no title for comp lookup' });
+    }
+
+    const { getCompsForItem } = await import('../services/comptool.service');
+    const suggestion = await getCompsForItem(item.title);
+
+    res.json({ success: true, data: suggestion });
+  } catch (error: any) {
+    console.error('Comps lookup error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch comps' });
+  }
+});
+
 // POST /api/dashboard/item/:id/suggest-price - Get AI price suggestion
 router.post('/item/:id/suggest-price', async (req: Request, res: Response) => {
   try {
@@ -1798,238 +1828,27 @@ router.post('/item/:id/push-to-ebay', async (req: Request, res: Response) => {
     const { id } = req.params;
     const userId = await resolveUserId(req);
 
-    const item = await prisma.item.findUnique({
-      where: { id },
-      include: {
-        photos: { orderBy: { order: 'asc' } },
+    const result = await ebayService.pushItem(id);
+
+    // Create workflow action
+    await prisma.workflowAction.create({
+      data: {
+        itemId: id,
+        userId,
+        fromStage: 'FINAL_REVIEW',
+        toStage: 'PUBLISHED',
+        action: 'publish',
+        notes: `Pushed to eBay: ${result.platformId}`,
       },
     });
 
-    if (!item) {
-      return res.status(404).json({ success: false, error: 'Item not found' });
-    }
-
-    if (item.stage !== 'FINAL_REVIEW') {
-      return res.status(400).json({ success: false, error: 'Item must be at FINAL_REVIEW stage to push to eBay' });
-    }
-
-    // Host images first (creates public URLs if missing)
-    try {
-      const { hostItemImages } = require('../services/imageHosting.service');
-      await hostItemImages(id);
-      // Reload photos to get updated public URLs
-      const freshPhotos = await prisma.photo.findMany({ where: { itemId: id }, orderBy: { order: 'asc' } });
-      item.photos = freshPhotos;
-    } catch (hostErr) {
-      console.warn('Image hosting skipped:', (hostErr as Error).message);
-    }
-
-    // Build image URLs from public URLs
-    const imageUrls = item.photos
-      .map(p => p.publicUrl)
-      .filter((url): url is string => !!url);
-
-    // Determine listing type for eBay
-    const format = item.listingFormat || 'FixedPrice';
-    const isAuction = format === 'Auction' || format === 'AuctionWithBIN';
-
-    // Resolve numeric eBay category ID
-    let categoryId = item.ebayCategoryId || '';
-    if (!categoryId) {
-      // Try to get from eBay suggested categories
-      try {
-        const suggestions = await ebayService.getCategories(item.title || '');
-        if (suggestions?.length > 0) {
-          const firstCat = suggestions[0];
-          categoryId = firstCat.CategoryID || firstCat.Category?.CategoryID || '';
-          // Cache it on the item
-          if (categoryId) {
-            await prisma.item.update({ where: { id }, data: { ebayCategoryId: categoryId } }).catch(() => {});
-          }
-        }
-      } catch (e) {
-        // ignore lookup failure
-      }
-    }
-    if (!categoryId) {
-      return res.status(400).json({ success: false, error: 'Missing eBay Category ID. Set it on the item detail page before pushing to eBay.' });
-    }
-
-    // Build item specifics from item fields and aiAnalysis
-    const aiData = (item.aiAnalysis as Record<string, unknown>) || {};
-    const specifics: { name: string; value: string }[] = [];
-    if (item.brand) specifics.push({ name: 'Brand', value: item.brand });
-    if (aiData.model && aiData.model !== 'Unknown') specifics.push({ name: 'Model', value: String(aiData.model) });
-    if (aiData.specifics && typeof aiData.specifics === 'object') {
-      Object.entries(aiData.specifics).forEach(([name, value]) => {
-        // Don't duplicate Brand/Model
-        if (!specifics.some(s => s.name.toLowerCase() === name.toLowerCase()) && value) {
-          specifics.push({ name, value: String(value) });
-        }
-      });
-    }
-
-    // Fetch required specifics for this category and check for missing ones
-    try {
-      const catSpecifics = await ebayService.getCategorySpecifics(categoryId);
-      if (catSpecifics.required.length > 0) {
-        const missingRequired = catSpecifics.required.filter(req => {
-          const existing = specifics.find(s => s.name.toLowerCase() === req.name.toLowerCase());
-          return !existing || !existing.value.trim();
-        });
-
-        if (missingRequired.length > 0) {
-          // Try to auto-fill using AI — ask Claude to provide values for missing specifics
-          try {
-            const missingNames = missingRequired.map(r => r.name);
-            const filledSpecifics = await aiService.fillItemSpecifics(
-              item.title || '',
-              item.description || '',
-              item.brand || '',
-              aiData.model ? String(aiData.model) : '',
-              item.category || '',
-              missingRequired.map(r => ({ name: r.name, values: r.values }))
-            );
-
-            // Merge AI-filled specifics
-            for (const filled of filledSpecifics.specifics) {
-              if (filled.value && filled.value.trim()) {
-                const existingIdx = specifics.findIndex(s => s.name.toLowerCase() === filled.name.toLowerCase());
-                if (existingIdx >= 0) {
-                  specifics[existingIdx].value = filled.value;
-                } else {
-                  specifics.push(filled);
-                }
-              }
-            }
-
-            // Save the AI-filled specifics back to the item
-            const existingAnalysis = (item.aiAnalysis as Record<string, unknown>) || {};
-            const existingSpecifics = (existingAnalysis.specifics as Record<string, string>) || {};
-            for (const filled of filledSpecifics.specifics) {
-              if (filled.value && filled.value.trim()) {
-                existingSpecifics[filled.name] = filled.value;
-              }
-            }
-            await prisma.item.update({
-              where: { id },
-              data: {
-                aiAnalysis: { ...existingAnalysis, specifics: existingSpecifics },
-                aiCost: { increment: filledSpecifics.cost },
-              },
-            });
-
-            console.log(`AI auto-filled ${filledSpecifics.specifics.filter(s => s.value).length}/${missingNames.length} missing specifics for item ${id}`);
-
-            // Re-check if any are still missing after AI fill
-            const stillMissing = missingRequired.filter(req => {
-              const existing = specifics.find(s => s.name.toLowerCase() === req.name.toLowerCase());
-              return !existing || !existing.value.trim();
-            });
-
-            if (stillMissing.length > 0) {
-              return res.status(400).json({
-                success: false,
-                error: `eBay requires these item specifics for this category: ${stillMissing.map(r => r.name).join(', ')}. AI couldn't determine them — please fill them in on the item detail page.`,
-                missingSpecifics: stillMissing.map(r => ({ name: r.name, values: r.values?.slice(0, 20) })),
-              });
-            }
-          } catch (aiErr) {
-            console.warn('AI specifics fill failed, returning missing list:', (aiErr as Error).message);
-            return res.status(400).json({
-              success: false,
-              error: `eBay requires these item specifics for this category: ${missingRequired.map(r => r.name).join(', ')}. Please fill them in on the item detail page.`,
-              missingSpecifics: missingRequired.map(r => ({ name: r.name, values: r.values?.slice(0, 20) })),
-            });
-          }
-        }
-      }
-    } catch (specErr) {
-      console.warn('Could not check required specifics:', (specErr as Error).message);
-      // Non-fatal — proceed without the check
-    }
-
-    const listingData = {
-      title: (item.title || 'Item for Sale').substring(0, 80),
-      description: item.description || '',
-      price: isAuction ? (item.startingPrice || item.buyNowPrice || 0) : (item.buyNowPrice || item.startingPrice || 0),
-      buyNowPrice: format === 'AuctionWithBIN' ? item.buyNowPrice || undefined : undefined,
-      category: categoryId,
-      condition: item.condition || 'Used',
-      imageUrls,
-      quantity: item.quantity || 1,
-      shippingCost: item.shippingCost || undefined,
-      shippingService: item.shippingService || undefined,
-      shippingType: item.shippingType || undefined,
-      listingFormat: item.listingFormat || undefined,
-      listingDuration: item.listingDuration || undefined,
-      handlingTime: item.handlingTime || undefined,
-      returnPolicy: item.returnPolicy as any || undefined,
-      weight: item.weight || undefined,
-      itemSpecifics: specifics.length > 0 ? specifics : undefined,
-      packageDimensions: item.packageDimensions as any || undefined,
-      postalCode: item.postalCode || undefined,
-      shippingProfileId: (item as any).shippingProfileId || undefined,
-      returnProfileId: (item as any).returnProfileId || undefined,
-      upc: item.upc || undefined,
-      isbn: item.isbn || undefined,
-    };
-
-    // Detect if this is an eBay Motors category
-    const pushSiteId = await ebayService.detectSiteId(categoryId);
-    (listingData as any).siteId = pushSiteId;
-
-    const result = await ebayService.createListing(listingData);
-
-    if (result.success) {
-      // Update item
-      await prisma.item.update({
-        where: { id },
-        data: {
-          ebayId: String(result.listingId),
-          stage: 'PUBLISHED',
-          publishedAt: new Date(),
-        },
-      });
-
-      // Create Listing record
-      await prisma.listing.create({
-        data: {
-          title: item.title || 'Item',
-          description: item.description,
-          price: listingData.price,
-          buyNowPrice: item.buyNowPrice,
-          ebayId: String(result.listingId),
-          status: 'active',
-          imageUrls,
-          category: item.category,
-          condition: item.condition,
-          itemId: id,
-        },
-      });
-
-      // Create workflow action
-      await prisma.workflowAction.create({
-        data: {
-          itemId: id,
-          userId,
-          fromStage: 'FINAL_REVIEW',
-          toStage: 'PUBLISHED',
-          action: 'publish',
-          notes: `Pushed to eBay: ${result.listingId}`,
-        },
-      });
-
-      res.json({
-        success: true,
-        data: {
-          ebayId: String(result.listingId),
-          listingUrl: result.listingUrl,
-        },
-      });
-    } else {
-      res.status(500).json({ success: false, error: 'eBay listing creation failed' });
-    }
+    res.json({
+      success: true,
+      data: {
+        ebayId: result.platformId,
+        listingUrl: result.listingUrl,
+      },
+    });
   } catch (error: any) {
     console.error('eBay push error:', JSON.stringify(error?.meta || error?.response?.data || error, null, 2));
     // Extract detailed eBay error messages
@@ -2247,10 +2066,11 @@ router.get('/inventory/locations', async (req, res) => {
   }
 });
 
-// GET /api/dashboard/inventory/items - Get inventory items
+// GET /api/dashboard/inventory/items - Get inventory items (cursor-based pagination)
 router.get('/inventory/items', async (req, res) => {
   try {
-    const { location } = req.query;
+    const { location, cursor, limit: limitStr } = req.query;
+    const limit = Math.min(parseInt(limitStr as string) || 50, 100);
 
     const items = await prisma.item.findMany({
       where: {
@@ -2262,10 +2082,15 @@ router.get('/inventory/items', async (req, res) => {
         photos: { select: { id: true, thumbnailPath: true }, take: 5 }
       },
       orderBy: { createdAt: 'desc' },
-      take: 200
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor as string }, skip: 1 } : {})
     });
 
-    const formattedItems = items.map(item => {
+    const hasMore = items.length > limit;
+    const pageItems = hasMore ? items.slice(0, limit) : items;
+    const nextCursor = hasMore ? pageItems[pageItems.length - 1].id : null;
+
+    const formattedItems = pageItems.map(item => {
       const comp = computeCompleteness(item);
       return {
         id: item.id,
@@ -2285,6 +2110,7 @@ router.get('/inventory/items', async (req, res) => {
     res.json({
       success: true,
       data: formattedItems,
+      nextCursor,
       count: formattedItems.length
     });
   } catch (error) {
@@ -2709,91 +2535,53 @@ router.post('/templates/:id/use', async (req, res) => {
 // BULK OPERATIONS
 // ============================================================================
 
-// POST /api/dashboard/items/bulk-push-to-ebay - Bulk push items to eBay
+// POST /api/dashboard/items/bulk-push-to-ebay - Bulk push items to eBay (enqueues jobs via Bull)
 router.post('/items/bulk-push-to-ebay', async (req: Request, res: Response) => {
   try {
     const { itemIds } = req.body;
     if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
       return res.status(400).json({ success: false, error: 'itemIds array required' });
     }
+    // No cap — the queue handles any volume
 
-    const results: { id: string; success: boolean; ebayId?: string; error?: string }[] = [];
-
-    for (const itemId of itemIds) {
-      try {
-        // Simulate calling the single push endpoint logic inline
-        const item = await prisma.item.findUnique({
-          where: { id: itemId },
-          include: { photos: { orderBy: { order: 'asc' } } },
-        });
-
-        if (!item || item.stage !== 'FINAL_REVIEW') {
-          results.push({ id: itemId, success: false, error: 'Not at FINAL_REVIEW stage' });
-          continue;
-        }
-
-        const imageUrls = item.photos.map(p => p.publicUrl).filter((url): url is string => !!url);
-        const format = item.listingFormat || 'FixedPrice';
-        const isAuction = format === 'Auction' || format === 'AuctionWithBIN';
-
-        const result = await ebayService.createListing({
-          title: (item.title || 'Item').substring(0, 80),
-          description: item.description || '',
-          price: isAuction ? (item.startingPrice || item.buyNowPrice || 0) : (item.buyNowPrice || item.startingPrice || 0),
-          buyNowPrice: format === 'AuctionWithBIN' ? item.buyNowPrice || undefined : undefined,
-          category: item.category || '',
-          condition: item.condition || 'Used',
-          imageUrls,
-          quantity: item.quantity || 1,
-          shippingCost: item.shippingCost || undefined,
-        });
-
-        if (result.success) {
-          const userId = await resolveUserId(req);
-          await prisma.item.update({
-            where: { id: itemId },
-            data: { ebayId: String(result.listingId), stage: 'PUBLISHED', publishedAt: new Date() },
-          });
-          await prisma.listing.create({
-            data: {
-              title: item.title || 'Item',
-              description: item.description,
-              price: isAuction ? (item.startingPrice || 0) : (item.buyNowPrice || item.startingPrice || 0),
-              buyNowPrice: item.buyNowPrice,
-              ebayId: String(result.listingId),
-              status: 'active',
-              imageUrls,
-              category: item.category,
-              condition: item.condition,
-              itemId,
-            },
-          });
-          await prisma.workflowAction.create({
-            data: {
-              itemId, userId,
-              fromStage: 'FINAL_REVIEW', toStage: 'PUBLISHED',
-              action: 'publish', notes: `Bulk pushed to eBay: ${result.listingId}`,
-            },
-          });
-          results.push({ id: itemId, success: true, ebayId: result.listingId });
-        } else {
-          results.push({ id: itemId, success: false, error: 'eBay API failed' });
-        }
-      } catch (err: any) {
-        results.push({ id: itemId, success: false, error: err.message });
-      }
-    }
-
-    const succeeded = results.filter(r => r.success).length;
-    const failed = results.filter(r => !r.success).length;
+    const jobs = await Promise.all(
+      itemIds.map((itemId: string) =>
+        pushQueue.add({ itemId, platform: 'ebay' }, { jobId: `ebay-${itemId}` })
+      )
+    );
 
     res.json({
       success: true,
-      data: { results, succeeded, failed },
+      data: {
+        enqueued: jobs.length,
+        jobIds: jobs.map(j => j.id),
+        message: `${jobs.length} item(s) queued for eBay push. Check /api/dashboard/queue/push-status for progress.`,
+      },
     });
   } catch (error: any) {
     console.error('Bulk eBay push error:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to bulk push to eBay' });
+  }
+});
+
+// GET /api/dashboard/queue/push-status - Get Bull push queue job counts
+router.get('/queue/push-status', async (_req: Request, res: Response) => {
+  try {
+    const [waiting, active, completed, failed, delayed] = await Promise.all([
+      pushQueue.getWaitingCount(),
+      pushQueue.getActiveCount(),
+      pushQueue.getCompletedCount(),
+      pushQueue.getFailedCount(),
+      pushQueue.getDelayedCount(),
+    ]);
+
+    res.json({
+      success: true,
+      data: { waiting, active, completed, failed, delayed },
+    });
+  } catch (error: any) {
+    console.error('Queue status error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to get queue status' });
   }
 });
 
@@ -3161,6 +2949,112 @@ router.put('/listing-defaults', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error saving listing defaults:', error);
     res.status(500).json({ success: false, error: 'Failed to save listing defaults' });
+  }
+});
+
+// GET /api/dashboard/analytics - Analytics dashboard data
+router.get('/analytics', async (req: Request, res: Response) => {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const [stageCounts, recentPublished, aiCostData, ebayBreakdown, listerActions] = await Promise.all([
+      // Stage funnel: current count at each stage
+      prisma.item.groupBy({
+        by: ['stage'],
+        where: { status: 'ACTIVE' },
+        _count: { id: true }
+      }),
+      // Items that reached PUBLISHED stage in last 30 days
+      prisma.item.findMany({
+        where: { stage: 'PUBLISHED', updatedAt: { gte: thirtyDaysAgo } },
+        select: { updatedAt: true, ebayId: true },
+        orderBy: { updatedAt: 'desc' }
+      }),
+      // AI cost per item in last 30 days
+      prisma.item.findMany({
+        where: { aiCost: { gt: 0 }, updatedAt: { gte: thirtyDaysAgo } },
+        select: { updatedAt: true, aiCost: true }
+      }),
+      // Platform breakdown: items with vs without ebayId
+      prisma.item.groupBy({
+        by: ['stage'],
+        where: { status: 'ACTIVE', ebayId: { not: null } },
+        _count: { id: true }
+      }),
+      // Per-lister throughput: workflow actions in last 30 days
+      prisma.workflowAction.findMany({
+        where: { createdAt: { gte: thirtyDaysAgo } },
+        select: { userId: true, createdAt: true, user: { select: { name: true } } },
+      })
+    ]);
+
+    // Aggregate published items by day
+    const dailyPublishedMap: Record<string, number> = {};
+    for (const item of recentPublished) {
+      const day = item.updatedAt.toISOString().split('T')[0];
+      dailyPublishedMap[day] = (dailyPublishedMap[day] || 0) + 1;
+    }
+    const dailyPublished = Object.entries(dailyPublishedMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, count]) => ({ date, count }));
+
+    // Aggregate AI costs by day
+    const aiCostByDayMap: Record<string, number> = {};
+    let totalAiCost = 0;
+    for (const item of aiCostData) {
+      const day = item.updatedAt.toISOString().split('T')[0];
+      const cost = (item.aiCost as number) || 0;
+      aiCostByDayMap[day] = (aiCostByDayMap[day] || 0) + cost;
+      totalAiCost += cost;
+    }
+    const aiCostByDay = Object.entries(aiCostByDayMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, cost]) => ({ date, cost: Math.round(cost * 10000) / 10000 }));
+
+    // Per-lister throughput
+    const listerMap: Record<string, { name: string; count: number }> = {};
+    for (const action of listerActions) {
+      if (!listerMap[action.userId]) {
+        listerMap[action.userId] = { name: (action.user as any)?.name || action.userId, count: 0 };
+      }
+      listerMap[action.userId].count++;
+    }
+    const perListerThroughput = Object.values(listerMap).sort((a, b) => b.count - a.count);
+
+    // Platform breakdown totals
+    const totalWithEbay = ebayBreakdown.reduce((sum, g) => sum + (g._count as any).id, 0);
+    const totalActive = stageCounts.reduce((sum, g) => sum + (g._count as any).id, 0);
+    const platformBreakdown = {
+      pushedToEbay: totalWithEbay,
+      notPushed: totalActive - totalWithEbay
+    };
+
+    // Format stage funnel
+    const stageFunnel = stageCounts.map(g => ({
+      stage: g.stage,
+      count: (g._count as any).id
+    })).sort((a, b) => {
+      const order = ['PHOTO_UPLOAD', 'AI_PROCESSING', 'REVIEW_EDIT', 'PRICING', 'FINAL_REVIEW', 'PUBLISHED', 'REJECTED'];
+      return order.indexOf(a.stage) - order.indexOf(b.stage);
+    });
+
+    res.json({
+      success: true,
+      data: {
+        stageFunnel,
+        dailyPublished,
+        aiCosts: {
+          byDay: aiCostByDay,
+          total: Math.round(totalAiCost * 10000) / 10000
+        },
+        platformBreakdown,
+        perListerThroughput
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching analytics:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch analytics' });
   }
 });
 

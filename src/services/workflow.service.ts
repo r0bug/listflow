@@ -1,6 +1,6 @@
 import { PrismaClient, WorkflowStage, UserRole, ItemStatus } from '../../src/generated/prisma';
 import { prisma as sharedPrisma } from '../config/database';
-import { aiService } from './ai.service';
+import { aiService, AiAnalysisSchema } from './ai.service';
 import { computeCompleteness } from '../utils/completeness';
 import { randomUUID } from 'crypto';
 
@@ -333,6 +333,14 @@ export class WorkflowService {
       const updatedJournal = [...existingJournal, journalEntry];
 
       const analysisJson: any = JSON.parse(JSON.stringify(analysis));
+
+      // Validate AI response shape before writing to DB
+      const parseResult = AiAnalysisSchema.safeParse(analysisJson);
+      if (!parseResult.success) {
+        console.error('AI response failed Zod validation:', parseResult.error.format());
+        console.error('Raw AI response:', raw.substring(0, 1000));
+        throw new Error(`AI response shape validation failed: ${parseResult.error.message}`);
+      }
 
       // Update item with all results
       const updateData: Record<string, unknown> = {

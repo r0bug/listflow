@@ -1,8 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { PrismaClient } from '../generated/prisma';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/database';
 
 interface CleanupStats {
   filesScanned: number;

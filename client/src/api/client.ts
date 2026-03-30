@@ -23,10 +23,14 @@ class ApiClient {
       },
     });
 
-    // Request interceptor to add auth token
+    // Request interceptor to add auth token and fix FormData Content-Type
     const addAuth = (config: any) => {
       if (this.token) {
         config.headers.Authorization = `Bearer ${this.token}`;
+      }
+      // Let the browser set Content-Type with boundary for FormData
+      if (config.data instanceof FormData) {
+        delete config.headers['Content-Type'];
       }
       return config;
     };
@@ -461,6 +465,11 @@ class ApiClient {
   // ============================================================================
   // REPORTS
   // ============================================================================
+
+  async getAnalytics() {
+    const response = await this.dashboardClient.get<ApiResponse<unknown>>('/dashboard/analytics');
+    return response.data;
+  }
 
   async getReports(range = '30d') {
     const response = await this.dashboardClient.get<ApiResponse<unknown>>('/dashboard/reports', { params: { range } });

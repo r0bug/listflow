@@ -42,22 +42,6 @@ export const authMiddleware = async (
     const token = req.headers.authorization?.replace('Bearer ', '');
 
     if (!token) {
-      // For development/testing only, check for user ID in header
-      if (process.env.NODE_ENV !== 'production') {
-        const userId = req.headers['x-user-id'] as string;
-
-        if (userId) {
-          const user = await prisma.user.findUnique({
-            where: { id: userId }
-          });
-
-          if (user) {
-            req.user = user;
-            return next();
-          }
-        }
-      }
-
       return res.status(401).json({
         success: false,
         error: 'Authentication required'

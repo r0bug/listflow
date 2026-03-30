@@ -1,6 +1,9 @@
 // import EbayAuthToken from '@hendt/ebay-api/lib/auth/eBayAuthToken';
 import eBayApi from '@hendt/ebay-api';
 import dotenv from 'dotenv';
+import { prisma } from '../config/database';
+import { aiService } from './ai.service';
+import { PlatformAdapter, PlatformResult } from '../adapters/platform.adapter';
 
 dotenv.config();
 
@@ -31,7 +34,8 @@ interface ListingData {
   isbn?: string;
 }
 
-class EbayService {
+class EbayService implements PlatformAdapter {
+  readonly platform = 'ebay';
   private ebayApi: any = null;
   private isConfigured: boolean = false;
 
@@ -682,11 +686,253 @@ class EbayService {
     return conditionMap[condition.toLowerCase()] || 3000;
   }
 
-  private getListingUrl(itemId: string): string {
-    const baseUrl = process.env.EBAY_SANDBOX === 'true' 
-      ? 'https://sandbox.ebay.com/itm/' 
+  getListingUrl(itemId: string): string {
+    const baseUrl = process.env.EBAY_SANDBOX === 'true'
+      ? 'https://sandbox.ebay.com/itm/'
       : 'https://www.ebay.com/itm/';
     return `${baseUrl}${itemId}`;
+  }
+
+  /**
+   * PlatformAdapter.reviseItem — revises an existing eBay listing and returns a PlatformResult.
+   */
+  async reviseItem(platformId: string, itemId: string): Promise<PlatformResult> {
+    const item = await prisma.item.findUnique({
+      where: { id: itemId },
+      include: { photos: { orderBy: { order: 'asc' } } },
+    });
+    if (!item) throw new Error(`Item not found: ${itemId}`);
+
+    const imageUrls = item.photos
+      .map((p: any) => p.publicUrl)
+      .filter((url: any): url is string => !!url);
+
+    const aiData = (item.aiAnalysis as Record<string, unknown>) || {};
+    const specifics: { name: string; value: string }[] = [];
+    if (item.brand) specifics.push({ name: 'Brand', value: item.brand });
+    if (aiData.model && aiData.model !== 'Unknown') specifics.push({ name: 'Model', value: String(aiData.model) });
+    if (aiData.specifics && typeof aiData.specifics === 'object') {
+      Object.entries(aiData.specifics as Record<string, unknown>).forEach(([name, value]) => {
+        if (!specifics.some(s => s.name.toLowerCase() === name.toLowerCase()) && value) {
+          specifics.push({ name, value: String(value) });
+        }
+      });
+    }
+
+    const result = await this.reviseListing(platformId, {
+      title: (item.title || '').substring(0, 80),
+      description: item.description || '',
+      price: item.buyNowPrice || item.startingPrice || undefined,
+      imageUrls,
+      quantity: item.quantity || 1,
+      itemSpecifics: specifics.length > 0 ? specifics : undefined,
+    });
+
+    return {
+      platformId,
+      listingUrl: this.getListingUrl(platformId),
+      platform: 'ebay',
+    };
+  }
+
+  /**
+   * Full push-to-eBay workflow for a single item.
+   * Extracted from the route handler so it can be called from the queue and route.
+   * Implements PlatformAdapter.pushItem — returns PlatformResult.
+   */
+  async pushItem(itemId: string): Promise<PlatformResult> {
+    const item = await prisma.item.findUnique({
+      where: { id: itemId },
+      include: { photos: { orderBy: { order: 'asc' } } },
+    });
+
+    if (!item) throw new Error('Item not found');
+    if (item.stage !== 'FINAL_REVIEW') {
+      throw new Error('Item must be at FINAL_REVIEW stage to push to eBay');
+    }
+
+    // Host images (creates public URLs if missing)
+    try {
+      const { hostItemImages } = require('./imageHosting.service');
+      await hostItemImages(itemId);
+      const freshPhotos = await prisma.photo.findMany({ where: { itemId }, orderBy: { order: 'asc' } });
+      (item as any).photos = freshPhotos;
+    } catch (hostErr) {
+      console.warn('Image hosting skipped:', (hostErr as Error).message);
+    }
+
+    // Build image URLs from public URLs
+    const imageUrls = item.photos
+      .map((p: any) => p.publicUrl)
+      .filter((url: any): url is string => !!url);
+
+    const format = item.listingFormat || 'FixedPrice';
+    const isAuction = format === 'Auction' || format === 'AuctionWithBIN';
+
+    // Resolve numeric eBay category ID
+    let categoryId = item.ebayCategoryId || '';
+    if (!categoryId) {
+      try {
+        const suggestions = await this.getCategories(item.title || '');
+        if (suggestions?.length > 0) {
+          const firstCat = suggestions[0];
+          categoryId = firstCat.CategoryID || firstCat.Category?.CategoryID || '';
+          if (categoryId) {
+            await prisma.item.update({ where: { id: itemId }, data: { ebayCategoryId: categoryId } }).catch(() => {});
+          }
+        }
+      } catch {
+        // ignore lookup failure
+      }
+    }
+    if (!categoryId) {
+      throw new Error('Missing eBay Category ID. Set it on the item detail page before pushing to eBay.');
+    }
+
+    // Build item specifics from item fields and aiAnalysis
+    const aiData = (item.aiAnalysis as Record<string, unknown>) || {};
+    const specifics: { name: string; value: string }[] = [];
+    if (item.brand) specifics.push({ name: 'Brand', value: item.brand });
+    if (aiData.model && aiData.model !== 'Unknown') specifics.push({ name: 'Model', value: String(aiData.model) });
+    if (aiData.specifics && typeof aiData.specifics === 'object') {
+      Object.entries(aiData.specifics as Record<string, unknown>).forEach(([name, value]) => {
+        if (!specifics.some(s => s.name.toLowerCase() === name.toLowerCase()) && value) {
+          specifics.push({ name, value: String(value) });
+        }
+      });
+    }
+
+    // Fetch required specifics and auto-fill missing ones with AI
+    try {
+      const catSpecifics = await this.getCategorySpecifics(categoryId);
+      if (catSpecifics.required.length > 0) {
+        const missingRequired = catSpecifics.required.filter(req => {
+          const existing = specifics.find(s => s.name.toLowerCase() === req.name.toLowerCase());
+          return !existing || !existing.value.trim();
+        });
+
+        if (missingRequired.length > 0) {
+          const filledSpecifics = await aiService.fillItemSpecifics(
+            item.title || '',
+            item.description || '',
+            item.brand || '',
+            aiData.model ? String(aiData.model) : '',
+            item.category || '',
+            missingRequired.map(r => ({ name: r.name, values: r.values }))
+          );
+
+          for (const filled of filledSpecifics.specifics) {
+            if (filled.value && filled.value.trim()) {
+              const existingIdx = specifics.findIndex(s => s.name.toLowerCase() === filled.name.toLowerCase());
+              if (existingIdx >= 0) {
+                specifics[existingIdx].value = filled.value;
+              } else {
+                specifics.push(filled);
+              }
+            }
+          }
+
+          // Save AI-filled specifics back to the item
+          const existingAnalysis = (item.aiAnalysis as Record<string, unknown>) || {};
+          const existingSpecifics = (existingAnalysis.specifics as Record<string, string>) || {};
+          for (const filled of filledSpecifics.specifics) {
+            if (filled.value && filled.value.trim()) {
+              existingSpecifics[filled.name] = filled.value;
+            }
+          }
+          await prisma.item.update({
+            where: { id: itemId },
+            data: {
+              aiAnalysis: { ...existingAnalysis, specifics: existingSpecifics },
+              aiCost: { increment: filledSpecifics.cost },
+            },
+          });
+
+          const stillMissing = missingRequired.filter(req => {
+            const existing = specifics.find(s => s.name.toLowerCase() === req.name.toLowerCase());
+            return !existing || !existing.value.trim();
+          });
+
+          if (stillMissing.length > 0) {
+            throw new Error(
+              `eBay requires these item specifics: ${stillMissing.map(r => r.name).join(', ')}. AI couldn't determine them — please fill them in on the item detail page.`
+            );
+          }
+        }
+      }
+    } catch (specErr) {
+      // Re-throw if it's our own structured error, otherwise log and continue
+      if ((specErr as Error).message?.startsWith('eBay requires')) throw specErr;
+      console.warn('Could not check required specifics:', (specErr as Error).message);
+    }
+
+    const listingData: ListingData = {
+      title: (item.title || 'Item for Sale').substring(0, 80),
+      description: item.description || '',
+      price: isAuction
+        ? (item.startingPrice || item.buyNowPrice || 0)
+        : (item.buyNowPrice || item.startingPrice || 0),
+      buyNowPrice: format === 'AuctionWithBIN' ? item.buyNowPrice || undefined : undefined,
+      category: categoryId,
+      condition: item.condition || 'Used',
+      imageUrls,
+      quantity: item.quantity || 1,
+      shippingCost: item.shippingCost || undefined,
+      shippingService: item.shippingService || undefined,
+      shippingType: item.shippingType || undefined,
+      listingFormat: item.listingFormat || undefined,
+      listingDuration: item.listingDuration || undefined,
+      handlingTime: item.handlingTime || undefined,
+      returnPolicy: item.returnPolicy as any || undefined,
+      weight: item.weight || undefined,
+      itemSpecifics: specifics.length > 0 ? specifics : undefined,
+      packageDimensions: item.packageDimensions as any || undefined,
+      postalCode: item.postalCode || undefined,
+      shippingProfileId: (item as any).shippingProfileId || undefined,
+      returnProfileId: (item as any).returnProfileId || undefined,
+      upc: item.upc || undefined,
+      isbn: item.isbn || undefined,
+    };
+
+    const pushSiteId = await this.detectSiteId(categoryId);
+    (listingData as any).siteId = pushSiteId;
+
+    const result = await this.createListing(listingData);
+
+    if (!result.success) {
+      throw new Error('eBay listing creation failed');
+    }
+
+    const ebayItemId = String(result.listingId);
+    const listingUrl = result.listingUrl || this.getListingUrl(ebayItemId);
+
+    // Update item
+    await prisma.item.update({
+      where: { id: itemId },
+      data: {
+        ebayId: ebayItemId,
+        stage: 'PUBLISHED',
+        publishedAt: new Date(),
+      },
+    });
+
+    // Create Listing record
+    await prisma.listing.create({
+      data: {
+        title: item.title || 'Item',
+        description: item.description,
+        price: listingData.price,
+        buyNowPrice: item.buyNowPrice,
+        ebayId: ebayItemId,
+        status: 'active',
+        imageUrls,
+        category: item.category,
+        condition: item.condition,
+        itemId,
+      },
+    });
+
+    return { platformId: ebayItemId, listingUrl, platform: 'ebay' };
   }
 
   private mockCreateListing(data: ListingData) {

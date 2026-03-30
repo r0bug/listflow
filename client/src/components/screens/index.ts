@@ -11,3 +11,4 @@ export { Listings } from './Listings';
 export { SellSimilar } from './SellSimilar';
 export { Reports } from './Reports';
 export { EbayCallback } from './EbayCallback';
+export { Analytics } from './Analytics';

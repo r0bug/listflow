@@ -13,6 +13,7 @@ import {
   Copy,
   BarChart3,
   Camera,
+  TrendingUp,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -125,6 +126,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onNavigate }) =>
       <NavItem to="/sell-similar" icon={<Copy size={18} />} label="Sell Similar" onNavigate={onNavigate} />
       <NavItem to="/research" icon={<Search size={18} />} label="Research" onNavigate={onNavigate} />
       <NavItem to="/reports" icon={<BarChart3 size={18} />} label="Reports" onNavigate={onNavigate} />
+      <NavItem to="/analytics" icon={<TrendingUp size={18} />} label="Analytics" onNavigate={onNavigate} />
 
       <div className="pt-3 mt-3 border-t border-slate-100">
         <NavItem to="/settings" icon={<Settings size={18} />} label="Settings" onNavigate={onNavigate} />

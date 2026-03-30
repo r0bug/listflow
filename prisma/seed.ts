@@ -43,7 +43,7 @@ async function main() {
   // Create default regular user
   const user = await prisma.user.upsert({
     where: { email: 'user@listflow.local' },
-    update: { role: UserRole.USER },
+    update: { role: UserRole.USER, password: defaultPin },
     create: {
       id: 'user_default',
       email: 'user@listflow.local',
@@ -53,12 +53,12 @@ async function main() {
       locationId: location.id,
     },
   });
-  console.log('Created user:', user.name, '(USER) - PIN: 1111');
+  console.log('Created user:', user.name, '(USER) - PIN: 1502');
 
   console.log('\nDatabase seeded successfully!');
   console.log('\nDefault users:');
   console.log('  - bossman (admin@listflow.local)');
-  console.log('  - User (user@listflow.local) - PIN: 1111');
+  console.log('  - User (user@listflow.local) - PIN: 1502');
 }
 
 main()

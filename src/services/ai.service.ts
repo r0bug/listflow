@@ -3,8 +3,24 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 import dotenv from 'dotenv';
+import { z } from 'zod';
 
 dotenv.config();
+
+// Zod schema for validating the AI unified-analysis response before writing to DB
+export const AiAnalysisSchema = z.object({
+  itemType: z.string().optional(),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  category: z.string().optional(),
+  condition: z.string().optional(),
+  brand: z.string().optional().nullable(),
+  features: z.array(z.string()).optional().default([]),
+  keywords: z.array(z.string()).optional().default([]),
+  specifics: z.record(z.string()).optional().default({}),
+  upc: z.string().optional().nullable(),
+  isbn: z.string().optional().nullable(),
+}).passthrough(); // allow extra fields without failing
 
 interface ImageAnalysis {
   itemType: string;

@@ -15,6 +15,7 @@ import {
   SellSimilar,
   Reports,
   EbayCallback,
+  Analytics,
 } from './components/screens';
 import Snap from './components/screens/Snap';
 import { useAuthStore } from './stores/authStore';
@@ -121,6 +122,9 @@ function AppRoutes() {
         {/* Reports */}
         <Route path="reports" element={<Reports />} />
         <Route path="performance" element={<Reports />} />
+
+        {/* Analytics */}
+        <Route path="analytics" element={<Analytics />} />
 
         {/* Settings */}
         <Route path="settings" element={<Settings />} />

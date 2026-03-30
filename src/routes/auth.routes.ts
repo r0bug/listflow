@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { validate } from '../middleware/validate.middleware';
 import { loginSchema, pinLoginSchema, refreshTokenSchema, createUserSchema } from '../schemas/auth.schema';
 import { authMiddleware, adminMiddleware, AuthRequest } from '../middleware/auth.middleware';
+import { authLimiter } from '../middleware/rateLimit.middleware';
 import { UserRole } from '../../src/generated/prisma';
 
 const router = Router();
@@ -24,7 +25,7 @@ const getJwtSecret = (): string => {
 const JWT_SECRET = getJwtSecret();
 
 // POST /api/v1/auth/login - Email/password login
-router.post('/login', validate(loginSchema), async (req: Request, res: Response) => {
+router.post('/login', authLimiter, validate(loginSchema), async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
@@ -75,7 +76,7 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
 });
 
 // POST /api/v1/auth/pin-login - PIN login
-router.post('/pin-login', validate(pinLoginSchema), async (req: Request, res: Response) => {
+router.post('/pin-login', authLimiter, validate(pinLoginSchema), async (req: Request, res: Response) => {
   try {
     const { userId, pin } = req.body;
 

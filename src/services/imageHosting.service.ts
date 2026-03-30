@@ -29,7 +29,7 @@ export async function hostItemImages(itemId: string): Promise<string[]> {
   if (!item.title) throw new Error('Item has no title for slug generation');
   if (item.photos.length === 0) throw new Error('Item has no photos');
 
-  const slug = slugify(item.title) || itemId;
+  const slug = (slugify(item.title) || 'item') + '-' + itemId.slice(-8);
   const destDir = path.resolve(PUBLIC_IMAGES_DIR, 'listflow', slug);
 
   // Create destination directory

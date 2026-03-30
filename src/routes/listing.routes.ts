@@ -1,12 +1,14 @@
 import { Router } from 'express';
-import { 
-  generateListing, 
-  createEbayListing, 
+import {
+  generateListing,
+  createEbayListing,
   getListingHistory,
-  getListingById 
+  getListingById
 } from '../controllers/listing.controller';
+import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
+router.use(authMiddleware);
 
 router.post('/generate', generateListing);
 router.post('/create', createEbayListing);

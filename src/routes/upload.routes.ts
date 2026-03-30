@@ -2,8 +2,10 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import { processImage } from '../controllers/upload.controller';
+import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
+router.use(authMiddleware);
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {

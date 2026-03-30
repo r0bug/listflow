@@ -1,8 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { soldDataService } from '../services/soldData.service';
 import { scraperLimiter } from '../middleware/rateLimit.middleware';
+import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
+router.use(authMiddleware);
 
 // Search for sold items (with scraping)
 router.post('/search', scraperLimiter, async (req: Request, res: Response) => {
