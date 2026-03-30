@@ -10,23 +10,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Mock dependencies before importing the service
+// Mock dependencies before importing the service.
+// vi.hoisted() ensures variables are available inside vi.mock() factories,
+// which are hoisted to the top of the file by Vitest.
 // ---------------------------------------------------------------------------
 
-const mockPrisma = {
-  item: {
-    findUnique: vi.fn(),
-    findMany: vi.fn(),
-    update: vi.fn(),
-    updateMany: vi.fn(),
-  },
-  photo: {
-    findMany: vi.fn(),
-  },
-  listing: {
-    create: vi.fn(),
-  },
-} as any;
+const { mockPrisma } = vi.hoisted(() => ({
+  mockPrisma: {
+    item: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    photo: {
+      findMany: vi.fn(),
+    },
+    listing: {
+      create: vi.fn(),
+    },
+  } as any,
+}));
 
 vi.mock('../../src/config/database', () => ({ prisma: mockPrisma }));
 
