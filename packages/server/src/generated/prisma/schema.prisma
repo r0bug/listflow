@@ -103,10 +103,10 @@ model EbayAccount {
 // ────────────────────────────────────────────────────────────────────
 
 model Item {
-  id                String     @id @default(cuid())
-  sku               String?    @unique
+  id                String   @id @default(cuid())
+  sku               String?  @unique
   title             String?
-  description       String?    @db.Text
+  description       String?  @db.Text
   brand             String?
   model             String?
   category          String?
@@ -120,9 +120,9 @@ model Item {
   isbn              String?
   mpn               String?
   epid              String?
-  startingPrice     Decimal?   @db.Decimal(10, 2)
-  buyNowPrice       Decimal?   @db.Decimal(10, 2)
-  shippingPrice     Decimal?   @db.Decimal(10, 2)
+  startingPrice     Decimal? @db.Decimal(10, 2)
+  buyNowPrice       Decimal? @db.Decimal(10, 2)
+  shippingPrice     Decimal? @db.Decimal(10, 2)
   weightOz          Float?
   packageDimensions Json?
   listingFormat     String?

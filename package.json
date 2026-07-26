@@ -1,65 +1,22 @@
 {
-  "name": "consoleebay",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "listflow",
+  "version": "2.0.0-alpha",
+  "private": true,
+  "description": "YF unified eBay suite: ingest → group → identify → comps → draft → sale ledger",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "nodemon --watch src --ext ts --exec ts-node src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "cli": "ts-node src/cli/ebay-cli.ts",
-    "cli:build": "tsc src/cli/ebay-cli.ts --outDir dist/cli",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
-    "setup": "npm install && npx prisma generate && npx prisma migrate dev",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "dev:server": "npm run dev -w @listflow/server",
+    "dev:watcher": "npm run dev -w @listflow/watcher",
+    "dev:app": "npm run dev -w @listflow/app",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio"
   },
-  "bin": {
-    "ebay-cli": "./dist/cli/ebay-cli.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
-    "@types/multer": "^2.0.0",
-    "@types/node": "^24.3.0",
-    "@vitest/coverage-v8": "^1.6.1",
-    "nodemon": "^3.1.10",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.2",
-    "vitest": "^1.6.1"
-  },
-  "dependencies": {
-    "@hendt/ebay-api": "^6.0.1",
-    "@prisma/client": "^6.15.0",
-    "@types/bcrypt": "^6.0.0",
-    "@types/inquirer": "^9.0.9",
-    "@types/jsonwebtoken": "^9.0.10",
-    "bcrypt": "^6.0.0",
-    "bull": "^4.16.5",
-    "chalk": "^5.6.0",
-    "cli-table3": "^0.6.5",
-    "commander": "^14.0.0",
-    "cors": "^2.8.5",
-    "csv-parse": "^7.0.1",
-    "dotenv": "^17.2.2",
-    "express": "^5.1.0",
-    "inquirer": "^12.9.4",
-    "jsonwebtoken": "^9.0.2",
-    "multer": "^2.0.2",
-    "openai": "^5.18.1",
-    "ora": "^8.2.0",
-    "playwright": "^1.58.2",
-    "playwright-extra": "^4.3.6",
-    "prisma": "^6.15.0",
-    "puppeteer": "^23.11.1",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "sharp": "^0.34.3",
-    "zod": "^3.25.76"
+    "prisma": "^6.15.0"
   }
 }

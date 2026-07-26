@@ -66,3 +66,9 @@ Ebaytools-main/api_config.json
 deploy/consoleebay-installer/backend/.env.current
 **/api_config.json
 **/.env.current
+
+# unified suite
+packages/extension/defaults.js
+files/
+public-images/
+prisma/schema.swiftlist.ref.prisma
