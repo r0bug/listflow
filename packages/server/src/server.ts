@@ -25,6 +25,8 @@ import draftsRoutes from './routes/drafts.routes.js';
 import extensionRoutes from './routes/extension.routes.js';
 import devicesRoutes from './routes/devices.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
+import salesRoutes from './routes/sales.routes.js';
+import ebayAccountsRoutes from './routes/ebayAccounts.routes.js';
 
 const app = express();
 
@@ -61,6 +63,8 @@ app.use('/api/v1/drafts', draftsRoutes);
 app.use('/api/v1/extension', extensionRoutes);
 app.use('/api/v1/devices', devicesRoutes);
 app.use('/api/v1/settings', settingsRoutes);
+app.use('/api/v1/sales', salesRoutes);
+app.use('/api/v1/ebay-accounts', ebayAccountsRoutes);
 
 app.use(errorHandler);
 

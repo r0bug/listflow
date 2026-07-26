@@ -45,6 +45,9 @@ const EnvSchema = z.object({
   AI_BATCH_SIZE: z.coerce.number().default(20),
 
   IMAGE_MIRROR: z.enum(['', 's3']).default(''),
+
+  // M2M secret TeamTime presents to pull /api/v1/sales/feed
+  LISTFLOW_API_SECRET: z.string().optional(),
 });
 
 export const env = EnvSchema.parse(process.env);
