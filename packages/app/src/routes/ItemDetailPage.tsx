@@ -151,13 +151,14 @@ export function ItemDetailPage() {
 
       <section>
         <h3 className="text-sm uppercase text-neutral-500 mb-2">Sold comps</h3>
-        {data.soldComps.length === 0 ? (
+        {data.comps.length === 0 ? (
           <div className="text-neutral-600 text-sm">No comps linked yet.</div>
         ) : (
           <ul className="text-sm">
-            {data.soldComps.map((c) => (
-              <li key={c.id}>
-                {c.title} — {c.soldPrice ? `$${c.soldPrice}` : '—'}
+            {data.comps.map((c) => (
+              <li key={c.compId}>
+                {c.isPrimary ? '★ ' : ''}
+                {c.comp.title} — {c.comp.soldPrice ? `$${c.comp.soldPrice}` : '—'}
               </li>
             ))}
           </ul>

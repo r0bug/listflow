@@ -91,7 +91,7 @@ export function DraftsPage() {
                     <StatusBadge status={d.status} />
                   </td>
                   <td className="px-3 py-2 text-neutral-400">
-                    {d.accountHint ?? <span className="text-neutral-600">—</span>}
+                    {d.notes ?? d.ebayAccountId ?? <span className="text-neutral-600">—</span>}
                   </td>
                   <td className="px-3 py-2 text-neutral-400" title={new Date(d.lastSeenAt).toLocaleString()}>
                     {relativeFrom(d.lastSeenAt)}

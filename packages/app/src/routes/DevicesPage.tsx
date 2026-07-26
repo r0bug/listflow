@@ -52,7 +52,6 @@ function summarizeUserAgent(ua: string | null): string {
 
 interface Group {
   apiKey: Device['apiKey'];
-  client: Device['client'];
   machines: Device[];
 }
 
@@ -63,7 +62,7 @@ function groupByApiKey(devices: Device[]): Group[] {
     if (g) {
       g.machines.push(d);
     } else {
-      map.set(d.apiKey.id, { apiKey: d.apiKey, client: d.client, machines: [d] });
+      map.set(d.apiKey.id, { apiKey: d.apiKey, machines: [d] });
     }
   }
   return Array.from(map.values());
@@ -95,10 +94,7 @@ export function DevicesPage() {
               <div className="flex items-baseline justify-between gap-4 mb-3">
                 <div>
                   <div className="font-medium">
-                    {g.client.name}
-                    {g.client.email ? (
-                      <span className="text-neutral-500 text-sm ml-2">{g.client.email}</span>
-                    ) : null}
+                    {g.apiKey.name ?? '(unnamed key)'}
                   </div>
                   <div className="text-xs text-neutral-500 mt-1">
                     API key: {g.apiKey.name ?? '(unnamed)'} ·{' '}

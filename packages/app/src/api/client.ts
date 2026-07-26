@@ -1,4 +1,35 @@
+declare const chrome: any; // ambient — present only in the extension bundle
+
 const BASE = '/api/v1';
+
+// Extension context: the same SPA is bundled into the extension as a
+// chrome-extension:// page (Standards §1: the plugin is the front door).
+// There, API calls need an absolute origin + Bearer from the service
+// worker's session storage; login routes through the SW so it can also
+// self-provision the machine key. In plain web-dev mode (vite) everything
+// stays relative + cookie-based.
+const EXT: boolean =
+  typeof chrome !== 'undefined' && Boolean((chrome as any).storage?.session);
+
+let apiOriginCache = '';
+export async function initApiOrigin(): Promise<void> {
+  if (!EXT) return;
+  const { baseUrl } = await (chrome as any).storage.sync.get('baseUrl');
+  apiOriginCache = ((baseUrl as string) || 'http://localhost:3005').replace(/\/$/, '');
+}
+export function apiOrigin(): string {
+  return apiOriginCache;
+}
+
+function swSend<T>(msg: unknown): Promise<T> {
+  return new Promise((resolve, reject) => {
+    (chrome as any).runtime.sendMessage(msg, (res: T) => {
+      const err = (chrome as any).runtime.lastError;
+      if (err) return reject(new Error(err.message));
+      resolve(res);
+    });
+  });
+}
 
 export class AuthError extends Error {
   constructor() {
@@ -6,11 +37,21 @@ export class AuthError extends Error {
   }
 }
 
+async function authHeaders(): Promise<Record<string, string>> {
+  if (!EXT) return {};
+  const { jwt } = await (chrome as any).storage.session.get('jwt');
+  return jwt ? { Authorization: `Bearer ${jwt}` } : {};
+}
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${apiOrigin()}${BASE}${path}`, {
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
     ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(await authHeaders()),
+      ...(init?.headers ?? {}),
+    },
   });
   if (res.status === 401) {
     throw new AuthError();
@@ -24,19 +65,40 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
 
 export interface Me {
   id: string;
-  email: string;
+  email: string | null;
   name: string | null;
+  role: string;
+  canListOnEbay?: boolean;
   isAdmin: boolean;
 }
 
+function withAdmin(u: Omit<Me, 'isAdmin'>): Me {
+  return { ...u, isAdmin: u.role === 'admin' };
+}
+
 export const api = {
-  login: (email: string, password: string) =>
-    http<{ token: string; user: Me }>('/auth/login', {
+  login: async (email: string, password: string): Promise<{ token?: string; user: Me }> => {
+    if (EXT) {
+      // Through the SW: stores JWT + provisions the machine key.
+      const res = await swSend<{ ok: boolean; error?: string; user?: Omit<Me, 'isAdmin'> }>({
+        type: 'login',
+        email,
+        pin: password,
+      });
+      if (!res.ok || !res.user) throw new Error(res.error || 'Login failed');
+      return { user: withAdmin(res.user) };
+    }
+    const out = await http<{ token: string; user: Omit<Me, 'isAdmin'> }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
-    }),
-  logout: () => http<{ ok: true }>('/auth/logout', { method: 'POST' }),
-  me: () => http<Me>('/auth/me'),
+      body: JSON.stringify({ email, pin: password }),
+    });
+    return { token: out.token, user: withAdmin(out.user) };
+  },
+  logout: async (): Promise<{ ok: true }> => {
+    if (EXT) await swSend({ type: 'logout' }).catch(() => undefined);
+    return http<{ ok: true }>('/auth/logout', { method: 'POST' });
+  },
+  me: async (): Promise<Me> => withAdmin(await http<Omit<Me, 'isAdmin'>>('/auth/me')),
   listItems: (params?: { q?: string; status?: string }) => {
     const qs = new URLSearchParams();
     if (params?.q) qs.set('q', params.q);
@@ -115,8 +177,8 @@ export const api = {
     ),
   listDevices: () => http<{ devices: Device[] }>('/devices'),
   listApiKeys: () => http<{ keys: ApiKeyRow[] }>('/settings/api-keys'),
-  createApiKey: (body: { name: string; clientName?: string }) =>
-    http<{ id: string; apiKey: string; clientId: string }>('/settings/api-keys', {
+  createApiKey: (body: { name: string }) =>
+    http<{ id: string; apiKey: string }>('/settings/api-keys', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -172,8 +234,8 @@ export type IdentifyAiResponse =
 export interface ApiKeyRow {
   id: string;
   name: string | null;
-  clientId: string;
-  client: { id: string; name: string; email: string | null };
+  kind: string;
+  machines: Array<{ machineId: string; label: string | null; kind: string | null; lastSeenAt: string | null }>;
   revokedAt: string | null;
   lastUsedAt: string | null;
   createdAt: string;
@@ -182,19 +244,17 @@ export interface ApiKeyRow {
 export interface Device {
   id: string;
   machineId: string;
+  label: string | null;
+  kind: string | null;
   userAgent: string | null;
   lastSeenAt: string | null;
   createdAt: string;
   apiKey: {
     id: string;
     name: string | null;
+    kind: string;
     revokedAt: string | null;
     lastUsedAt: string | null;
-  };
-  client: {
-    id: string;
-    name: string;
-    email: string | null;
   };
 }
 
@@ -203,7 +263,8 @@ export interface DraftRow {
   itemId: string;
   ebayDraftId: string | null;
   ebayDraftUrl: string;
-  accountHint: string | null;
+  ebayAccountId: string | null;
+  notes: string | null;
   status: 'OPEN' | 'SUBMITTED' | 'ABANDONED' | 'UNKNOWN';
   lastSeenAt: string;
   lastFilledAt: string | null;
@@ -262,7 +323,7 @@ export interface ItemRow {
   stage: string;
   completeness: { score?: number } | null;
   photos: { id: string; thumbnailPath: string | null; publicUrl: string | null }[];
-  _count: { photos: number; soldComps: number; drafts: number };
+  _count: { photos: number; comps: number; drafts: number };
 }
 
 export interface ItemDetail extends ItemRow {
@@ -274,5 +335,9 @@ export interface ItemDetail extends ItemRow {
   buyNowPrice: number | null;
   itemSpecifics: Record<string, string> | null;
   drafts: Array<{ id: string; ebayDraftUrl: string; status: string; lastSeenAt: string }>;
-  soldComps: Array<{ id: string; ebayItemId: string; soldPrice: number | null; title: string | null }>;
+  comps: Array<{
+    compId: number;
+    isPrimary: boolean;
+    comp: { id: number; ebayItemId: string; soldPrice: number | null; title: string | null; itemUrl: string | null };
+  }>;
 }

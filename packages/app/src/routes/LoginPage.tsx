@@ -28,7 +28,7 @@ export function LoginPage() {
       await refresh();
       navigate(from, { replace: true });
     } catch (err) {
-      setError(err instanceof Error && err.message !== 'unauthenticated' ? err.message : 'Invalid email or password');
+      setError(err instanceof Error && err.message !== 'unauthenticated' ? err.message : 'Invalid email or PIN');
     } finally {
       setLoading(false);
     }
@@ -54,7 +54,7 @@ export function LoginPage() {
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-xs uppercase tracking-wide text-neutral-400">Password</span>
+          <span className="text-xs uppercase tracking-wide text-neutral-400">PIN</span>
           <input
             type="password"
             required

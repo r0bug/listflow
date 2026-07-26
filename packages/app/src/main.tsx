@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route, NavLink, useNavigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './index.css';
 import { ItemsPage } from './routes/ItemsPage.js';
@@ -12,6 +12,7 @@ import { DraftsPage } from './routes/DraftsPage.js';
 import { DevicesPage } from './routes/DevicesPage.js';
 import { SettingsPage } from './routes/SettingsPage.js';
 import { AuthProvider, RequireAuth, useAuth, useAuthErrorBoundary } from './hooks/useAuth.js';
+import { initApiOrigin } from './api/client.js';
 
 const queryClient = new QueryClient();
 
@@ -22,7 +23,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex">
       <nav className="w-56 border-r border-neutral-800 p-4 flex flex-col">
-        <h1 className="text-xl font-semibold mb-6">swiftlist</h1>
+        <h1 className="text-xl font-semibold mb-6">listflow</h1>
         <div className="space-y-1 flex-1">
           <NavItem to="/">Items</NavItem>
           <NavItem to="/pool">Pool</NavItem>
@@ -66,10 +67,11 @@ function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
   );
 }
 
+void initApiOrigin().then(() =>
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <HashRouter>
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
@@ -93,7 +95,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             />
           </Routes>
         </AuthProvider>
-      </BrowserRouter>
+      </HashRouter>
     </QueryClientProvider>
   </React.StrictMode>,
+),
 );

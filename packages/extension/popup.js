@@ -77,12 +77,11 @@ async function loadPinnedAccountSelect(state) {
 // ── Nav ────────────────────────────────────────────────────────────
 
 async function openWebPath(p) {
+  // Bundled SPA is the default (plugin-as-front-door); an explicit webUrl
+  // in Config overrides it for vite dev.
   const { webUrl } = await window.swiftlist.settings();
-  if (!webUrl) {
-    setStatus('err', 'Web app URL not set — open Config.');
-    return;
-  }
-  chrome.tabs.create({ url: `${webUrl}${p}` });
+  const url = webUrl ? `${webUrl}${p}` : chrome.runtime.getURL(`app/index.html#${p}`);
+  chrome.tabs.create({ url });
 }
 
 document.querySelectorAll('nav button[data-path]').forEach((btn) => {

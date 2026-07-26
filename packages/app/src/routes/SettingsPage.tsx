@@ -188,10 +188,7 @@ function ApiKeysSection() {
 
   const create = useMutation({
     mutationFn: () =>
-      api.createApiKey({
-        name: newName,
-        clientName: newClientName.trim() || undefined,
-      }),
+      api.createApiKey({ name: newName }),
     onSuccess: (res) => {
       setJustCreated({ apiKey: res.apiKey, id: res.id });
       setNewName('');
@@ -331,7 +328,7 @@ function ApiKeysSection() {
               k={k}
               disabled={revoke.isPending}
               onRevoke={() => {
-                if (window.confirm(`Revoke API key "${k.name ?? k.client.name}"? This cannot be undone.`)) {
+                if (window.confirm(`Revoke API key "${k.name ?? '(unnamed)'}"? This cannot be undone.`)) {
                   revoke.mutate(k.id);
                 }
               }}
@@ -360,8 +357,8 @@ function ApiKeyRowView({
     <div className="py-3 flex items-start justify-between gap-4">
       <div className="min-w-0">
         <div className="font-medium text-sm">
-          {k.client.name}
-          <span className="text-neutral-500 ml-2">· {k.name ?? '—'}</span>
+          {k.name ?? '(unnamed)'}
+          <span className="text-neutral-500 ml-2">· {k.kind}</span>
         </div>
         <div className="text-xs text-neutral-500 mt-1">
           {revoked ? (
