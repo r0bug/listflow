@@ -166,13 +166,22 @@ class SalesImportService {
 
       // Item join (spec §3b): Custom Label SKU → Item.sku, else Item Number
       // → Item.ebayItemId. LOC half compared against the DB, never written.
-      let item =
+      const item =
         (mapped.sku
-          ? await prisma.item.findUnique({ where: { sku: mapped.sku } })
+          ? await prisma.item.findUnique({
+              where: { sku: mapped.sku },
+              include: { drafts: { where: { filledById: { not: null } }, orderBy: { lastSeenAt: 'desc' }, take: 1 } },
+            })
           : null) ??
         (mapped.legacyItemId
-          ? await prisma.item.findUnique({ where: { ebayItemId: mapped.legacyItemId } })
+          ? await prisma.item.findUnique({
+              where: { ebayItemId: mapped.legacyItemId },
+              include: { drafts: { where: { filledById: { not: null } }, orderBy: { lastSeenAt: 'desc' }, take: 1 } },
+            })
           : null);
+      // Attribution chain (Standards §6): sale → item → most recent draft
+      // with a known lister → StaffUser.
+      const listedById = item?.drafts[0]?.filledById ?? null;
 
       if (item && mapped.locationCode && item.locationCode && mapped.locationCode !== item.locationCode) {
         result.locMismatches.push({
@@ -217,8 +226,8 @@ class SalesImportService {
           rawData: stripPii(records[i]!),
           itemId: item?.id ?? null,
           consignmentGroupId: item?.consignmentGroupId ?? null,
-          // listedById stays null until draft-lister attribution exists;
-          // attributionStatus flips ATTRIBUTED then (or via manual match UI).
+          listedById,
+          attributionStatus: listedById ? 'ATTRIBUTED' : 'PENDING',
         },
       });
 

@@ -111,6 +111,24 @@ export const machineAuth: RequestHandler = async (req, res, next) => {
   await prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } });
 
   req.machine = { apiKeyId: apiKey.id, machineDbId, machineId: machineId ?? undefined };
+
+  // Best-effort staff identity: the extension sends its machine key AND the
+  // logged-in lister's JWT. A valid Bearer attaches req.staff (attribution);
+  // an invalid/missing one never fails a machine-authenticated call.
+  const bearer = req.header('Authorization')?.replace(/^Bearer\s+/i, '');
+  if (bearer) {
+    try {
+      const d = jwt.verify(bearer, env.JWT_SECRET) as {
+        sub: string;
+        name: string;
+        role: string;
+        tt: string | null;
+      };
+      req.staff = { id: d.sub, name: d.name, role: d.role, teamtimeUserId: d.tt };
+    } catch {
+      /* ignore — machine auth stands on its own */
+    }
+  }
   next();
 };
 

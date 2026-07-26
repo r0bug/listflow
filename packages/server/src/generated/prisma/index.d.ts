@@ -2829,6 +2829,7 @@ export namespace Prisma {
     itemsCreated: number
     photosAdded: number
     salesListed: number
+    draftsFilled: number
     collections: number
   }
 
@@ -2836,6 +2837,7 @@ export namespace Prisma {
     itemsCreated?: boolean | StaffUserCountOutputTypeCountItemsCreatedArgs
     photosAdded?: boolean | StaffUserCountOutputTypeCountPhotosAddedArgs
     salesListed?: boolean | StaffUserCountOutputTypeCountSalesListedArgs
+    draftsFilled?: boolean | StaffUserCountOutputTypeCountDraftsFilledArgs
     collections?: boolean | StaffUserCountOutputTypeCountCollectionsArgs
   }
 
@@ -2869,6 +2871,13 @@ export namespace Prisma {
    */
   export type StaffUserCountOutputTypeCountSalesListedArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: SaleWhereInput
+  }
+
+  /**
+   * StaffUserCountOutputType without action
+   */
+  export type StaffUserCountOutputTypeCountDraftsFilledArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: EbayDraftWhereInput
   }
 
   /**
@@ -3458,6 +3467,7 @@ export namespace Prisma {
     itemsCreated?: boolean | StaffUser$itemsCreatedArgs<ExtArgs>
     photosAdded?: boolean | StaffUser$photosAddedArgs<ExtArgs>
     salesListed?: boolean | StaffUser$salesListedArgs<ExtArgs>
+    draftsFilled?: boolean | StaffUser$draftsFilledArgs<ExtArgs>
     collections?: boolean | StaffUser$collectionsArgs<ExtArgs>
     _count?: boolean | StaffUserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["staffUser"]>
@@ -3509,6 +3519,7 @@ export namespace Prisma {
     itemsCreated?: boolean | StaffUser$itemsCreatedArgs<ExtArgs>
     photosAdded?: boolean | StaffUser$photosAddedArgs<ExtArgs>
     salesListed?: boolean | StaffUser$salesListedArgs<ExtArgs>
+    draftsFilled?: boolean | StaffUser$draftsFilledArgs<ExtArgs>
     collections?: boolean | StaffUser$collectionsArgs<ExtArgs>
     _count?: boolean | StaffUserCountOutputTypeDefaultArgs<ExtArgs>
   }
@@ -3521,6 +3532,7 @@ export namespace Prisma {
       itemsCreated: Prisma.$ItemPayload<ExtArgs>[]
       photosAdded: Prisma.$PhotoPayload<ExtArgs>[]
       salesListed: Prisma.$SalePayload<ExtArgs>[]
+      draftsFilled: Prisma.$EbayDraftPayload<ExtArgs>[]
       collections: Prisma.$CollectionPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
@@ -3932,6 +3944,7 @@ export namespace Prisma {
     itemsCreated<T extends StaffUser$itemsCreatedArgs<ExtArgs> = {}>(args?: Subset<T, StaffUser$itemsCreatedArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     photosAdded<T extends StaffUser$photosAddedArgs<ExtArgs> = {}>(args?: Subset<T, StaffUser$photosAddedArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PhotoPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     salesListed<T extends StaffUser$salesListedArgs<ExtArgs> = {}>(args?: Subset<T, StaffUser$salesListedArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SalePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    draftsFilled<T extends StaffUser$draftsFilledArgs<ExtArgs> = {}>(args?: Subset<T, StaffUser$draftsFilledArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$EbayDraftPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     collections<T extends StaffUser$collectionsArgs<ExtArgs> = {}>(args?: Subset<T, StaffUser$collectionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CollectionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -4430,6 +4443,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: SaleScalarFieldEnum | SaleScalarFieldEnum[]
+  }
+
+  /**
+   * StaffUser.draftsFilled
+   */
+  export type StaffUser$draftsFilledArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the EbayDraft
+     */
+    select?: EbayDraftSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the EbayDraft
+     */
+    omit?: EbayDraftOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: EbayDraftInclude<ExtArgs> | null
+    where?: EbayDraftWhereInput
+    orderBy?: EbayDraftOrderByWithRelationInput | EbayDraftOrderByWithRelationInput[]
+    cursor?: EbayDraftWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: EbayDraftScalarFieldEnum | EbayDraftScalarFieldEnum[]
   }
 
   /**
@@ -17801,6 +17838,7 @@ export namespace Prisma {
     ebayDraftId: string | null
     ebayDraftUrl: string | null
     ebayAccountId: string | null
+    filledById: string | null
     lastSeenAt: Date | null
     lastFilledAt: Date | null
     status: $Enums.EbayDraftStatus | null
@@ -17815,6 +17853,7 @@ export namespace Prisma {
     ebayDraftId: string | null
     ebayDraftUrl: string | null
     ebayAccountId: string | null
+    filledById: string | null
     lastSeenAt: Date | null
     lastFilledAt: Date | null
     status: $Enums.EbayDraftStatus | null
@@ -17829,6 +17868,7 @@ export namespace Prisma {
     ebayDraftId: number
     ebayDraftUrl: number
     ebayAccountId: number
+    filledById: number
     lastSeenAt: number
     lastFilledAt: number
     lastFilledFields: number
@@ -17847,6 +17887,7 @@ export namespace Prisma {
     ebayDraftId?: true
     ebayDraftUrl?: true
     ebayAccountId?: true
+    filledById?: true
     lastSeenAt?: true
     lastFilledAt?: true
     status?: true
@@ -17861,6 +17902,7 @@ export namespace Prisma {
     ebayDraftId?: true
     ebayDraftUrl?: true
     ebayAccountId?: true
+    filledById?: true
     lastSeenAt?: true
     lastFilledAt?: true
     status?: true
@@ -17875,6 +17917,7 @@ export namespace Prisma {
     ebayDraftId?: true
     ebayDraftUrl?: true
     ebayAccountId?: true
+    filledById?: true
     lastSeenAt?: true
     lastFilledAt?: true
     lastFilledFields?: true
@@ -17964,6 +18007,7 @@ export namespace Prisma {
     ebayDraftId: string | null
     ebayDraftUrl: string
     ebayAccountId: string | null
+    filledById: string | null
     lastSeenAt: Date
     lastFilledAt: Date | null
     lastFilledFields: JsonValue | null
@@ -17997,6 +18041,7 @@ export namespace Prisma {
     ebayDraftId?: boolean
     ebayDraftUrl?: boolean
     ebayAccountId?: boolean
+    filledById?: boolean
     lastSeenAt?: boolean
     lastFilledAt?: boolean
     lastFilledFields?: boolean
@@ -18005,6 +18050,7 @@ export namespace Prisma {
     notes?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    filledBy?: boolean | EbayDraft$filledByArgs<ExtArgs>
     item?: boolean | ItemDefaultArgs<ExtArgs>
     ebayAccount?: boolean | EbayDraft$ebayAccountArgs<ExtArgs>
   }, ExtArgs["result"]["ebayDraft"]>
@@ -18015,6 +18061,7 @@ export namespace Prisma {
     ebayDraftId?: boolean
     ebayDraftUrl?: boolean
     ebayAccountId?: boolean
+    filledById?: boolean
     lastSeenAt?: boolean
     lastFilledAt?: boolean
     lastFilledFields?: boolean
@@ -18023,6 +18070,7 @@ export namespace Prisma {
     notes?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    filledBy?: boolean | EbayDraft$filledByArgs<ExtArgs>
     item?: boolean | ItemDefaultArgs<ExtArgs>
     ebayAccount?: boolean | EbayDraft$ebayAccountArgs<ExtArgs>
   }, ExtArgs["result"]["ebayDraft"]>
@@ -18033,6 +18081,7 @@ export namespace Prisma {
     ebayDraftId?: boolean
     ebayDraftUrl?: boolean
     ebayAccountId?: boolean
+    filledById?: boolean
     lastSeenAt?: boolean
     lastFilledAt?: boolean
     lastFilledFields?: boolean
@@ -18041,6 +18090,7 @@ export namespace Prisma {
     notes?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    filledBy?: boolean | EbayDraft$filledByArgs<ExtArgs>
     item?: boolean | ItemDefaultArgs<ExtArgs>
     ebayAccount?: boolean | EbayDraft$ebayAccountArgs<ExtArgs>
   }, ExtArgs["result"]["ebayDraft"]>
@@ -18051,6 +18101,7 @@ export namespace Prisma {
     ebayDraftId?: boolean
     ebayDraftUrl?: boolean
     ebayAccountId?: boolean
+    filledById?: boolean
     lastSeenAt?: boolean
     lastFilledAt?: boolean
     lastFilledFields?: boolean
@@ -18061,16 +18112,19 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type EbayDraftOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "itemId" | "ebayDraftId" | "ebayDraftUrl" | "ebayAccountId" | "lastSeenAt" | "lastFilledAt" | "lastFilledFields" | "currentValues" | "status" | "notes" | "createdAt" | "updatedAt", ExtArgs["result"]["ebayDraft"]>
+  export type EbayDraftOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "itemId" | "ebayDraftId" | "ebayDraftUrl" | "ebayAccountId" | "filledById" | "lastSeenAt" | "lastFilledAt" | "lastFilledFields" | "currentValues" | "status" | "notes" | "createdAt" | "updatedAt", ExtArgs["result"]["ebayDraft"]>
   export type EbayDraftInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    filledBy?: boolean | EbayDraft$filledByArgs<ExtArgs>
     item?: boolean | ItemDefaultArgs<ExtArgs>
     ebayAccount?: boolean | EbayDraft$ebayAccountArgs<ExtArgs>
   }
   export type EbayDraftIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    filledBy?: boolean | EbayDraft$filledByArgs<ExtArgs>
     item?: boolean | ItemDefaultArgs<ExtArgs>
     ebayAccount?: boolean | EbayDraft$ebayAccountArgs<ExtArgs>
   }
   export type EbayDraftIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    filledBy?: boolean | EbayDraft$filledByArgs<ExtArgs>
     item?: boolean | ItemDefaultArgs<ExtArgs>
     ebayAccount?: boolean | EbayDraft$ebayAccountArgs<ExtArgs>
   }
@@ -18078,6 +18132,7 @@ export namespace Prisma {
   export type $EbayDraftPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "EbayDraft"
     objects: {
+      filledBy: Prisma.$StaffUserPayload<ExtArgs> | null
       item: Prisma.$ItemPayload<ExtArgs>
       ebayAccount: Prisma.$EbayAccountPayload<ExtArgs> | null
     }
@@ -18087,6 +18142,7 @@ export namespace Prisma {
       ebayDraftId: string | null
       ebayDraftUrl: string
       ebayAccountId: string | null
+      filledById: string | null
       lastSeenAt: Date
       lastFilledAt: Date | null
       lastFilledFields: Prisma.JsonValue | null
@@ -18489,6 +18545,7 @@ export namespace Prisma {
    */
   export interface Prisma__EbayDraftClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
+    filledBy<T extends EbayDraft$filledByArgs<ExtArgs> = {}>(args?: Subset<T, EbayDraft$filledByArgs<ExtArgs>>): Prisma__StaffUserClient<$Result.GetResult<Prisma.$StaffUserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     item<T extends ItemDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ItemDefaultArgs<ExtArgs>>): Prisma__ItemClient<$Result.GetResult<Prisma.$ItemPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     ebayAccount<T extends EbayDraft$ebayAccountArgs<ExtArgs> = {}>(args?: Subset<T, EbayDraft$ebayAccountArgs<ExtArgs>>): Prisma__EbayAccountClient<$Result.GetResult<Prisma.$EbayAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
@@ -18525,6 +18582,7 @@ export namespace Prisma {
     readonly ebayDraftId: FieldRef<"EbayDraft", 'String'>
     readonly ebayDraftUrl: FieldRef<"EbayDraft", 'String'>
     readonly ebayAccountId: FieldRef<"EbayDraft", 'String'>
+    readonly filledById: FieldRef<"EbayDraft", 'String'>
     readonly lastSeenAt: FieldRef<"EbayDraft", 'DateTime'>
     readonly lastFilledAt: FieldRef<"EbayDraft", 'DateTime'>
     readonly lastFilledFields: FieldRef<"EbayDraft", 'Json'>
@@ -18926,6 +18984,25 @@ export namespace Prisma {
      * Limit how many EbayDrafts to delete.
      */
     limit?: number
+  }
+
+  /**
+   * EbayDraft.filledBy
+   */
+  export type EbayDraft$filledByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StaffUser
+     */
+    select?: StaffUserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StaffUser
+     */
+    omit?: StaffUserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StaffUserInclude<ExtArgs> | null
+    where?: StaffUserWhereInput
   }
 
   /**
@@ -29310,6 +29387,7 @@ export namespace Prisma {
     ebayDraftId: 'ebayDraftId',
     ebayDraftUrl: 'ebayDraftUrl',
     ebayAccountId: 'ebayAccountId',
+    filledById: 'filledById',
     lastSeenAt: 'lastSeenAt',
     lastFilledAt: 'lastFilledAt',
     lastFilledFields: 'lastFilledFields',
@@ -29798,6 +29876,7 @@ export namespace Prisma {
     itemsCreated?: ItemListRelationFilter
     photosAdded?: PhotoListRelationFilter
     salesListed?: SaleListRelationFilter
+    draftsFilled?: EbayDraftListRelationFilter
     collections?: CollectionListRelationFilter
   }
 
@@ -29816,6 +29895,7 @@ export namespace Prisma {
     itemsCreated?: ItemOrderByRelationAggregateInput
     photosAdded?: PhotoOrderByRelationAggregateInput
     salesListed?: SaleOrderByRelationAggregateInput
+    draftsFilled?: EbayDraftOrderByRelationAggregateInput
     collections?: CollectionOrderByRelationAggregateInput
   }
 
@@ -29837,6 +29917,7 @@ export namespace Prisma {
     itemsCreated?: ItemListRelationFilter
     photosAdded?: PhotoListRelationFilter
     salesListed?: SaleListRelationFilter
+    draftsFilled?: EbayDraftListRelationFilter
     collections?: CollectionListRelationFilter
   }, "id" | "teamtimeUserId" | "email">
 
@@ -31017,6 +31098,7 @@ export namespace Prisma {
     ebayDraftId?: StringNullableFilter<"EbayDraft"> | string | null
     ebayDraftUrl?: StringFilter<"EbayDraft"> | string
     ebayAccountId?: StringNullableFilter<"EbayDraft"> | string | null
+    filledById?: StringNullableFilter<"EbayDraft"> | string | null
     lastSeenAt?: DateTimeFilter<"EbayDraft"> | Date | string
     lastFilledAt?: DateTimeNullableFilter<"EbayDraft"> | Date | string | null
     lastFilledFields?: JsonNullableFilter<"EbayDraft">
@@ -31025,6 +31107,7 @@ export namespace Prisma {
     notes?: StringNullableFilter<"EbayDraft"> | string | null
     createdAt?: DateTimeFilter<"EbayDraft"> | Date | string
     updatedAt?: DateTimeFilter<"EbayDraft"> | Date | string
+    filledBy?: XOR<StaffUserNullableScalarRelationFilter, StaffUserWhereInput> | null
     item?: XOR<ItemScalarRelationFilter, ItemWhereInput>
     ebayAccount?: XOR<EbayAccountNullableScalarRelationFilter, EbayAccountWhereInput> | null
   }
@@ -31035,6 +31118,7 @@ export namespace Prisma {
     ebayDraftId?: SortOrderInput | SortOrder
     ebayDraftUrl?: SortOrder
     ebayAccountId?: SortOrderInput | SortOrder
+    filledById?: SortOrderInput | SortOrder
     lastSeenAt?: SortOrder
     lastFilledAt?: SortOrderInput | SortOrder
     lastFilledFields?: SortOrderInput | SortOrder
@@ -31043,6 +31127,7 @@ export namespace Prisma {
     notes?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    filledBy?: StaffUserOrderByWithRelationInput
     item?: ItemOrderByWithRelationInput
     ebayAccount?: EbayAccountOrderByWithRelationInput
   }
@@ -31056,6 +31141,7 @@ export namespace Prisma {
     itemId?: StringFilter<"EbayDraft"> | string
     ebayDraftUrl?: StringFilter<"EbayDraft"> | string
     ebayAccountId?: StringNullableFilter<"EbayDraft"> | string | null
+    filledById?: StringNullableFilter<"EbayDraft"> | string | null
     lastSeenAt?: DateTimeFilter<"EbayDraft"> | Date | string
     lastFilledAt?: DateTimeNullableFilter<"EbayDraft"> | Date | string | null
     lastFilledFields?: JsonNullableFilter<"EbayDraft">
@@ -31064,6 +31150,7 @@ export namespace Prisma {
     notes?: StringNullableFilter<"EbayDraft"> | string | null
     createdAt?: DateTimeFilter<"EbayDraft"> | Date | string
     updatedAt?: DateTimeFilter<"EbayDraft"> | Date | string
+    filledBy?: XOR<StaffUserNullableScalarRelationFilter, StaffUserWhereInput> | null
     item?: XOR<ItemScalarRelationFilter, ItemWhereInput>
     ebayAccount?: XOR<EbayAccountNullableScalarRelationFilter, EbayAccountWhereInput> | null
   }, "id" | "ebayDraftId">
@@ -31074,6 +31161,7 @@ export namespace Prisma {
     ebayDraftId?: SortOrderInput | SortOrder
     ebayDraftUrl?: SortOrder
     ebayAccountId?: SortOrderInput | SortOrder
+    filledById?: SortOrderInput | SortOrder
     lastSeenAt?: SortOrder
     lastFilledAt?: SortOrderInput | SortOrder
     lastFilledFields?: SortOrderInput | SortOrder
@@ -31096,6 +31184,7 @@ export namespace Prisma {
     ebayDraftId?: StringNullableWithAggregatesFilter<"EbayDraft"> | string | null
     ebayDraftUrl?: StringWithAggregatesFilter<"EbayDraft"> | string
     ebayAccountId?: StringNullableWithAggregatesFilter<"EbayDraft"> | string | null
+    filledById?: StringNullableWithAggregatesFilter<"EbayDraft"> | string | null
     lastSeenAt?: DateTimeWithAggregatesFilter<"EbayDraft"> | Date | string
     lastFilledAt?: DateTimeNullableWithAggregatesFilter<"EbayDraft"> | Date | string | null
     lastFilledFields?: JsonNullableWithAggregatesFilter<"EbayDraft">
@@ -32015,6 +32104,7 @@ export namespace Prisma {
     itemsCreated?: ItemCreateNestedManyWithoutCreatedByInput
     photosAdded?: PhotoCreateNestedManyWithoutUploadedByInput
     salesListed?: SaleCreateNestedManyWithoutListedByInput
+    draftsFilled?: EbayDraftCreateNestedManyWithoutFilledByInput
     collections?: CollectionCreateNestedManyWithoutOwnerInput
   }
 
@@ -32033,6 +32123,7 @@ export namespace Prisma {
     itemsCreated?: ItemUncheckedCreateNestedManyWithoutCreatedByInput
     photosAdded?: PhotoUncheckedCreateNestedManyWithoutUploadedByInput
     salesListed?: SaleUncheckedCreateNestedManyWithoutListedByInput
+    draftsFilled?: EbayDraftUncheckedCreateNestedManyWithoutFilledByInput
     collections?: CollectionUncheckedCreateNestedManyWithoutOwnerInput
   }
 
@@ -32051,6 +32142,7 @@ export namespace Prisma {
     itemsCreated?: ItemUpdateManyWithoutCreatedByNestedInput
     photosAdded?: PhotoUpdateManyWithoutUploadedByNestedInput
     salesListed?: SaleUpdateManyWithoutListedByNestedInput
+    draftsFilled?: EbayDraftUpdateManyWithoutFilledByNestedInput
     collections?: CollectionUpdateManyWithoutOwnerNestedInput
   }
 
@@ -32069,6 +32161,7 @@ export namespace Prisma {
     itemsCreated?: ItemUncheckedUpdateManyWithoutCreatedByNestedInput
     photosAdded?: PhotoUncheckedUpdateManyWithoutUploadedByNestedInput
     salesListed?: SaleUncheckedUpdateManyWithoutListedByNestedInput
+    draftsFilled?: EbayDraftUncheckedUpdateManyWithoutFilledByNestedInput
     collections?: CollectionUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
@@ -33459,6 +33552,7 @@ export namespace Prisma {
     notes?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    filledBy?: StaffUserCreateNestedOneWithoutDraftsFilledInput
     item: ItemCreateNestedOneWithoutDraftsInput
     ebayAccount?: EbayAccountCreateNestedOneWithoutDraftsInput
   }
@@ -33469,6 +33563,7 @@ export namespace Prisma {
     ebayDraftId?: string | null
     ebayDraftUrl: string
     ebayAccountId?: string | null
+    filledById?: string | null
     lastSeenAt?: Date | string
     lastFilledAt?: Date | string | null
     lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
@@ -33491,6 +33586,7 @@ export namespace Prisma {
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    filledBy?: StaffUserUpdateOneWithoutDraftsFilledNestedInput
     item?: ItemUpdateOneRequiredWithoutDraftsNestedInput
     ebayAccount?: EbayAccountUpdateOneWithoutDraftsNestedInput
   }
@@ -33501,6 +33597,7 @@ export namespace Prisma {
     ebayDraftId?: NullableStringFieldUpdateOperationsInput | string | null
     ebayDraftUrl?: StringFieldUpdateOperationsInput | string
     ebayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    filledById?: NullableStringFieldUpdateOperationsInput | string | null
     lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastFilledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
@@ -33517,6 +33614,7 @@ export namespace Prisma {
     ebayDraftId?: string | null
     ebayDraftUrl: string
     ebayAccountId?: string | null
+    filledById?: string | null
     lastSeenAt?: Date | string
     lastFilledAt?: Date | string | null
     lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
@@ -33547,6 +33645,7 @@ export namespace Prisma {
     ebayDraftId?: NullableStringFieldUpdateOperationsInput | string | null
     ebayDraftUrl?: StringFieldUpdateOperationsInput | string
     ebayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    filledById?: NullableStringFieldUpdateOperationsInput | string | null
     lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastFilledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
@@ -34663,6 +34762,12 @@ export namespace Prisma {
     none?: SaleWhereInput
   }
 
+  export type EbayDraftListRelationFilter = {
+    every?: EbayDraftWhereInput
+    some?: EbayDraftWhereInput
+    none?: EbayDraftWhereInput
+  }
+
   export type CollectionListRelationFilter = {
     every?: CollectionWhereInput
     some?: CollectionWhereInput
@@ -34683,6 +34788,10 @@ export namespace Prisma {
   }
 
   export type SaleOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type EbayDraftOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -34956,16 +35065,6 @@ export namespace Prisma {
     gt?: number | IntFieldRefInput<$PrismaModel>
     gte?: number | IntFieldRefInput<$PrismaModel>
     not?: NestedIntFilter<$PrismaModel> | number
-  }
-
-  export type EbayDraftListRelationFilter = {
-    every?: EbayDraftWhereInput
-    some?: EbayDraftWhereInput
-    none?: EbayDraftWhereInput
-  }
-
-  export type EbayDraftOrderByRelationAggregateInput = {
-    _count?: SortOrder
   }
 
   export type EbayAccountCountOrderByAggregateInput = {
@@ -35853,6 +35952,7 @@ export namespace Prisma {
     ebayDraftId?: SortOrder
     ebayDraftUrl?: SortOrder
     ebayAccountId?: SortOrder
+    filledById?: SortOrder
     lastSeenAt?: SortOrder
     lastFilledAt?: SortOrder
     lastFilledFields?: SortOrder
@@ -35869,6 +35969,7 @@ export namespace Prisma {
     ebayDraftId?: SortOrder
     ebayDraftUrl?: SortOrder
     ebayAccountId?: SortOrder
+    filledById?: SortOrder
     lastSeenAt?: SortOrder
     lastFilledAt?: SortOrder
     status?: SortOrder
@@ -35883,6 +35984,7 @@ export namespace Prisma {
     ebayDraftId?: SortOrder
     ebayDraftUrl?: SortOrder
     ebayAccountId?: SortOrder
+    filledById?: SortOrder
     lastSeenAt?: SortOrder
     lastFilledAt?: SortOrder
     status?: SortOrder
@@ -36580,6 +36682,13 @@ export namespace Prisma {
     connect?: SaleWhereUniqueInput | SaleWhereUniqueInput[]
   }
 
+  export type EbayDraftCreateNestedManyWithoutFilledByInput = {
+    create?: XOR<EbayDraftCreateWithoutFilledByInput, EbayDraftUncheckedCreateWithoutFilledByInput> | EbayDraftCreateWithoutFilledByInput[] | EbayDraftUncheckedCreateWithoutFilledByInput[]
+    connectOrCreate?: EbayDraftCreateOrConnectWithoutFilledByInput | EbayDraftCreateOrConnectWithoutFilledByInput[]
+    createMany?: EbayDraftCreateManyFilledByInputEnvelope
+    connect?: EbayDraftWhereUniqueInput | EbayDraftWhereUniqueInput[]
+  }
+
   export type CollectionCreateNestedManyWithoutOwnerInput = {
     create?: XOR<CollectionCreateWithoutOwnerInput, CollectionUncheckedCreateWithoutOwnerInput> | CollectionCreateWithoutOwnerInput[] | CollectionUncheckedCreateWithoutOwnerInput[]
     connectOrCreate?: CollectionCreateOrConnectWithoutOwnerInput | CollectionCreateOrConnectWithoutOwnerInput[]
@@ -36606,6 +36715,13 @@ export namespace Prisma {
     connectOrCreate?: SaleCreateOrConnectWithoutListedByInput | SaleCreateOrConnectWithoutListedByInput[]
     createMany?: SaleCreateManyListedByInputEnvelope
     connect?: SaleWhereUniqueInput | SaleWhereUniqueInput[]
+  }
+
+  export type EbayDraftUncheckedCreateNestedManyWithoutFilledByInput = {
+    create?: XOR<EbayDraftCreateWithoutFilledByInput, EbayDraftUncheckedCreateWithoutFilledByInput> | EbayDraftCreateWithoutFilledByInput[] | EbayDraftUncheckedCreateWithoutFilledByInput[]
+    connectOrCreate?: EbayDraftCreateOrConnectWithoutFilledByInput | EbayDraftCreateOrConnectWithoutFilledByInput[]
+    createMany?: EbayDraftCreateManyFilledByInputEnvelope
+    connect?: EbayDraftWhereUniqueInput | EbayDraftWhereUniqueInput[]
   }
 
   export type CollectionUncheckedCreateNestedManyWithoutOwnerInput = {
@@ -36677,6 +36793,20 @@ export namespace Prisma {
     deleteMany?: SaleScalarWhereInput | SaleScalarWhereInput[]
   }
 
+  export type EbayDraftUpdateManyWithoutFilledByNestedInput = {
+    create?: XOR<EbayDraftCreateWithoutFilledByInput, EbayDraftUncheckedCreateWithoutFilledByInput> | EbayDraftCreateWithoutFilledByInput[] | EbayDraftUncheckedCreateWithoutFilledByInput[]
+    connectOrCreate?: EbayDraftCreateOrConnectWithoutFilledByInput | EbayDraftCreateOrConnectWithoutFilledByInput[]
+    upsert?: EbayDraftUpsertWithWhereUniqueWithoutFilledByInput | EbayDraftUpsertWithWhereUniqueWithoutFilledByInput[]
+    createMany?: EbayDraftCreateManyFilledByInputEnvelope
+    set?: EbayDraftWhereUniqueInput | EbayDraftWhereUniqueInput[]
+    disconnect?: EbayDraftWhereUniqueInput | EbayDraftWhereUniqueInput[]
+    delete?: EbayDraftWhereUniqueInput | EbayDraftWhereUniqueInput[]
+    connect?: EbayDraftWhereUniqueInput | EbayDraftWhereUniqueInput[]
+    update?: EbayDraftUpdateWithWhereUniqueWithoutFilledByInput | EbayDraftUpdateWithWhereUniqueWithoutFilledByInput[]
+    updateMany?: EbayDraftUpdateManyWithWhereWithoutFilledByInput | EbayDraftUpdateManyWithWhereWithoutFilledByInput[]
+    deleteMany?: EbayDraftScalarWhereInput | EbayDraftScalarWhereInput[]
+  }
+
   export type CollectionUpdateManyWithoutOwnerNestedInput = {
     create?: XOR<CollectionCreateWithoutOwnerInput, CollectionUncheckedCreateWithoutOwnerInput> | CollectionCreateWithoutOwnerInput[] | CollectionUncheckedCreateWithoutOwnerInput[]
     connectOrCreate?: CollectionCreateOrConnectWithoutOwnerInput | CollectionCreateOrConnectWithoutOwnerInput[]
@@ -36731,6 +36861,20 @@ export namespace Prisma {
     update?: SaleUpdateWithWhereUniqueWithoutListedByInput | SaleUpdateWithWhereUniqueWithoutListedByInput[]
     updateMany?: SaleUpdateManyWithWhereWithoutListedByInput | SaleUpdateManyWithWhereWithoutListedByInput[]
     deleteMany?: SaleScalarWhereInput | SaleScalarWhereInput[]
+  }
+
+  export type EbayDraftUncheckedUpdateManyWithoutFilledByNestedInput = {
+    create?: XOR<EbayDraftCreateWithoutFilledByInput, EbayDraftUncheckedCreateWithoutFilledByInput> | EbayDraftCreateWithoutFilledByInput[] | EbayDraftUncheckedCreateWithoutFilledByInput[]
+    connectOrCreate?: EbayDraftCreateOrConnectWithoutFilledByInput | EbayDraftCreateOrConnectWithoutFilledByInput[]
+    upsert?: EbayDraftUpsertWithWhereUniqueWithoutFilledByInput | EbayDraftUpsertWithWhereUniqueWithoutFilledByInput[]
+    createMany?: EbayDraftCreateManyFilledByInputEnvelope
+    set?: EbayDraftWhereUniqueInput | EbayDraftWhereUniqueInput[]
+    disconnect?: EbayDraftWhereUniqueInput | EbayDraftWhereUniqueInput[]
+    delete?: EbayDraftWhereUniqueInput | EbayDraftWhereUniqueInput[]
+    connect?: EbayDraftWhereUniqueInput | EbayDraftWhereUniqueInput[]
+    update?: EbayDraftUpdateWithWhereUniqueWithoutFilledByInput | EbayDraftUpdateWithWhereUniqueWithoutFilledByInput[]
+    updateMany?: EbayDraftUpdateManyWithWhereWithoutFilledByInput | EbayDraftUpdateManyWithWhereWithoutFilledByInput[]
+    deleteMany?: EbayDraftScalarWhereInput | EbayDraftScalarWhereInput[]
   }
 
   export type CollectionUncheckedUpdateManyWithoutOwnerNestedInput = {
@@ -37522,6 +37666,12 @@ export namespace Prisma {
     push?: string | string[]
   }
 
+  export type StaffUserCreateNestedOneWithoutDraftsFilledInput = {
+    create?: XOR<StaffUserCreateWithoutDraftsFilledInput, StaffUserUncheckedCreateWithoutDraftsFilledInput>
+    connectOrCreate?: StaffUserCreateOrConnectWithoutDraftsFilledInput
+    connect?: StaffUserWhereUniqueInput
+  }
+
   export type ItemCreateNestedOneWithoutDraftsInput = {
     create?: XOR<ItemCreateWithoutDraftsInput, ItemUncheckedCreateWithoutDraftsInput>
     connectOrCreate?: ItemCreateOrConnectWithoutDraftsInput
@@ -37536,6 +37686,16 @@ export namespace Prisma {
 
   export type EnumEbayDraftStatusFieldUpdateOperationsInput = {
     set?: $Enums.EbayDraftStatus
+  }
+
+  export type StaffUserUpdateOneWithoutDraftsFilledNestedInput = {
+    create?: XOR<StaffUserCreateWithoutDraftsFilledInput, StaffUserUncheckedCreateWithoutDraftsFilledInput>
+    connectOrCreate?: StaffUserCreateOrConnectWithoutDraftsFilledInput
+    upsert?: StaffUserUpsertWithoutDraftsFilledInput
+    disconnect?: StaffUserWhereInput | boolean
+    delete?: StaffUserWhereInput | boolean
+    connect?: StaffUserWhereUniqueInput
+    update?: XOR<XOR<StaffUserUpdateToOneWithWhereWithoutDraftsFilledInput, StaffUserUpdateWithoutDraftsFilledInput>, StaffUserUncheckedUpdateWithoutDraftsFilledInput>
   }
 
   export type ItemUpdateOneRequiredWithoutDraftsNestedInput = {
@@ -38760,6 +38920,48 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type EbayDraftCreateWithoutFilledByInput = {
+    id?: string
+    ebayDraftId?: string | null
+    ebayDraftUrl: string
+    lastSeenAt?: Date | string
+    lastFilledAt?: Date | string | null
+    lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
+    currentValues?: NullableJsonNullValueInput | InputJsonValue
+    status?: $Enums.EbayDraftStatus
+    notes?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    item: ItemCreateNestedOneWithoutDraftsInput
+    ebayAccount?: EbayAccountCreateNestedOneWithoutDraftsInput
+  }
+
+  export type EbayDraftUncheckedCreateWithoutFilledByInput = {
+    id?: string
+    itemId: string
+    ebayDraftId?: string | null
+    ebayDraftUrl: string
+    ebayAccountId?: string | null
+    lastSeenAt?: Date | string
+    lastFilledAt?: Date | string | null
+    lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
+    currentValues?: NullableJsonNullValueInput | InputJsonValue
+    status?: $Enums.EbayDraftStatus
+    notes?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type EbayDraftCreateOrConnectWithoutFilledByInput = {
+    where: EbayDraftWhereUniqueInput
+    create: XOR<EbayDraftCreateWithoutFilledByInput, EbayDraftUncheckedCreateWithoutFilledByInput>
+  }
+
+  export type EbayDraftCreateManyFilledByInputEnvelope = {
+    data: EbayDraftCreateManyFilledByInput | EbayDraftCreateManyFilledByInput[]
+    skipDuplicates?: boolean
+  }
+
   export type CollectionCreateWithoutOwnerInput = {
     id?: string
     name: string
@@ -38959,6 +39161,42 @@ export namespace Prisma {
     itemId?: StringNullableFilter<"Sale"> | string | null
     createdAt?: DateTimeFilter<"Sale"> | Date | string
     updatedAt?: DateTimeFilter<"Sale"> | Date | string
+  }
+
+  export type EbayDraftUpsertWithWhereUniqueWithoutFilledByInput = {
+    where: EbayDraftWhereUniqueInput
+    update: XOR<EbayDraftUpdateWithoutFilledByInput, EbayDraftUncheckedUpdateWithoutFilledByInput>
+    create: XOR<EbayDraftCreateWithoutFilledByInput, EbayDraftUncheckedCreateWithoutFilledByInput>
+  }
+
+  export type EbayDraftUpdateWithWhereUniqueWithoutFilledByInput = {
+    where: EbayDraftWhereUniqueInput
+    data: XOR<EbayDraftUpdateWithoutFilledByInput, EbayDraftUncheckedUpdateWithoutFilledByInput>
+  }
+
+  export type EbayDraftUpdateManyWithWhereWithoutFilledByInput = {
+    where: EbayDraftScalarWhereInput
+    data: XOR<EbayDraftUpdateManyMutationInput, EbayDraftUncheckedUpdateManyWithoutFilledByInput>
+  }
+
+  export type EbayDraftScalarWhereInput = {
+    AND?: EbayDraftScalarWhereInput | EbayDraftScalarWhereInput[]
+    OR?: EbayDraftScalarWhereInput[]
+    NOT?: EbayDraftScalarWhereInput | EbayDraftScalarWhereInput[]
+    id?: StringFilter<"EbayDraft"> | string
+    itemId?: StringFilter<"EbayDraft"> | string
+    ebayDraftId?: StringNullableFilter<"EbayDraft"> | string | null
+    ebayDraftUrl?: StringFilter<"EbayDraft"> | string
+    ebayAccountId?: StringNullableFilter<"EbayDraft"> | string | null
+    filledById?: StringNullableFilter<"EbayDraft"> | string | null
+    lastSeenAt?: DateTimeFilter<"EbayDraft"> | Date | string
+    lastFilledAt?: DateTimeNullableFilter<"EbayDraft"> | Date | string | null
+    lastFilledFields?: JsonNullableFilter<"EbayDraft">
+    currentValues?: JsonNullableFilter<"EbayDraft">
+    status?: EnumEbayDraftStatusFilter<"EbayDraft"> | $Enums.EbayDraftStatus
+    notes?: StringNullableFilter<"EbayDraft"> | string | null
+    createdAt?: DateTimeFilter<"EbayDraft"> | Date | string
+    updatedAt?: DateTimeFilter<"EbayDraft"> | Date | string
   }
 
   export type CollectionUpsertWithWhereUniqueWithoutOwnerInput = {
@@ -39311,6 +39549,7 @@ export namespace Prisma {
     notes?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    filledBy?: StaffUserCreateNestedOneWithoutDraftsFilledInput
     item: ItemCreateNestedOneWithoutDraftsInput
   }
 
@@ -39319,6 +39558,7 @@ export namespace Prisma {
     itemId: string
     ebayDraftId?: string | null
     ebayDraftUrl: string
+    filledById?: string | null
     lastSeenAt?: Date | string
     lastFilledAt?: Date | string | null
     lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
@@ -39457,25 +39697,6 @@ export namespace Prisma {
     data: XOR<EbayDraftUpdateManyMutationInput, EbayDraftUncheckedUpdateManyWithoutEbayAccountInput>
   }
 
-  export type EbayDraftScalarWhereInput = {
-    AND?: EbayDraftScalarWhereInput | EbayDraftScalarWhereInput[]
-    OR?: EbayDraftScalarWhereInput[]
-    NOT?: EbayDraftScalarWhereInput | EbayDraftScalarWhereInput[]
-    id?: StringFilter<"EbayDraft"> | string
-    itemId?: StringFilter<"EbayDraft"> | string
-    ebayDraftId?: StringNullableFilter<"EbayDraft"> | string | null
-    ebayDraftUrl?: StringFilter<"EbayDraft"> | string
-    ebayAccountId?: StringNullableFilter<"EbayDraft"> | string | null
-    lastSeenAt?: DateTimeFilter<"EbayDraft"> | Date | string
-    lastFilledAt?: DateTimeNullableFilter<"EbayDraft"> | Date | string | null
-    lastFilledFields?: JsonNullableFilter<"EbayDraft">
-    currentValues?: JsonNullableFilter<"EbayDraft">
-    status?: EnumEbayDraftStatusFilter<"EbayDraft"> | $Enums.EbayDraftStatus
-    notes?: StringNullableFilter<"EbayDraft"> | string | null
-    createdAt?: DateTimeFilter<"EbayDraft"> | Date | string
-    updatedAt?: DateTimeFilter<"EbayDraft"> | Date | string
-  }
-
   export type SaleUpsertWithWhereUniqueWithoutEbayAccountInput = {
     where: SaleWhereUniqueInput
     update: XOR<SaleUpdateWithoutEbayAccountInput, SaleUncheckedUpdateWithoutEbayAccountInput>
@@ -39506,6 +39727,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     photosAdded?: PhotoCreateNestedManyWithoutUploadedByInput
     salesListed?: SaleCreateNestedManyWithoutListedByInput
+    draftsFilled?: EbayDraftCreateNestedManyWithoutFilledByInput
     collections?: CollectionCreateNestedManyWithoutOwnerInput
   }
 
@@ -39523,6 +39745,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     photosAdded?: PhotoUncheckedCreateNestedManyWithoutUploadedByInput
     salesListed?: SaleUncheckedCreateNestedManyWithoutListedByInput
+    draftsFilled?: EbayDraftUncheckedCreateNestedManyWithoutFilledByInput
     collections?: CollectionUncheckedCreateNestedManyWithoutOwnerInput
   }
 
@@ -39777,6 +40000,7 @@ export namespace Prisma {
     notes?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    filledBy?: StaffUserCreateNestedOneWithoutDraftsFilledInput
     ebayAccount?: EbayAccountCreateNestedOneWithoutDraftsInput
   }
 
@@ -39785,6 +40009,7 @@ export namespace Prisma {
     ebayDraftId?: string | null
     ebayDraftUrl: string
     ebayAccountId?: string | null
+    filledById?: string | null
     lastSeenAt?: Date | string
     lastFilledAt?: Date | string | null
     lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
@@ -39954,6 +40179,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     photosAdded?: PhotoUpdateManyWithoutUploadedByNestedInput
     salesListed?: SaleUpdateManyWithoutListedByNestedInput
+    draftsFilled?: EbayDraftUpdateManyWithoutFilledByNestedInput
     collections?: CollectionUpdateManyWithoutOwnerNestedInput
   }
 
@@ -39971,6 +40197,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     photosAdded?: PhotoUncheckedUpdateManyWithoutUploadedByNestedInput
     salesListed?: SaleUncheckedUpdateManyWithoutListedByNestedInput
+    draftsFilled?: EbayDraftUncheckedUpdateManyWithoutFilledByNestedInput
     collections?: CollectionUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
@@ -40280,6 +40507,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     itemsCreated?: ItemCreateNestedManyWithoutCreatedByInput
     salesListed?: SaleCreateNestedManyWithoutListedByInput
+    draftsFilled?: EbayDraftCreateNestedManyWithoutFilledByInput
     collections?: CollectionCreateNestedManyWithoutOwnerInput
   }
 
@@ -40297,6 +40525,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     itemsCreated?: ItemUncheckedCreateNestedManyWithoutCreatedByInput
     salesListed?: SaleUncheckedCreateNestedManyWithoutListedByInput
+    draftsFilled?: EbayDraftUncheckedCreateNestedManyWithoutFilledByInput
     collections?: CollectionUncheckedCreateNestedManyWithoutOwnerInput
   }
 
@@ -40503,6 +40732,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     itemsCreated?: ItemUpdateManyWithoutCreatedByNestedInput
     salesListed?: SaleUpdateManyWithoutListedByNestedInput
+    draftsFilled?: EbayDraftUpdateManyWithoutFilledByNestedInput
     collections?: CollectionUpdateManyWithoutOwnerNestedInput
   }
 
@@ -40520,6 +40750,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     itemsCreated?: ItemUncheckedUpdateManyWithoutCreatedByNestedInput
     salesListed?: SaleUncheckedUpdateManyWithoutListedByNestedInput
+    draftsFilled?: EbayDraftUncheckedUpdateManyWithoutFilledByNestedInput
     collections?: CollectionUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
@@ -41193,6 +41424,47 @@ export namespace Prisma {
     sales?: SaleUncheckedUpdateManyWithoutItemNestedInput
   }
 
+  export type StaffUserCreateWithoutDraftsFilledInput = {
+    id?: string
+    teamtimeUserId?: string | null
+    email?: string | null
+    name: string
+    role?: string
+    canListOnEbay?: boolean
+    active?: boolean
+    source?: string
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    itemsCreated?: ItemCreateNestedManyWithoutCreatedByInput
+    photosAdded?: PhotoCreateNestedManyWithoutUploadedByInput
+    salesListed?: SaleCreateNestedManyWithoutListedByInput
+    collections?: CollectionCreateNestedManyWithoutOwnerInput
+  }
+
+  export type StaffUserUncheckedCreateWithoutDraftsFilledInput = {
+    id?: string
+    teamtimeUserId?: string | null
+    email?: string | null
+    name: string
+    role?: string
+    canListOnEbay?: boolean
+    active?: boolean
+    source?: string
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    itemsCreated?: ItemUncheckedCreateNestedManyWithoutCreatedByInput
+    photosAdded?: PhotoUncheckedCreateNestedManyWithoutUploadedByInput
+    salesListed?: SaleUncheckedCreateNestedManyWithoutListedByInput
+    collections?: CollectionUncheckedCreateNestedManyWithoutOwnerInput
+  }
+
+  export type StaffUserCreateOrConnectWithoutDraftsFilledInput = {
+    where: StaffUserWhereUniqueInput
+    create: XOR<StaffUserCreateWithoutDraftsFilledInput, StaffUserUncheckedCreateWithoutDraftsFilledInput>
+  }
+
   export type ItemCreateWithoutDraftsInput = {
     id?: string
     sku?: string | null
@@ -41339,6 +41611,53 @@ export namespace Prisma {
   export type EbayAccountCreateOrConnectWithoutDraftsInput = {
     where: EbayAccountWhereUniqueInput
     create: XOR<EbayAccountCreateWithoutDraftsInput, EbayAccountUncheckedCreateWithoutDraftsInput>
+  }
+
+  export type StaffUserUpsertWithoutDraftsFilledInput = {
+    update: XOR<StaffUserUpdateWithoutDraftsFilledInput, StaffUserUncheckedUpdateWithoutDraftsFilledInput>
+    create: XOR<StaffUserCreateWithoutDraftsFilledInput, StaffUserUncheckedCreateWithoutDraftsFilledInput>
+    where?: StaffUserWhereInput
+  }
+
+  export type StaffUserUpdateToOneWithWhereWithoutDraftsFilledInput = {
+    where?: StaffUserWhereInput
+    data: XOR<StaffUserUpdateWithoutDraftsFilledInput, StaffUserUncheckedUpdateWithoutDraftsFilledInput>
+  }
+
+  export type StaffUserUpdateWithoutDraftsFilledInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    teamtimeUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    canListOnEbay?: BoolFieldUpdateOperationsInput | boolean
+    active?: BoolFieldUpdateOperationsInput | boolean
+    source?: StringFieldUpdateOperationsInput | string
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    itemsCreated?: ItemUpdateManyWithoutCreatedByNestedInput
+    photosAdded?: PhotoUpdateManyWithoutUploadedByNestedInput
+    salesListed?: SaleUpdateManyWithoutListedByNestedInput
+    collections?: CollectionUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type StaffUserUncheckedUpdateWithoutDraftsFilledInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    teamtimeUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    canListOnEbay?: BoolFieldUpdateOperationsInput | boolean
+    active?: BoolFieldUpdateOperationsInput | boolean
+    source?: StringFieldUpdateOperationsInput | string
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    itemsCreated?: ItemUncheckedUpdateManyWithoutCreatedByNestedInput
+    photosAdded?: PhotoUncheckedUpdateManyWithoutUploadedByNestedInput
+    salesListed?: SaleUncheckedUpdateManyWithoutListedByNestedInput
+    collections?: CollectionUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ItemUpsertWithoutDraftsInput = {
@@ -41515,6 +41834,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     itemsCreated?: ItemCreateNestedManyWithoutCreatedByInput
     photosAdded?: PhotoCreateNestedManyWithoutUploadedByInput
+    draftsFilled?: EbayDraftCreateNestedManyWithoutFilledByInput
     collections?: CollectionCreateNestedManyWithoutOwnerInput
   }
 
@@ -41532,6 +41852,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     itemsCreated?: ItemUncheckedCreateNestedManyWithoutCreatedByInput
     photosAdded?: PhotoUncheckedCreateNestedManyWithoutUploadedByInput
+    draftsFilled?: EbayDraftUncheckedCreateNestedManyWithoutFilledByInput
     collections?: CollectionUncheckedCreateNestedManyWithoutOwnerInput
   }
 
@@ -41713,6 +42034,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     itemsCreated?: ItemUpdateManyWithoutCreatedByNestedInput
     photosAdded?: PhotoUpdateManyWithoutUploadedByNestedInput
+    draftsFilled?: EbayDraftUpdateManyWithoutFilledByNestedInput
     collections?: CollectionUpdateManyWithoutOwnerNestedInput
   }
 
@@ -41730,6 +42052,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     itemsCreated?: ItemUncheckedUpdateManyWithoutCreatedByNestedInput
     photosAdded?: PhotoUncheckedUpdateManyWithoutUploadedByNestedInput
+    draftsFilled?: EbayDraftUncheckedUpdateManyWithoutFilledByNestedInput
     collections?: CollectionUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
@@ -42645,6 +42968,7 @@ export namespace Prisma {
     itemsCreated?: ItemCreateNestedManyWithoutCreatedByInput
     photosAdded?: PhotoCreateNestedManyWithoutUploadedByInput
     salesListed?: SaleCreateNestedManyWithoutListedByInput
+    draftsFilled?: EbayDraftCreateNestedManyWithoutFilledByInput
   }
 
   export type StaffUserUncheckedCreateWithoutCollectionsInput = {
@@ -42662,6 +42986,7 @@ export namespace Prisma {
     itemsCreated?: ItemUncheckedCreateNestedManyWithoutCreatedByInput
     photosAdded?: PhotoUncheckedCreateNestedManyWithoutUploadedByInput
     salesListed?: SaleUncheckedCreateNestedManyWithoutListedByInput
+    draftsFilled?: EbayDraftUncheckedCreateNestedManyWithoutFilledByInput
   }
 
   export type StaffUserCreateOrConnectWithoutCollectionsInput = {
@@ -42715,6 +43040,7 @@ export namespace Prisma {
     itemsCreated?: ItemUpdateManyWithoutCreatedByNestedInput
     photosAdded?: PhotoUpdateManyWithoutUploadedByNestedInput
     salesListed?: SaleUpdateManyWithoutListedByNestedInput
+    draftsFilled?: EbayDraftUpdateManyWithoutFilledByNestedInput
   }
 
   export type StaffUserUncheckedUpdateWithoutCollectionsInput = {
@@ -42732,6 +43058,7 @@ export namespace Prisma {
     itemsCreated?: ItemUncheckedUpdateManyWithoutCreatedByNestedInput
     photosAdded?: PhotoUncheckedUpdateManyWithoutUploadedByNestedInput
     salesListed?: SaleUncheckedUpdateManyWithoutListedByNestedInput
+    draftsFilled?: EbayDraftUncheckedUpdateManyWithoutFilledByNestedInput
   }
 
   export type CollectionCompUpsertWithWhereUniqueWithoutCollectionInput = {
@@ -43189,6 +43516,22 @@ export namespace Prisma {
     updatedAt?: Date | string
   }
 
+  export type EbayDraftCreateManyFilledByInput = {
+    id?: string
+    itemId: string
+    ebayDraftId?: string | null
+    ebayDraftUrl: string
+    ebayAccountId?: string | null
+    lastSeenAt?: Date | string
+    lastFilledAt?: Date | string | null
+    lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
+    currentValues?: NullableJsonNullValueInput | InputJsonValue
+    status?: $Enums.EbayDraftStatus
+    notes?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type CollectionCreateManyOwnerInput = {
     id?: string
     name: string
@@ -43538,6 +43881,54 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type EbayDraftUpdateWithoutFilledByInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ebayDraftId?: NullableStringFieldUpdateOperationsInput | string | null
+    ebayDraftUrl?: StringFieldUpdateOperationsInput | string
+    lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastFilledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
+    currentValues?: NullableJsonNullValueInput | InputJsonValue
+    status?: EnumEbayDraftStatusFieldUpdateOperationsInput | $Enums.EbayDraftStatus
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    item?: ItemUpdateOneRequiredWithoutDraftsNestedInput
+    ebayAccount?: EbayAccountUpdateOneWithoutDraftsNestedInput
+  }
+
+  export type EbayDraftUncheckedUpdateWithoutFilledByInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    itemId?: StringFieldUpdateOperationsInput | string
+    ebayDraftId?: NullableStringFieldUpdateOperationsInput | string | null
+    ebayDraftUrl?: StringFieldUpdateOperationsInput | string
+    ebayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastFilledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
+    currentValues?: NullableJsonNullValueInput | InputJsonValue
+    status?: EnumEbayDraftStatusFieldUpdateOperationsInput | $Enums.EbayDraftStatus
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type EbayDraftUncheckedUpdateManyWithoutFilledByInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    itemId?: StringFieldUpdateOperationsInput | string
+    ebayDraftId?: NullableStringFieldUpdateOperationsInput | string | null
+    ebayDraftUrl?: StringFieldUpdateOperationsInput | string
+    ebayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastFilledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
+    currentValues?: NullableJsonNullValueInput | InputJsonValue
+    status?: EnumEbayDraftStatusFieldUpdateOperationsInput | $Enums.EbayDraftStatus
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type CollectionUpdateWithoutOwnerInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
@@ -43766,6 +44157,7 @@ export namespace Prisma {
     itemId: string
     ebayDraftId?: string | null
     ebayDraftUrl: string
+    filledById?: string | null
     lastSeenAt?: Date | string
     lastFilledAt?: Date | string | null
     lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
@@ -43973,6 +44365,7 @@ export namespace Prisma {
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    filledBy?: StaffUserUpdateOneWithoutDraftsFilledNestedInput
     item?: ItemUpdateOneRequiredWithoutDraftsNestedInput
   }
 
@@ -43981,6 +44374,7 @@ export namespace Prisma {
     itemId?: StringFieldUpdateOperationsInput | string
     ebayDraftId?: NullableStringFieldUpdateOperationsInput | string | null
     ebayDraftUrl?: StringFieldUpdateOperationsInput | string
+    filledById?: NullableStringFieldUpdateOperationsInput | string | null
     lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastFilledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
@@ -43996,6 +44390,7 @@ export namespace Prisma {
     itemId?: StringFieldUpdateOperationsInput | string
     ebayDraftId?: NullableStringFieldUpdateOperationsInput | string | null
     ebayDraftUrl?: StringFieldUpdateOperationsInput | string
+    filledById?: NullableStringFieldUpdateOperationsInput | string | null
     lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastFilledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
@@ -44170,6 +44565,7 @@ export namespace Prisma {
     ebayDraftId?: string | null
     ebayDraftUrl: string
     ebayAccountId?: string | null
+    filledById?: string | null
     lastSeenAt?: Date | string
     lastFilledAt?: Date | string | null
     lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
@@ -44381,6 +44777,7 @@ export namespace Prisma {
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    filledBy?: StaffUserUpdateOneWithoutDraftsFilledNestedInput
     ebayAccount?: EbayAccountUpdateOneWithoutDraftsNestedInput
   }
 
@@ -44389,6 +44786,7 @@ export namespace Prisma {
     ebayDraftId?: NullableStringFieldUpdateOperationsInput | string | null
     ebayDraftUrl?: StringFieldUpdateOperationsInput | string
     ebayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    filledById?: NullableStringFieldUpdateOperationsInput | string | null
     lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastFilledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     lastFilledFields?: NullableJsonNullValueInput | InputJsonValue
@@ -44404,6 +44802,7 @@ export namespace Prisma {
     ebayDraftId?: NullableStringFieldUpdateOperationsInput | string | null
     ebayDraftUrl?: StringFieldUpdateOperationsInput | string
     ebayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    filledById?: NullableStringFieldUpdateOperationsInput | string | null
     lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastFilledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     lastFilledFields?: NullableJsonNullValueInput | InputJsonValue

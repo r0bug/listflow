@@ -32,6 +32,7 @@ model StaffUser {
   itemsCreated Item[]       @relation("ItemCreator")
   photosAdded  Photo[]
   salesListed  Sale[]
+  draftsFilled EbayDraft[]
   collections  Collection[]
 
   @@index([active])
@@ -317,6 +318,8 @@ model EbayDraft {
   ebayDraftId      String?         @unique
   ebayDraftUrl     String
   ebayAccountId    String? // replaces accountHint — profile-pinned
+  filledBy         StaffUser?      @relation(fields: [filledById], references: [id])
+  filledById       String? // lister identity from extension staff JWT — feeds Sale.listedById
   lastSeenAt       DateTime        @default(now())
   lastFilledAt     DateTime?
   lastFilledFields Json?

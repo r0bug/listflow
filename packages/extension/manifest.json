@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "swiftlist",
-  "version": "0.2.1",
-  "description": "Drive eBay's listing UI from your swiftlist database. Find sold comps, populate drafts, resume where you left off.",
+  "name": "listflow",
+  "version": "1.0.0",
+  "description": "YF eBay suite front door: comps research, AI-identified items, draft autofill with SKU|LOC labels, draft resume, sale detection.",
   "permissions": ["storage", "activeTab", "scripting", "tabs", "alarms"],
   "host_permissions": [
     "https://www.ebay.com/*",
-    "http://localhost:3004/*",
+    "https://www.worthpoint.com/*",
+    "http://localhost:3005/*",
     "https://list.robug.com/*",
     "https://listflow.robug.com/*"
   ],
@@ -28,12 +29,35 @@
   "content_scripts": [
     {
       "matches": ["https://www.ebay.com/sch/*"],
-      "js": ["defaults.js", "lib/api.js", "content-sold.js"],
+      "js": ["lib/api.js", "content-sold.js", "comptool-sold.js"],
+      "css": ["comptool.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.ebay.com/seller/*",
+        "https://www.ebay.com/usr/*",
+        "https://www.ebay.com/str/*"
+      ],
+      "js": ["lib/api.js", "comptool-sold.js"],
+      "css": ["comptool.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.ebay.com/sh/research*"],
+      "js": ["lib/api.js", "comptool-terapeak.js"],
+      "css": ["comptool.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.worthpoint.com/inventory/search*"],
+      "js": ["lib/api.js", "comptool-worthpoint.js"],
+      "css": ["comptool.css"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://www.ebay.com/itm/*"],
-      "js": ["defaults.js", "lib/api.js", "content-detail.js"],
+      "js": ["lib/api.js", "content-detail.js"],
       "run_at": "document_idle"
     },
     {
@@ -41,12 +65,12 @@
         "https://www.ebay.com/sl/sell*",
         "https://www.ebay.com/lstng*"
       ],
-      "js": ["defaults.js", "lib/api.js", "content-listing.js", "content-draft.js"],
+      "js": ["lib/api.js", "content-listing.js", "content-draft.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://www.ebay.com/sh/lst/drafts*"],
-      "js": ["defaults.js", "lib/api.js", "content-drafts-list.js"],
+      "js": ["lib/api.js", "content-drafts-list.js"],
       "run_at": "document_idle"
     }
   ]

@@ -51,6 +51,24 @@ async function fillForm(payload, opts = {}) {
   if (payload.pricing?.startingPrice) safe(() => setInput(['[name="startPrice"]', '[data-testid="starting-price"]'], payload.pricing.startingPrice), 'pricing.startingPrice', filled);
   if (payload.shipping?.weightOz) safe(() => setInput(['[name="weightOz"]', '[data-testid="weight-oz"]'], payload.shipping.weightOz), 'shipping.weightOz', filled);
   if (payload.shipping?.postalCode) safe(() => setInput(['[name="postalCode"]', '[data-testid="postal-code"]'], payload.shipping.postalCode), 'shipping.postalCode', filled);
+  // Custom Label "<SKU>|<LOC>" (fleet Standards §6) — REQUIRED on every
+  // draft: sale→item→lister attribution and pick/pack both depend on it.
+  if (payload.customLabel) {
+    safe(
+      () =>
+        setInput(
+          [
+            '[name="customLabel"]',
+            '[data-testid="custom-label"]',
+            'input[aria-label*="Custom label" i]',
+            'input[aria-label*="SKU" i]',
+          ],
+          payload.customLabel,
+        ),
+      'customLabel',
+      filled,
+    );
+  }
 
   if (payload.photos?.length) {
     safe(() => sidePanelPhotoUrls(payload.photos), 'photos', filled);

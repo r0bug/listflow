@@ -1,45 +1,41 @@
-// Shared fetch wrapper for all content scripts + popup/options. Reads
-// {baseUrl, apiKey, webUrl} from chrome.storage.sync, falling back to
-// window.__swiftlist_defaults (set by defaults.js, written at install time),
-// then to localhost fallbacks.
+// Shared API wrapper for content scripts. All requests route through the
+// service worker (background.js), which holds the credentials — content
+// scripts never touch the JWT or machine key (Standards §6).
+// Keeps the window.swiftlist.* surface the content scripts already use.
 
 (function () {
   if (window.__swiftlist_api_loaded) return;
   window.__swiftlist_api_loaded = true;
 
-  const HARDCODED = {
-    baseUrl: 'http://localhost:3004',
-    apiKey: '',
-    webUrl: 'http://localhost:5173',
-  };
-
-  function bundledDefaults() {
-    return Object.assign({}, HARDCODED, window.__swiftlist_defaults || {});
-  }
-
-  async function settings() {
-    const sync = await chrome.storage.sync.get(['apiKey', 'baseUrl', 'webUrl']);
-    const local = await chrome.storage.local.get(['machineId', 'lastSwiftlistItemId']);
-    const def = bundledDefaults();
-    return {
-      apiKey: sync.apiKey || def.apiKey || '',
-      baseUrl: ((sync.baseUrl || def.baseUrl || '').replace(/\/$/, '')),
-      webUrl: ((sync.webUrl || def.webUrl || '').replace(/\/$/, '')),
-      machineId: local.machineId || '',
-      lastSwiftlistItemId: local.lastSwiftlistItemId || '',
-    };
+  function send(msg) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(msg, (res) => {
+        if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+        resolve(res);
+      });
+    });
   }
 
   async function api(path, opts = {}) {
-    const { apiKey, baseUrl, machineId } = await settings();
-    if (!apiKey) throw new Error('No swiftlist API key set — open extension popup.');
-    const headers = Object.assign(
-      { 'Content-Type': 'application/json', 'X-Api-Key': apiKey, 'X-Machine-Id': machineId },
-      opts.headers || {},
-    );
-    const res = await fetch(`${baseUrl}${path}`, { ...opts, headers });
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text().catch(() => '')}`);
-    return res.json();
+    const res = await send({ type: 'api', path, method: opts.method || 'GET', body: opts.body });
+    if (!res) throw new Error('No response from extension service worker');
+    if (res.ok === false && res.error) throw new Error(res.error);
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${JSON.stringify(res.data ?? '')}`);
+    return res.data;
+  }
+
+  async function settings() {
+    const state = await send({ type: 'auth-state' });
+    const local = await chrome.storage.local.get(['lastSwiftlistItemId']);
+    return {
+      apiKey: state.hasKey ? 'held-by-service-worker' : '',
+      baseUrl: state.baseUrl,
+      webUrl: state.webUrl,
+      user: state.user,
+      loggedIn: state.loggedIn,
+      pinnedAccount: state.pinnedAccount,
+      lastSwiftlistItemId: local.lastSwiftlistItemId || '',
+    };
   }
 
   function setLastItem(itemId) {
@@ -50,16 +46,14 @@
     try {
       await api('/api/v1/extension/telemetry', { method: 'POST', body: JSON.stringify(payload) });
     } catch (err) {
-      console.warn('[swiftlist] telemetry failed', err);
+      console.warn('[listflow] telemetry failed', err);
     }
   }
 
   async function ping() {
-    const { baseUrl } = await settings();
-    const res = await fetch(`${baseUrl}/api/v1/health`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+    return api('/api/v1/health');
   }
 
-  window.swiftlist = { api, settings, setLastItem, telemetry, ping, bundledDefaults };
+  window.swiftlist = { api, settings, setLastItem, telemetry, ping };
+  window.listflow = window.swiftlist; // forward-facing alias
 })();

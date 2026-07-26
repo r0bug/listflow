@@ -121,7 +121,7 @@
             `/api/v1/items/${lastSwiftlistItemId}/drafts`,
             {
               method: 'POST',
-              body: JSON.stringify({ ebayDraftId: draftId, ebayDraftUrl: currentUrl.href, currentValues }),
+              body: JSON.stringify({ ebayDraftId: draftId, ebayDraftUrl: currentUrl.href, currentValues, accountHint: await pinnedAccountName() }),
             },
           );
           await renderLinkedState(b, { draft, item: { id: lastSwiftlistItemId, title: '' }, autofill: null });
@@ -139,7 +139,7 @@
         `/api/v1/items/${id}/drafts`,
         {
           method: 'POST',
-          body: JSON.stringify({ ebayDraftId: draftId, ebayDraftUrl: currentUrl.href, currentValues }),
+          body: JSON.stringify({ ebayDraftId: draftId, ebayDraftUrl: currentUrl.href, currentValues, accountHint: await pinnedAccountName() }),
         },
       );
       await renderLinkedState(b, { draft, item: { id, title: '' }, autofill: null });
@@ -148,6 +148,12 @@
 })();
 
 // ── Helpers ─────────────────────────────────────────────────────────────
+
+
+async function pinnedAccountName() {
+  const { pinnedAccountName } = await chrome.storage.sync.get('pinnedAccountName');
+  return pinnedAccountName || undefined;
+}
 
 function extractDraftId(url) {
   return (

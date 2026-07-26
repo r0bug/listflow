@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>swiftlist</title>
+    <title>listflow</title>
     <style>
       body {
         font-family: -apple-system, system-ui, sans-serif;
@@ -51,25 +51,28 @@
       .row button { background: #2a2a2a; color: #eee; border: 1px solid #444; border-radius: 3px; padding: 3px 8px; cursor: pointer; font-size: 11px; white-space: nowrap; }
       .row button:hover { background: #333; }
       .empty { color: #666; font-style: italic; font-size: 12px; padding: 6px 0; }
-      form.config { display: none; }
-      form.config.visible { display: block; }
-      form.config label { display: block; font-size: 11px; color: #aaa; margin-top: 8px; }
-      form.config input, form.config select { width: 100%; padding: 5px 7px; box-sizing: border-box; background: #222; color: #eee; border: 1px solid #3a3a3a; border-radius: 3px; margin-top: 3px; font-size: 12px; }
+      form.panel label { display: block; font-size: 11px; color: #aaa; margin-top: 8px; }
+      form.panel input, form.panel select { width: 100%; padding: 5px 7px; box-sizing: border-box; background: #222; color: #eee; border: 1px solid #3a3a3a; border-radius: 3px; margin-top: 3px; font-size: 12px; }
+      form.panel .actions { display: flex; gap: 6px; margin-top: 10px; align-items: center; }
+      form.panel button[type=submit] { background: #4a8; color: #111; border: 0; border-radius: 3px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+      form.panel button.ghost { background: transparent; color: #999; border: 0; padding: 4px 6px; font-size: 11px; cursor: pointer; text-decoration: underline; }
+      form.panel .msg { font-size: 11px; margin-left: auto; }
       .status-col { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
       .mcp-badge { font-size: 10px; color: #ea4; background: #2a2a12; border: 1px solid #554818; border-radius: 10px; padding: 1px 6px; display: none; }
       .mcp-badge.visible { display: inline-block; }
-      form.config .actions { display: flex; gap: 6px; margin-top: 10px; align-items: center; }
-      form.config button[type=submit] { background: #4a8; color: #111; border: 0; border-radius: 3px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
-      form.config button.ghost { background: transparent; color: #999; border: 0; padding: 4px 6px; font-size: 11px; cursor: pointer; text-decoration: underline; }
-      form.config .msg { font-size: 11px; margin-left: auto; }
-      .toggle { background: none; border: 0; color: #6af; font-size: 11px; cursor: pointer; padding: 0; }
+      .userline { font-size: 11px; color: #9c9; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+      .userline .acct { color: #6af; }
+      .userline button { background: none; border: 0; color: #999; font-size: 11px; cursor: pointer; text-decoration: underline; padding: 0; }
+      .hidden { display: none !important; }
+      form.config-extra { display: none; }
+      form.config-extra.visible { display: block; }
     </style>
   </head>
   <body>
     <header>
       <div>
-        <h1>swiftlist</h1>
-        <a href="#" id="open-webui" class="sublink">Open web UI →</a>
+        <h1>listflow</h1>
+        <a href="#" id="open-webui" class="sublink">Open app →</a>
       </div>
       <div class="status-col">
         <span id="status" class="status"><span class="dot"></span><span id="status-text">Checking…</span></span>
@@ -77,7 +80,33 @@
       </div>
     </header>
 
-    <nav id="nav">
+    <!-- Login (TeamTime credentials via server proxy) -->
+    <section id="login-section" class="hidden">
+      <h2>Sign in</h2>
+      <form class="panel" id="login-form">
+        <label>Email
+          <input id="login-email" type="email" autocomplete="username" placeholder="you@yakimafinds.com" />
+        </label>
+        <label>PIN
+          <input id="login-pin" type="password" autocomplete="current-password" placeholder="TeamTime PIN" />
+        </label>
+        <div class="actions">
+          <button type="submit">Sign in</button>
+          <span id="login-msg" class="msg"></span>
+        </div>
+      </form>
+    </section>
+
+    <!-- Signed-in bar: who + which eBay account this Chrome profile is pinned to -->
+    <section id="session-section" class="hidden">
+      <div class="userline">
+        <span id="user-name"></span>
+        <span>eBay: <select id="pinned-account" style="background:#222;color:#6af;border:1px solid #3a3a3a;border-radius:3px;font-size:11px;padding:2px 4px;"></select></span>
+        <button id="logout-btn" type="button">sign out</button>
+      </div>
+    </section>
+
+    <nav id="nav" class="hidden">
       <button data-path="/">Items</button>
       <button data-path="/pool">Pool</button>
       <button data-path="/drafts">Drafts</button>
@@ -86,7 +115,7 @@
       <button id="toggle-config">Config</button>
     </nav>
 
-    <section id="scan-section">
+    <section id="scan-section" class="hidden">
       <div class="scan-row">
         <button id="scan-btn">Scan inbox</button>
         <span id="scan-folder" class="folder" title=""></span>
@@ -97,15 +126,12 @@
       </div>
     </section>
 
-    <section>
-      <form class="config" id="config">
+    <section id="config-section">
+      <form class="panel config-extra" id="config">
         <label>API base URL
-          <input id="baseUrl" placeholder="http://localhost:3004" />
+          <input id="baseUrl" placeholder="http://localhost:3005" />
         </label>
-        <label>API key
-          <input id="apiKey" type="password" placeholder="sl_..." />
-        </label>
-        <label>Web UI URL
+        <label>Web app URL
           <input id="webUrl" placeholder="http://localhost:5173" />
         </label>
         <label>Vision provider
@@ -117,18 +143,16 @@
         </label>
         <div class="actions">
           <button type="submit">Save &amp; test</button>
-          <button type="button" class="ghost" id="reset-defaults">Reset to bundled</button>
           <span id="config-msg" class="msg"></span>
         </div>
       </form>
     </section>
 
-    <section id="needs-comps-section">
+    <section id="needs-comps-section" class="hidden">
       <h2>Items needing sold comps</h2>
       <div id="needs-comps" class="empty">…</div>
     </section>
 
-    <script src="defaults.js"></script>
     <script src="lib/api.js"></script>
     <script src="popup.js"></script>
   </body>

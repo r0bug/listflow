@@ -325,6 +325,7 @@ exports.Prisma.EbayDraftScalarFieldEnum = {
   ebayDraftId: 'ebayDraftId',
   ebayDraftUrl: 'ebayDraftUrl',
   ebayAccountId: 'ebayAccountId',
+  filledById: 'filledById',
   lastSeenAt: 'lastSeenAt',
   lastFilledAt: 'lastFilledAt',
   lastFilledFields: 'lastFilledFields',
