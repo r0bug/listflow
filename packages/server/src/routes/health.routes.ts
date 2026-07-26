@@ -8,7 +8,7 @@ router.get('/health', async (_req, res) => {
     await prisma.$queryRaw`SELECT 1`;
     res.json({
       status: 'ok',
-      service: 'swiftlist',
+      service: 'listflow',
       version: process.env.npm_package_version ?? '0.1.0',
       time: new Date().toISOString(),
     });

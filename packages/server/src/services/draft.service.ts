@@ -21,6 +21,7 @@ import {
 import type { DraftCurrentValues, DraftDeltaPayload } from '@listflow/shared';
 import { EBAY_CONDITION_ID } from '@listflow/shared';
 import { readFileSync } from 'node:fs';
+import { ensureItemSku, composeCustomLabel } from './sku.service.js';
 
 const PACKAGE_VERSION = readPkgVersion();
 
@@ -98,6 +99,7 @@ export async function buildAutofillPayload(
       epid: item.epid ?? undefined,
       brand: item.brand ?? undefined,
     },
+    customLabel: composeCustomLabel(await ensureItemSku(item), item.locationCode),
     metadata: {
       swiftlistVersion: PACKAGE_VERSION,
       sourceSystem: 'swiftlist',

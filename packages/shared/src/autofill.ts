@@ -57,6 +57,11 @@ export interface EbayAutofillPayload {
     brand?: string;
   };
 
+  /** eBay Custom Label field: "<SKU>|<LOC>" (fleet Standards §6). The
+   *  extension MUST fill this on every draft — sale→item→lister joins
+   *  depend on it. */
+  customLabel?: string;
+
   metadata: {
     swiftlistVersion: string;
     sourceSystem: 'swiftlist';

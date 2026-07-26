@@ -20,8 +20,8 @@ import { startUsbWatcher } from './usbWatcher.js';
   }
 })();
 
-const watchFolder = process.env.SWIFTLIST_WATCH_FOLDER ?? path.resolve(process.cwd(), 'inbox');
-const importDir = process.env.SWIFTLIST_IMPORT_DIR ?? path.join(watchFolder, '_usb');
+const watchFolder = process.env.LISTFLOW_WATCH_FOLDER ?? path.resolve(process.cwd(), 'inbox');
+const importDir = process.env.LISTFLOW_IMPORT_DIR ?? path.join(watchFolder, '_usb');
 
 fs.mkdirSync(watchFolder, { recursive: true });
 fs.mkdirSync(importDir, { recursive: true });

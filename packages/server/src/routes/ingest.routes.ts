@@ -55,10 +55,20 @@ const JsonPhotoSchema = CommonFields.extend({
     .optional(),
 }).refine((v) => Boolean(v.path || v.inline), { message: 'path, inline, or multipart file required' });
 
-function buildContext(req: import('express').Request, fields: z.infer<typeof CommonFields>, viaFile: boolean): IngestContext {
+function buildContext(
+  req: import('express').Request,
+  fields: z.infer<typeof CommonFields>,
+  viaFile: boolean,
+  sourcePath?: string,
+): IngestContext {
   const machine = req.machine;
   const staff = req.staff;
-  const defaultSource = machine ? 'WATCH_FOLDER' : 'PWA_UPLOAD';
+  // USB/DCIM auto-imports arrive via the watcher's inbox/_usb staging dir.
+  const defaultSource = machine
+    ? sourcePath?.includes('/_usb/')
+      ? 'USB_DCIM'
+      : 'WATCH_FOLDER'
+    : 'PWA_UPLOAD';
   return {
     source: fields.source ?? defaultSource,
     machineDbId: machine?.machineDbId,
@@ -100,7 +110,7 @@ router.post('/photo', staffOrMachine, upload.single('file'), (req, res) => {
   }
   const { jobId } = ingestService.enqueue(
     sourcePath!,
-    buildContext(req, parsed.data, Boolean(parsed.data.inline)),
+    buildContext(req, parsed.data, Boolean(parsed.data.inline), sourcePath),
   );
   res.status(202).json({ jobId, status: 'queued' });
 });
@@ -125,7 +135,7 @@ router.post('/batch', staffOrMachine, (req, res) => {
       sourcePath = path.join(dir, `${Date.now()}-${randomBytes(6).toString('hex')}${ext}`);
       fs.writeFileSync(sourcePath, Buffer.from(p.inline.base64, 'base64'));
     }
-    const { jobId } = ingestService.enqueue(sourcePath!, buildContext(req, p, Boolean(p.inline)));
+    const { jobId } = ingestService.enqueue(sourcePath!, buildContext(req, p, Boolean(p.inline), sourcePath));
     jobIds.push(jobId);
   }
   res.status(202).json({ jobIds, status: 'queued', count: jobIds.length });

@@ -7,9 +7,9 @@ import axios, { type AxiosInstance } from 'axios';
 let cached: { client: AxiosInstance; baseURL: string } | null = null;
 
 function makeClient(): { client: AxiosInstance; baseURL: string } {
-  const baseURL = process.env.SWIFTLIST_API_BASE ?? 'http://localhost:3004';
-  const apiKey = process.env.SWIFTLIST_API_KEY ?? '';
-  const machineId = process.env.SWIFTLIST_MACHINE_ID ?? `watcher-${process.pid}`;
+  const baseURL = process.env.LISTFLOW_API_BASE ?? 'http://localhost:3005';
+  const apiKey = process.env.LISTFLOW_API_KEY ?? '';
+  const machineId = process.env.LISTFLOW_MACHINE_ID ?? `watcher-${process.pid}`;
   const client = axios.create({
     baseURL,
     headers: {
