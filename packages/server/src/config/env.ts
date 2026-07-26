@@ -48,6 +48,18 @@ const EnvSchema = z.object({
 
   // M2M secret TeamTime presents to pull /api/v1/sales/feed
   LISTFLOW_API_SECRET: z.string().optional(),
+
+  // eBay developer app (read paths: sales sync + Browse; not publishing)
+  EBAY_CLIENT_ID: z.string().optional(),
+  EBAY_CLIENT_SECRET: z.string().optional(),
+  EBAY_DEV_ID: z.string().optional(),
+  EBAY_RU_NAME: z.string().optional(),
+
+  // In-process jobs (sales sync / roster sync)
+  JOBS_ENABLED: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
 });
 
 export const env = EnvSchema.parse(process.env);

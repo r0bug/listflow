@@ -106,6 +106,13 @@ router.patch('/:id/attribution', staffAuth, async (req, res) => {
   res.json(updated);
 });
 
+// Manual API-sync trigger (staff) — runs all connected accounts now.
+router.post('/sync', staffAuth, async (_req, res) => {
+  const { salesSyncService } = await import('../services/salesSync.service.js');
+  const results = await salesSyncService.syncAllAccounts();
+  res.json({ results });
+});
+
 // ── TeamTime feed (M2M) ────────────────────────────────────────────────
 
 const feedAuth: RequestHandler = (req, res, next) => {

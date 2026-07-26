@@ -28,6 +28,8 @@ import settingsRoutes from './routes/settings.routes.js';
 import salesRoutes from './routes/sales.routes.js';
 import ebayAccountsRoutes from './routes/ebayAccounts.routes.js';
 import compsRoutes from './routes/comps.routes.js';
+import ebayOauthRoutes from './routes/ebayOauth.routes.js';
+import { startScheduler } from './jobs/scheduler.js';
 
 const app = express();
 
@@ -67,9 +69,11 @@ app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/sales', salesRoutes);
 app.use('/api/v1/ebay-accounts', ebayAccountsRoutes);
 app.use('/api/v1/comps', compsRoutes);
+app.use('/api/v1/ebay/oauth', ebayOauthRoutes);
 
 app.use(errorHandler);
 
 app.listen(env.PORT, () => {
   logger.info({ port: env.PORT }, 'listflow server started');
+  startScheduler();
 });
