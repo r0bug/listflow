@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#181818" />
+  <title>listflow field</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, system-ui, sans-serif; background: #181818; color: #eee; margin: 0; padding: 14px; }
+    h1 { font-size: 18px; margin: 4px 0 14px; }
+    h1 small { color: #6af; font-weight: 400; font-size: 12px; margin-left: 8px; }
+    label { display: block; font-size: 13px; color: #aaa; margin: 10px 0 4px; }
+    input, button, select { font-size: 15px; border-radius: 8px; }
+    input, select { width: 100%; padding: 11px; background: #222; color: #eee; border: 1px solid #3a3a3a; }
+    button { padding: 11px 16px; border: 0; cursor: pointer; }
+    .primary { background: #4a8; color: #111; font-weight: 600; }
+    .ghost { background: #2a2a2a; color: #eee; border: 1px solid #3a3a3a; }
+    .hidden { display: none !important; }
+    .msg { font-size: 13px; margin-top: 8px; min-height: 16px; }
+    .msg.err { color: #f66; } .msg.ok { color: #6c6; }
+    #topbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; }
+    #net { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+    #net.on { background: #12321a; color: #6c6; } #net.off { background: #33201a; color: #ea4; }
+    /* collections list */
+    .col-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 4px; border-top: 1px solid #262626; }
+    .col-row .name { font-size: 15px; font-weight: 600; }
+    .col-row .meta { font-size: 12px; color: #888; margin-top: 2px; }
+    .col-row .badge { font-size: 10px; color: #6c6; border: 1px solid #2c4; border-radius: 8px; padding: 1px 6px; margin-left: 6px; }
+    .col-actions { display: flex; gap: 6px; }
+    .col-actions button { font-size: 12px; padding: 7px 10px; }
+    /* grid */
+    #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+    .card { background: #202020; border: 1px solid #2c2c2c; border-radius: 10px; overflow: hidden; position: relative; }
+    .card.flagged { border-color: #4a8; }
+    .card img { width: 100%; aspect-ratio: 1; object-fit: cover; background: #262626; display: block; }
+    .card .noimg { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; color: #555; font-size: 11px; background: #222; }
+    .card .body { padding: 8px; }
+    .card .price { font-weight: 700; color: #6c6; font-size: 15px; }
+    .card .title { font-size: 11px; color: #bbb; margin-top: 3px; line-height: 1.3; max-height: 2.6em; overflow: hidden; }
+    .card .sub { font-size: 10px; color: #777; margin-top: 4px; }
+    .card .flag { position: absolute; top: 6px; right: 6px; background: #000a; border: 0; border-radius: 6px; color: #ea4; font-size: 15px; padding: 4px 7px; }
+    .card.flagged .flag { color: #4a8; }
+    #statsbar { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #aaa; background: #202020; border: 1px solid #2c2c2c; border-radius: 8px; padding: 8px 12px; margin-top: 10px; }
+    #statsbar b { color: #6c6; }
+    .toolbar { display: flex; gap: 8px; margin-top: 10px; }
+    .toolbar input { flex: 1; }
+    .toolbar select { width: auto; }
+    #back { margin-bottom: 8px; font-size: 13px; }
+    form#new-col { background: #202020; border: 1px solid #2c2c2c; border-radius: 10px; padding: 12px; margin-top: 12px; }
+    form#new-col button { margin-top: 10px; width: 100%; }
+  </style>
+</head>
+<body>
+  <h1>listflow <small>field comps</small></h1>
+
+  <div id="login-view">
+    <label>Email</label>
+    <input id="email" type="email" autocomplete="username" />
+    <label>PIN</label>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" />
+    <button class="primary" id="login-btn" style="width:100%;margin-top:14px">Sign in</button>
+    <div class="msg" id="login-msg"></div>
+  </div>
+
+  <div id="list-view" class="hidden">
+    <div id="topbar">
+      <span id="who"></span>
+      <span><span id="net" class="on">online</span> <button class="ghost" id="logout-btn" style="font-size:12px;padding:5px 9px">sign out</button></span>
+    </div>
+
+    <form id="new-col">
+      <b style="font-size:13px">New collection (pick prep)</b>
+      <label>Name</label>
+      <input id="nc-name" placeholder="Ford Model A parts" />
+      <label>Match sold comps containing…</label>
+      <input id="nc-q" placeholder="model a carburetor" />
+      <button class="primary" type="submit">Build collection</button>
+      <div class="msg" id="nc-msg"></div>
+    </form>
+
+    <div id="collections"></div>
+  </div>
+
+  <div id="grid-view" class="hidden">
+    <div id="topbar">
+      <button class="ghost" id="back">← Collections</button>
+      <span id="net2" class="on" ></span>
+    </div>
+    <h2 id="col-title" style="font-size:16px;margin:4px 0"></h2>
+    <div id="statsbar"></div>
+    <div class="toolbar">
+      <input id="filter" placeholder="filter…" />
+      <select id="sort">
+        <option value="price-desc">$ high→low</option>
+        <option value="price-asc">$ low→high</option>
+        <option value="date-desc">newest sold</option>
+      </select>
+    </div>
+    <div id="grid"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

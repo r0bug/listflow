@@ -1,0 +1,11 @@
+{
+  "name": "listflow field comps",
+  "short_name": "lf field",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#181818",
+  "theme_color": "#181818",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }
+  ]
+}

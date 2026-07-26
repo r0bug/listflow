@@ -29,6 +29,7 @@ import salesRoutes from './routes/sales.routes.js';
 import ebayAccountsRoutes from './routes/ebayAccounts.routes.js';
 import compsRoutes from './routes/comps.routes.js';
 import ebayOauthRoutes from './routes/ebayOauth.routes.js';
+import collectionsRoutes from './routes/collections.routes.js';
 import { startScheduler } from './jobs/scheduler.js';
 
 const app = express();
@@ -57,6 +58,8 @@ app.use('/dist', express.static(distDir));
 // Mobile upload PWA (staff-only surface: static shell is public, every API
 // call it makes requires a staff JWT).
 app.use('/m', express.static(path.resolve(__dirname, '..', '..', 'mobile-upload')));
+// Field comps PWA (offline pick-prep collections).
+app.use('/f', express.static(path.resolve(__dirname, '..', '..', 'field')));
 
 app.use('/api/v1', healthRoutes);
 app.use('/api/v1/auth', authRoutes);
@@ -73,6 +76,7 @@ app.use('/api/v1/sales', salesRoutes);
 app.use('/api/v1/ebay-accounts', ebayAccountsRoutes);
 app.use('/api/v1/comps', compsRoutes);
 app.use('/api/v1/ebay/oauth', ebayOauthRoutes);
+app.use('/api/v1/collections', collectionsRoutes);
 
 app.use(errorHandler);
 

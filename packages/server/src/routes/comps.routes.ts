@@ -150,4 +150,53 @@ router.get('/searches', staffOrMachine, async (_req, res) => {
   res.json({ searches });
 });
 
+// Server-cached comp thumbnail (offline field bundles precache these).
+// First hit downloads from eBay into FILE_ROOT/comps/<id>.jpg and records
+// SoldComp.localImage; later hits stream the local copy — pick sites keep
+// working when eBay's CDN is unreachable.
+router.get('/:id/thumb', staffOrMachine, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: 'bad id' });
+    return;
+  }
+  const comp = await prisma.soldComp.findUnique({ where: { id } });
+  if (!comp) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const { absPath, ensureDirFor } = await import('../util/paths.js');
+
+  let rel = comp.localImage;
+  if (!rel || !fs.existsSync(absPath(rel))) {
+    if (!comp.imageUrl) {
+      res.status(404).json({ error: 'No image for this comp' });
+      return;
+    }
+    try {
+      const sharp = (await import('sharp')).default;
+      const resp = await fetch(comp.imageUrl, { signal: AbortSignal.timeout(15000) });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const buf = Buffer.from(await resp.arrayBuffer());
+      rel = path.join('comps', `${comp.id}.jpg`);
+      const abs = absPath(rel);
+      ensureDirFor(abs);
+      await sharp(buf)
+        .resize(600, 600, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 78 })
+        .toFile(abs);
+      await prisma.soldComp.update({ where: { id }, data: { localImage: rel } });
+    } catch {
+      res.status(502).json({ error: 'image fetch failed' });
+      return;
+    }
+  }
+  res.setHeader('Content-Type', 'image/jpeg');
+  res.setHeader('Cache-Control', 'private, max-age=604800, immutable');
+  fs.createReadStream(absPath(rel)).pipe(res);
+});
+
 export default router;
