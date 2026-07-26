@@ -68,6 +68,36 @@ async function main() {
   });
   console.log('Created user:', photographer.name, '- PIN: 1111');
 
+  // Provision the two eBay seller accounts (creds shared from the one dev app;
+  // per-account user tokens arrive via the OAuth Connect flow in Settings).
+  // Names/emails are placeholders until real ones are set via env or Settings.
+  const ebayAccounts = [
+    {
+      accountName: process.env.EBAY_ACCOUNT_1_NAME || 'account-1',
+      email: process.env.EBAY_ACCOUNT_1_EMAIL || 'account1@placeholder.local',
+    },
+    {
+      accountName: process.env.EBAY_ACCOUNT_2_NAME || 'account-2',
+      email: process.env.EBAY_ACCOUNT_2_EMAIL || 'account2@placeholder.local',
+    },
+  ];
+  for (const acct of ebayAccounts) {
+    const created = await prisma.ebayAccount.upsert({
+      where: { accountName: acct.accountName },
+      update: {},
+      create: {
+        accountName: acct.accountName,
+        email: acct.email,
+        appId: process.env.EBAY_CLIENT_ID || process.env.EBAY_APP_ID || '',
+        certId: process.env.EBAY_CLIENT_SECRET || process.env.EBAY_CERT_ID || '',
+        devId: process.env.EBAY_DEV_ID || '',
+        sandbox: process.env.EBAY_SANDBOX === 'true',
+        locationId: location.id,
+      },
+    });
+    console.log('Created eBay account:', created.accountName);
+  }
+
   console.log('\nDatabase seeded successfully!');
   console.log('\nDefault users created:');
   console.log('  - Admin User (admin@listflow.local) - PIN: 1111');

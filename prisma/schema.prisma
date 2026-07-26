@@ -55,6 +55,8 @@ model EbayAccount {
   // Status
   isActive     Boolean  @default(true)
   lastSync     DateTime?
+  tokenExpiresAt     DateTime? // access-token expiry (refresh before this)
+  ordersSyncedThrough DateTime? // backfill/incremental cursor for sales sync
   
   // Location this account belongs to
   location     Location @relation(fields: [locationId], references: [id])
@@ -66,6 +68,7 @@ model EbayAccount {
   // Relations
   items        Item[]
   listings     Listing[]
+  sales        Sale[]
 
   @@index([accountName])
   @@index([locationId])
@@ -258,6 +261,14 @@ model Listing {
   ebayAccount  EbayAccount? @relation(fields: [ebayAccountId], references: [id])
   ebayAccountId String?
 
+  // Listing agent (commission attribution)
+  listingAgent   ListingAgent? @relation(fields: [listingAgentId], references: [id])
+  listingAgentId String?
+  // Per-listing commission override (falls back to agent default when null)
+  commissionRateType  CommissionRateType?
+  commissionRateValue Float?
+  sales        Sale[]
+
   // Timestamps
   listedAt     DateTime @default(now())
   endedAt      DateTime?
@@ -270,6 +281,7 @@ model Listing {
   @@index([ebayId])
   @@index([status])
   @@index([listedAt])
+  @@index([listingAgentId])
 }
 
 // Sold data from eBay marketplace research (scraped/API)
@@ -404,4 +416,104 @@ enum TemplateSourceType {
   SELL_SIMILAR
   AI_GENERATED
   IMPORTED
+}
+
+// ============ Sales & Commission tracking ============
+
+enum CommissionRateType {
+  PERCENT
+  FLAT
+}
+
+enum CommissionStatus {
+  PENDING
+  PAID
+}
+
+enum AttributionStatus {
+  PENDING     // sold, no agent assigned yet
+  ATTRIBUTED  // commission created
+  HOUSE       // explicitly no commission
+}
+
+// Listing agents (staff who list items) — synced from TeamTime or added manually
+model ListingAgent {
+  id             String   @id @default(cuid())
+  teamtimeUserId String?  @unique
+  name           String
+  email          String?
+  active         Boolean  @default(true)
+  rateType       CommissionRateType @default(PERCENT)
+  rateValue      Float    @default(0) // percent (10 = 10%) or flat $ per sale
+  source         String   @default("manual") // teamtime | manual
+  lastSyncedAt   DateTime?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  listings       Listing[]
+  commissions    Commission[]
+
+  @@index([active])
+}
+
+// One row per sold order line item, from API sync or Seller Hub CSV import
+model Sale {
+  id             String   @id @default(cuid())
+  ebayOrderId    String
+  lineItemId     String   @default("0") // Fulfillment lineItemId; CSV fallback: transactionId/itemNumber
+  legacyItemId   String?  // eBay item number — joins Listing.ebayId
+  title          String
+  quantity       Int      @default(1)
+  itemPrice      Float    // per-unit sold price
+  shippingPrice  Float?
+  totalPrice     Float    // itemPrice*qty + shipping
+  fees           Float?
+  currency       String   @default("USD")
+  buyerUsername  String?
+  buyerName      String?
+  soldAt         DateTime
+  imageUrl       String?  // remote eBay picture URL
+  imagePath      String?  // local copy under uploads/sales/
+  thumbnailPath  String?
+  source         String   // api | csv
+  rawData        Json?
+
+  attributionStatus AttributionStatus @default(PENDING)
+
+  ebayAccount    EbayAccount @relation(fields: [ebayAccountId], references: [id])
+  ebayAccountId  String
+  listing        Listing?    @relation(fields: [listingId], references: [id])
+  listingId      String?
+  commission     Commission?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([ebayAccountId, ebayOrderId, lineItemId])
+  @@index([soldAt])
+  @@index([attributionStatus])
+  @@index([ebayAccountId])
+  @@index([legacyItemId])
+}
+
+// Commission owed to an agent for a sale; rate snapshotted at creation
+model Commission {
+  id         String   @id @default(cuid())
+  sale       Sale     @relation(fields: [saleId], references: [id])
+  saleId     String   @unique
+  agent      ListingAgent @relation(fields: [agentId], references: [id])
+  agentId    String
+  rateType   CommissionRateType
+  rateValue  Float
+  basis      Float    // itemPrice * quantity (shipping excluded)
+  amount     Float    // PERCENT: basis*rateValue/100, FLAT: rateValue
+  status     CommissionStatus @default(PENDING)
+  paidAt     DateTime?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([agentId, createdAt])
+  @@index([status])
 }

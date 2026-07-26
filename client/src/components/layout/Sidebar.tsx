@@ -13,6 +13,8 @@ import {
   ChevronRight,
   Copy,
   BarChart3,
+  Receipt,
+  DollarSign,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { cn } from '../../utils/cn';
@@ -135,6 +137,8 @@ export const Sidebar: React.FC = () => {
         <NavItem to="/templates" icon={<FileText size={18} />} label="Templates" />
         <NavItem to="/sell-similar" icon={<Copy size={18} />} label="Sell Similar" />
         <NavItem to="/research" icon={<Search size={18} />} label="Research" />
+        <NavItem to="/sales" icon={<Receipt size={18} />} label="Sales" />
+        <NavItem to="/commissions" icon={<DollarSign size={18} />} label="Commissions" />
         <NavItem to="/reports" icon={<BarChart3 size={18} />} label="Reports" />
 
         <div className="pt-3 mt-3 border-t border-slate-100">

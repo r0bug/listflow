@@ -21,11 +21,53 @@ function getRedirectUri(): string {
     `${process.env.CLIENT_URL || 'http://localhost:5173'}/settings/ebay/callback`;
 }
 
+// List eBay accounts (connection status only, no secrets)
+// GET /api/v1/ebay/accounts
+router.get('/accounts', async (_req: Request, res: Response) => {
+  try {
+    const accounts = await prisma.ebayAccount.findMany({
+      orderBy: { accountName: 'asc' },
+      select: {
+        id: true,
+        accountName: true,
+        email: true,
+        sandbox: true,
+        isActive: true,
+        lastSync: true,
+        tokenExpiresAt: true,
+        ordersSyncedThrough: true,
+        refreshToken: true,
+      },
+    });
+    res.json({
+      accounts: accounts.map(({ refreshToken, ...account }) => ({
+        ...account,
+        connected: Boolean(refreshToken),
+      })),
+    });
+  } catch (error) {
+    console.error('Error listing eBay accounts:', error);
+    res.status(500).json({ error: 'Failed to list eBay accounts' });
+  }
+});
+
 // Generate OAuth authorization URL
 // POST /api/v1/ebay/auth/url
 router.post('/auth/url', async (req: Request, res: Response) => {
   try {
-    const { clientId, sandbox } = req.body;
+    const { clientId: reqClientId, sandbox: reqSandbox, ebayAccountId } = req.body;
+
+    // Preferred: authorize a specific EbayAccount row (carried through OAuth state)
+    let clientId = reqClientId || process.env.EBAY_CLIENT_ID;
+    let sandbox = reqSandbox !== undefined ? reqSandbox : process.env.EBAY_SANDBOX === 'true';
+    if (ebayAccountId) {
+      const account = await prisma.ebayAccount.findUnique({ where: { id: ebayAccountId } });
+      if (!account) {
+        return res.status(404).json({ success: false, error: 'Unknown eBay account' });
+      }
+      clientId = account.appId || clientId;
+      sandbox = account.sandbox;
+    }
 
     if (!clientId) {
       return res.status(400).json({ success: false, error: 'Client ID is required' });
@@ -43,6 +85,9 @@ router.post('/auth/url', async (req: Request, res: Response) => {
       scope: EBAY_OAUTH_SCOPES,
       prompt: 'login',
     });
+    if (ebayAccountId) {
+      params.set('state', ebayAccountId);
+    }
 
     const authUrl = `${baseUrl}?${params.toString()}`;
 
@@ -58,11 +103,41 @@ router.post('/auth/url', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Persist an OAuth token response onto an EbayAccount row. When ebayAccountId
+ * (from OAuth state) is present the tokens go to that exact row; otherwise we
+ * fall back to matching on appId. Returns false if no account row was found —
+ * callers must surface that instead of silently dropping tokens.
+ */
+async function storeTokensForAccount(
+  tokenData: { access_token: string; refresh_token?: string; expires_in?: number },
+  ebayAccountId: string | undefined,
+  clientId: string
+): Promise<boolean> {
+  const account = ebayAccountId
+    ? await prisma.ebayAccount.findUnique({ where: { id: ebayAccountId } })
+    : await prisma.ebayAccount.findFirst({ where: { appId: clientId } });
+  if (!account) return false;
+
+  await prisma.ebayAccount.update({
+    where: { id: account.id },
+    data: {
+      authToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token || account.refreshToken,
+      tokenExpiresAt: tokenData.expires_in
+        ? new Date(Date.now() + tokenData.expires_in * 1000)
+        : null,
+      lastSync: new Date(),
+    },
+  });
+  return true;
+}
+
 // Exchange authorization code for tokens
 // POST /api/v1/ebay/auth/token
 router.post('/auth/token', async (req: Request, res: Response) => {
   try {
-    const { code, clientId: reqClientId, clientSecret: reqClientSecret, sandbox: reqSandbox } = req.body;
+    const { code, clientId: reqClientId, clientSecret: reqClientSecret, sandbox: reqSandbox, state } = req.body;
 
     if (!code) {
       return res.status(400).json({ success: false, error: 'Authorization code is required' });
@@ -107,24 +182,12 @@ router.post('/auth/token', async (req: Request, res: Response) => {
       });
     }
 
-    // Store tokens in database
-    try {
-      const existingAccount = await prisma.ebayAccount.findFirst({
-        where: { appId: clientId }
+    const stored = await storeTokensForAccount(tokenData, state, clientId);
+    if (!stored) {
+      return res.status(400).json({
+        success: false,
+        error: 'No matching EbayAccount row to store tokens on — create the account first',
       });
-
-      if (existingAccount) {
-        await prisma.ebayAccount.update({
-          where: { id: existingAccount.id },
-          data: {
-            authToken: tokenData.access_token,
-            refreshToken: tokenData.refresh_token || existingAccount.refreshToken,
-            lastSync: new Date(),
-          }
-        });
-      }
-    } catch (dbError) {
-      console.warn('Could not store eBay tokens in database:', dbError);
     }
 
     res.json({
@@ -142,7 +205,7 @@ router.post('/auth/token', async (req: Request, res: Response) => {
 // GET /api/v1/ebay/auth/callback
 router.get('/auth/callback', async (req: Request, res: Response) => {
   try {
-    const { code, error, error_description } = req.query;
+    const { code, error, error_description, state } = req.query;
 
     if (error) {
       console.error('eBay OAuth error:', error, error_description);
@@ -186,24 +249,13 @@ router.get('/auth/callback', async (req: Request, res: Response) => {
       return res.redirect(`/settings?ebay_error=${encodeURIComponent(tokenData.error_description || 'Token exchange failed')}`);
     }
 
-    // Store tokens in database
-    try {
-      const existingAccount = await prisma.ebayAccount.findFirst({
-        where: { appId: clientId }
-      });
-
-      if (existingAccount) {
-        await prisma.ebayAccount.update({
-          where: { id: existingAccount.id },
-          data: {
-            authToken: tokenData.access_token,
-            refreshToken: tokenData.refresh_token || existingAccount.refreshToken,
-            lastSync: new Date(),
-          }
-        });
-      }
-    } catch (dbError) {
-      console.warn('Could not store eBay tokens in database:', dbError);
+    const stored = await storeTokensForAccount(
+      tokenData,
+      typeof state === 'string' && state ? state : undefined,
+      clientId
+    );
+    if (!stored) {
+      return res.redirect('/settings?ebay_error=No matching eBay account to store tokens on');
     }
 
     res.redirect('/settings?ebay_success=true');

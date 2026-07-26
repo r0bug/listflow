@@ -36,6 +36,15 @@ interface Listing {
   soldAt?: string;
   buyer?: string;
   shippingCost?: number;
+  listingAgentId?: string | null;
+}
+
+interface ListingAgent {
+  id: string;
+  name: string;
+  active: boolean;
+  rateType: 'PERCENT' | 'FLAT';
+  rateValue: number;
 }
 
 interface ListingStats {
@@ -85,6 +94,9 @@ export const Listings: React.FC = () => {
   const [endingListing, setEndingListing] = useState<Listing | null>(null);
   const [isEnding, setIsEnding] = useState(false);
 
+  // Listing agents (for attribution)
+  const [agents, setAgents] = useState<ListingAgent[]>([]);
+
   const loadListings = async () => {
     setIsLoading(true);
     try {
@@ -118,6 +130,46 @@ export const Listings: React.FC = () => {
   useEffect(() => {
     loadListings();
   }, []);
+
+  // Load active agents (defensive: agents endpoint may not be available)
+  useEffect(() => {
+    const loadAgents = async () => {
+      try {
+        const response = await fetch('/api/v1/agents');
+        const data = await response.json();
+        if (Array.isArray(data.agents)) {
+          setAgents(data.agents.filter((a: ListingAgent) => a.active));
+        }
+      } catch (error) {
+        console.error('Failed to load agents:', error);
+      }
+    };
+    loadAgents();
+  }, []);
+
+  const handleAgentChange = async (listing: Listing, agentId: string) => {
+    const previousAgentId = listing.listingAgentId ?? null;
+    // Optimistic update
+    setActiveListings(prev => prev.map(l =>
+      l.id === listing.id ? { ...l, listingAgentId: agentId || null } : l
+    ));
+    try {
+      const response = await fetch(`/api/listings/${listing.id}/agent`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId: agentId || null })
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Failed to update listing agent:', error);
+      // Revert on failure
+      setActiveListings(prev => prev.map(l =>
+        l.id === listing.id ? { ...l, listingAgentId: previousAgentId } : l
+      ));
+    }
+  };
 
   // Close filter dropdown when clicking outside
   useEffect(() => {
@@ -499,6 +551,22 @@ export const Listings: React.FC = () => {
                   <p className="text-sm text-slate-500 mb-3">
                     Sold to: {listing.buyer}
                   </p>
+                )}
+
+                {listing.status === 'active' && agents.length > 0 && listing.id && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <label className="text-sm text-slate-500 flex-shrink-0">Agent</label>
+                    <select
+                      value={listing.listingAgentId || ''}
+                      onChange={(e) => handleAgentChange(listing, e.target.value)}
+                      className="input flex-1 text-sm py-1"
+                    >
+                      <option value="">Unassigned</option>
+                      {agents.map((agent) => (
+                        <option key={agent.id} value={agent.id}>{agent.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 )}
 
                 <div className="flex items-center gap-2 pt-3 border-t border-slate-100">

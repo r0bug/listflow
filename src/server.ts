@@ -13,6 +13,10 @@ import itemRoutes from './routes/item.routes';
 import templateRoutes from './routes/template.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import sellSimilarRoutes from './routes/sellSimilar.routes';
+import agentRoutes from './routes/agent.routes';
+import salesRoutes from './routes/sales.routes';
+import commissionRoutes from './routes/commission.routes';
+import { startScheduler } from './jobs/scheduler';
 import { generalLimiter } from './middleware/rateLimit.middleware';
 
 dotenv.config();
@@ -89,6 +93,9 @@ app.use('/api/v1/items', itemRoutes);
 app.use('/api/v1/templates', templateRoutes);
 app.use('/api/v1/inventory', inventoryRoutes);
 app.use('/api/v1/sell-similar', sellSimilarRoutes);
+app.use('/api/v1/agents', agentRoutes);
+app.use('/api/v1/sales', salesRoutes);
+app.use('/api/v1/commissions', commissionRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/listings', listingRoutes);
 app.use('/api/upload', uploadRoutes);
@@ -116,4 +123,5 @@ app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  startScheduler();
 });

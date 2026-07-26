@@ -1,4 +1,15 @@
-# ConsoleEbay Project Guidelines
+# ListFlow Project Guidelines
+
+> **Orientation (2026-07):** This repo (`github.com/r0bug/listflow`, package name
+> still `consoleebay`) is the evolution of ConsoleEbay into a full-stack platform:
+> Express 5.1 + Prisma 6.15 (PostgreSQL) + Segmind AI + eBay Trading API, with a
+> React + Zustand + Vite client in `client/`. Prisma, Vitest (37 tests), zod
+> validation, and the route/controller refactor (Phases 1–4) are already DONE —
+> the "Technical Tasks" checklist further down is a stale ancestor list; trust
+> the memory index (`~/.claude/projects/-home-robug/memory/MEMORY.md`) for current
+> status over this file. `tsconfig` uses loose typing (`strict: false`,
+> `noImplicitAny: false`); Prisma client is a singleton from
+> `src/config/database.ts`; generated types live in `src/generated/prisma`.
 
 ## Project Overview
 Multi-platform eBay listing workflow system with:

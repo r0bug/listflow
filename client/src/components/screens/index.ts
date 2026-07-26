@@ -10,4 +10,6 @@ export { Settings } from './Settings';
 export { Listings } from './Listings';
 export { SellSimilar } from './SellSimilar';
 export { Reports } from './Reports';
+export { Sales } from './Sales';
+export { Commissions } from './Commissions';
 export { EbayCallback } from './EbayCallback';

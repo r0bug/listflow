@@ -8,7 +8,9 @@ export function validate(schema: ZodSchema, source: 'body' | 'query' | 'params' 
   return (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = schema.parse(req[source]);
-      req[source] = data;
+      // Express 5 exposes req.query via a getter-only property; reassignment
+      // throws. defineProperty works for body/params too.
+      Object.defineProperty(req, source, { value: data, writable: true });
       next();
     } catch (error) {
       if (error instanceof ZodError) {

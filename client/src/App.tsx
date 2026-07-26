@@ -15,6 +15,8 @@ import {
   Listings,
   SellSimilar,
   Reports,
+  Sales,
+  Commissions,
   EbayCallback,
 } from './components/screens';
 import { useAuthStore } from './stores/authStore';
@@ -117,6 +119,10 @@ function AppRoutes() {
         {/* Reports */}
         <Route path="reports" element={<Reports />} />
         <Route path="performance" element={<Reports />} />
+
+        {/* Sales & Commissions */}
+        <Route path="sales" element={<Sales />} />
+        <Route path="commissions" element={<Commissions />} />
 
         {/* Settings */}
         <Route path="settings" element={<Settings />} />

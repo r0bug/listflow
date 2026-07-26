@@ -11,12 +11,15 @@ import {
   Save,
   Check,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Users,
+  Plus,
+  Loader2
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { useAuthStore } from '../../stores/authStore';
 
-type SettingsTab = 'profile' | 'ebay' | 'ai' | 'notifications' | 'appearance' | 'security';
+type SettingsTab = 'profile' | 'ebay' | 'agents' | 'ai' | 'notifications' | 'appearance' | 'security';
 
 interface TabConfig {
   id: SettingsTab;
@@ -27,11 +30,469 @@ interface TabConfig {
 const tabs: TabConfig[] = [
   { id: 'profile', label: 'Profile', icon: <User size={20} /> },
   { id: 'ebay', label: 'eBay Account', icon: <CreditCard size={20} /> },
+  { id: 'agents', label: 'Listing Agents', icon: <Users size={20} /> },
   { id: 'ai', label: 'AI Settings', icon: <Database size={20} /> },
   { id: 'notifications', label: 'Notifications', icon: <Bell size={20} /> },
   { id: 'appearance', label: 'Appearance', icon: <Palette size={20} /> },
   { id: 'security', label: 'Security', icon: <Shield size={20} /> },
 ];
+
+type AgentRateType = 'PERCENT' | 'FLAT';
+
+interface ListingAgent {
+  id: string;
+  name: string;
+  active: boolean;
+  rateType: AgentRateType;
+  rateValue: number;
+  source?: string;
+}
+
+interface AgentSyncResult {
+  created: number;
+  updated: number;
+  deactivated: number;
+}
+
+const formatAgentRate = (rateType: AgentRateType, rateValue: number): string =>
+  rateType === 'PERCENT' ? `${rateValue}%` : `$${Number(rateValue).toFixed(2)} flat`;
+
+interface SellerAccount {
+  id: string;
+  accountName: string;
+  email: string;
+  sandbox: boolean;
+  isActive: boolean;
+  connected: boolean;
+  lastSync: string | null;
+  ordersSyncedThrough: string | null;
+}
+
+// Per-seller-account OAuth connect cards (two accounts share one dev app;
+// each needs its own user-token consent, keyed through OAuth state)
+const SellerAccountsSection: React.FC = () => {
+  const [accounts, setAccounts] = useState<SellerAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const response = await fetch('/api/v1/ebay/accounts');
+        if (response.ok) {
+          const data = await response.json();
+          setAccounts(data.accounts || []);
+        }
+      } catch {
+        // section is non-critical; leave list empty
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const connect = async (account: SellerAccount) => {
+    setConnecting(account.id);
+    setError(null);
+    try {
+      const response = await fetch('/api/v1/ebay/auth/url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ebayAccountId: account.id }),
+      });
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Could not build auth URL');
+      localStorage.setItem(
+        'ebay_oauth_state',
+        JSON.stringify({ sandbox: account.sandbox, ebayAccountId: account.id })
+      );
+      window.location.href = data.authUrl;
+    } catch (err: any) {
+      setError(err?.message || 'Failed to start eBay connection');
+      setConnecting(null);
+    }
+  };
+
+  if (loading) return null;
+  if (accounts.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <h3 className="font-medium text-slate-700">Seller Accounts</h3>
+      {error && (
+        <div className="p-3 bg-coral-50 border border-coral-200 rounded-lg text-sm text-coral-700">
+          {error}
+        </div>
+      )}
+      {accounts.map((account) => (
+        <div
+          key={account.id}
+          className="p-4 bg-white border border-slate-200 rounded-lg flex items-center justify-between gap-4"
+        >
+          <div>
+            <p className="font-medium text-slate-800">
+              {account.accountName}
+              {account.sandbox && (
+                <span className="ml-2 text-xs text-amber-600">sandbox</span>
+              )}
+            </p>
+            <p className="text-sm text-slate-500">
+              {account.connected
+                ? `Connected • synced through ${
+                    account.ordersSyncedThrough
+                      ? new Date(account.ordersSyncedThrough).toLocaleDateString()
+                      : 'never'
+                  }`
+                : 'Not connected — sales sync inactive'}
+            </p>
+          </div>
+          <button
+            onClick={() => connect(account)}
+            disabled={connecting === account.id}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-sm font-medium',
+              account.connected
+                ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                : 'bg-ink-600 text-white hover:bg-ink-700'
+            )}
+          >
+            {connecting === account.id
+              ? 'Redirecting…'
+              : account.connected
+                ? 'Reconnect'
+                : 'Connect eBay'}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const ListingAgentsSettings: React.FC = () => {
+  const [agents, setAgents] = useState<ListingAgent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Inline rate editing
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editRateType, setEditRateType] = useState<AgentRateType>('PERCENT');
+  const [editRateValue, setEditRateValue] = useState('');
+  const [isSavingRate, setIsSavingRate] = useState(false);
+
+  // Add agent form
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addName, setAddName] = useState('');
+  const [addRateType, setAddRateType] = useState<AgentRateType>('PERCENT');
+  const [addRateValue, setAddRateValue] = useState('');
+  const [isAdding, setIsAdding] = useState(false);
+
+  // Sync
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<AgentSyncResult | null>(null);
+
+  const loadAgents = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/v1/agents?includeInactive=true');
+      const data = await response.json();
+      if (Array.isArray(data.agents)) {
+        setAgents(data.agents);
+      }
+    } catch (err) {
+      console.error('Failed to load agents:', err);
+      setError('Failed to load agents');
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    loadAgents();
+  }, []);
+
+  const patchAgent = async (id: string, body: Record<string, unknown>) => {
+    const response = await fetch(`/api/v1/agents/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update agent');
+    }
+  };
+
+  const handleToggleActive = async (agent: ListingAgent) => {
+    setError('');
+    // Optimistic update
+    setAgents(prev => prev.map(a => (a.id === agent.id ? { ...a, active: !a.active } : a)));
+    try {
+      await patchAgent(agent.id, { active: !agent.active });
+    } catch (err) {
+      console.error('Failed to toggle agent:', err);
+      setError('Failed to update agent');
+      await loadAgents();
+    }
+  };
+
+  const startEditRate = (agent: ListingAgent) => {
+    setEditingId(agent.id);
+    setEditRateType(agent.rateType);
+    setEditRateValue(String(agent.rateValue));
+  };
+
+  const handleSaveRate = async () => {
+    if (!editingId || editRateValue === '') return;
+    setIsSavingRate(true);
+    setError('');
+    try {
+      await patchAgent(editingId, {
+        rateType: editRateType,
+        rateValue: parseFloat(editRateValue),
+      });
+      setEditingId(null);
+      await loadAgents();
+    } catch (err) {
+      console.error('Failed to save rate:', err);
+      setError('Failed to save rate');
+    }
+    setIsSavingRate(false);
+  };
+
+  const handleAddAgent = async () => {
+    if (!addName.trim() || addRateValue === '') return;
+    setIsAdding(true);
+    setError('');
+    try {
+      const response = await fetch('/api/v1/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: addName.trim(),
+          rateType: addRateType,
+          rateValue: parseFloat(addRateValue),
+        }),
+      });
+      if (response.ok) {
+        setAddName('');
+        setAddRateValue('');
+        setShowAddForm(false);
+        await loadAgents();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        setError(data.error || data.message || 'Failed to add agent');
+      }
+    } catch (err) {
+      console.error('Failed to add agent:', err);
+      setError('Failed to add agent');
+    }
+    setIsAdding(false);
+  };
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    setSyncResult(null);
+    setError('');
+    try {
+      const response = await fetch('/api/v1/agents/sync', { method: 'POST' });
+      const data = await response.json();
+      if (response.ok) {
+        setSyncResult({
+          created: data.created ?? 0,
+          updated: data.updated ?? 0,
+          deactivated: data.deactivated ?? 0,
+        });
+        await loadAgents();
+      } else {
+        setError(data.error || data.message || 'Sync failed');
+      }
+    } catch (err) {
+      console.error('Failed to sync agents:', err);
+      setError('Sync failed');
+    }
+    setIsSyncing(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-medium text-slate-900">Listing Agents</h3>
+          <p className="text-sm text-slate-500">Manage agents and their commission rates</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="btn-secondary text-sm flex items-center gap-2 disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+            Sync from TeamTime
+          </button>
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="btn-primary text-sm flex items-center gap-2"
+          >
+            <Plus size={16} />
+            Add agent
+          </button>
+        </div>
+      </div>
+
+      {syncResult && (
+        <div className="p-3 bg-sage-50 border border-sage-200 rounded-lg text-sm text-sage-700">
+          Sync complete: {syncResult.created} created, {syncResult.updated} updated,{' '}
+          {syncResult.deactivated} deactivated
+        </div>
+      )}
+
+      {error && (
+        <div className="flex items-center gap-2 text-coral-600 text-sm">
+          <AlertCircle size={16} />
+          {error}
+        </div>
+      )}
+
+      {showAddForm && (
+        <div className="p-4 bg-slate-50 rounded-lg space-y-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex-1 min-w-[160px]">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
+              <input
+                type="text"
+                value={addName}
+                onChange={(e) => setAddName(e.target.value)}
+                placeholder="Agent name"
+                className="input w-full bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Rate Type</label>
+              <select
+                value={addRateType}
+                onChange={(e) => setAddRateType(e.target.value as AgentRateType)}
+                className="input w-auto bg-white"
+              >
+                <option value="PERCENT">Percent</option>
+                <option value="FLAT">Flat ($)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Rate</label>
+              <input
+                type="number"
+                value={addRateValue}
+                onChange={(e) => setAddRateValue(e.target.value)}
+                placeholder={addRateType === 'PERCENT' ? 'e.g. 10' : 'e.g. 5.00'}
+                className="input w-28 bg-white"
+                min="0"
+                step="0.01"
+              />
+            </div>
+            <button
+              onClick={handleAddAgent}
+              disabled={isAdding || !addName.trim() || addRateValue === ''}
+              className="btn-primary flex items-center gap-2 disabled:opacity-50"
+            >
+              {isAdding && <Loader2 size={16} className="animate-spin" />}
+              Add
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-ink-600" />
+        </div>
+      ) : agents.length === 0 ? (
+        <p className="text-slate-500 text-sm py-4">No agents yet. Add one or sync from TeamTime.</p>
+      ) : (
+        <div className="space-y-2">
+          {agents.map((agent) => (
+            <div
+              key={agent.id}
+              className={cn(
+                'flex items-center justify-between p-3 rounded-lg border',
+                agent.active ? 'border-slate-200 bg-white' : 'border-slate-100 bg-slate-50 opacity-70'
+              )}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 bg-ink-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-ink-600 font-medium text-sm">{agent.name.charAt(0)}</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-900 truncate">{agent.name}</p>
+                  <p className="text-xs text-slate-500">{agent.source || 'Manual'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {editingId === agent.id ? (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={editRateType}
+                      onChange={(e) => setEditRateType(e.target.value as AgentRateType)}
+                      className="input w-auto text-sm py-1"
+                    >
+                      <option value="PERCENT">Percent</option>
+                      <option value="FLAT">Flat ($)</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={editRateValue}
+                      onChange={(e) => setEditRateValue(e.target.value)}
+                      className="input w-20 text-sm py-1"
+                      min="0"
+                      step="0.01"
+                    />
+                    <button
+                      onClick={handleSaveRate}
+                      disabled={isSavingRate || editRateValue === ''}
+                      className="px-2 py-1 text-sm text-ink-600 hover:bg-ink-50 rounded-lg font-medium disabled:opacity-50"
+                    >
+                      {isSavingRate ? <Loader2 size={14} className="animate-spin" /> : 'Save'}
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="px-2 py-1 text-sm text-slate-500 hover:bg-slate-50 rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => startEditRate(agent)}
+                    className="text-sm text-slate-600 hover:text-ink-600 hover:bg-ink-50 px-2 py-1 rounded-lg"
+                    title="Edit rate"
+                  >
+                    {formatAgentRate(agent.rateType, agent.rateValue)}
+                  </button>
+                )}
+
+                <button
+                  onClick={() => handleToggleActive(agent)}
+                  className={cn(
+                    'relative w-12 h-6 rounded-full transition-colors',
+                    agent.active ? 'bg-sage-500' : 'bg-slate-200'
+                  )}
+                  title={agent.active ? 'Deactivate' : 'Activate'}
+                >
+                  <div
+                    className={cn(
+                      'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
+                      agent.active ? 'translate-x-7' : 'translate-x-1'
+                    )}
+                  />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const Settings: React.FC = () => {
   const { user } = useAuthStore();
@@ -235,6 +696,7 @@ export const Settings: React.FC = () => {
       case 'ebay':
         return (
           <div className="space-y-6">
+            <SellerAccountsSection />
             {/* Connection Status Banner */}
             {ebayStatus.loading ? (
               <div className="p-4 bg-slate-50 rounded-lg flex items-center gap-3">
@@ -424,6 +886,9 @@ export const Settings: React.FC = () => {
             </div>
           </div>
         );
+
+      case 'agents':
+        return <ListingAgentsSettings />;
 
       case 'ai':
         return (

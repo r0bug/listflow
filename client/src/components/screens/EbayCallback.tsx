@@ -48,6 +48,9 @@ export const EbayCallback: React.FC = () => {
             clientId: oauthState.clientId,
             clientSecret: oauthState.clientSecret,
             sandbox: oauthState.sandbox,
+            // eBay echoes back the state we set in the auth URL; it carries
+            // the EbayAccount id so tokens land on the right account row
+            state: searchParams.get('state') || oauthState.ebayAccountId,
           }),
         });
 
