@@ -18,7 +18,8 @@ import sharp from 'sharp';
 import { z } from 'zod';
 import type { Prisma } from '../generated/prisma/index.js';
 import { prisma } from '../db/prisma.js';
-import { jwtAuth } from '../middleware/auth.js';
+import { staffAuth } from '../middleware/auth.js';
+import { absPath } from '../util/paths.js';
 import { qstr, pstr } from '../util/req.js';
 import { logger } from '../util/logger.js';
 import { aiService, type PhotoForAnalysis } from '../services/ai.service.js';
@@ -28,6 +29,7 @@ import {
   type EbayItemSummary,
 } from '../services/ebayBrowse.service.js';
 import { hostItemImages } from '../services/imageHosting.service.js';
+import { upsertCompAndLink } from '../services/comps.service.js';
 import { computeCompleteness } from '../util/completeness.js';
 import { loadAiProvider } from './settings.routes.js';
 
@@ -42,7 +44,7 @@ const AddPhotosSchema = z.object({
   photoIds: z.array(z.string().min(1)).min(1),
 });
 
-router.post('/', jwtAuth, async (req, res) => {
+router.post('/', staffAuth, async (req, res) => {
   const parsed = CreateGroupSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
@@ -87,7 +89,7 @@ router.post('/', jwtAuth, async (req, res) => {
   res.status(201).json({ id: group.id, label: group.label, photoCount: photos.length });
 });
 
-router.get('/', jwtAuth, async (req, res) => {
+router.get('/', staffAuth, async (req, res) => {
   const unidentifiedOnly = qstr(req.query.unidentified) !== 'false';
 
   const groups = await prisma.photoGroup.findMany({
@@ -116,7 +118,7 @@ router.get('/', jwtAuth, async (req, res) => {
   });
 });
 
-router.get('/:id', jwtAuth, async (req, res) => {
+router.get('/:id', staffAuth, async (req, res) => {
   const group = await prisma.photoGroup.findUnique({
     where: { id: pstr(req.params.id) },
     include: {
@@ -149,7 +151,7 @@ router.get('/:id', jwtAuth, async (req, res) => {
   });
 });
 
-router.post('/:id/photos', jwtAuth, async (req, res) => {
+router.post('/:id/photos', staffAuth, async (req, res) => {
   const parsed = AddPhotosSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
@@ -178,7 +180,7 @@ router.post('/:id/photos', jwtAuth, async (req, res) => {
   res.json({ ok: true, added: eligible.length });
 });
 
-router.delete('/:id/photos/:photoId', jwtAuth, async (req, res) => {
+router.delete('/:id/photos/:photoId', staffAuth, async (req, res) => {
   const groupId = pstr(req.params.id);
   const photoId = pstr(req.params.photoId);
   await prisma.photo.updateMany({
@@ -188,7 +190,7 @@ router.delete('/:id/photos/:photoId', jwtAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/:id', jwtAuth, async (req, res) => {
+router.delete('/:id', staffAuth, async (req, res) => {
   const groupId = pstr(req.params.id);
   const group = await prisma.photoGroup.findUnique({ where: { id: groupId } });
   if (!group) {
@@ -235,7 +237,7 @@ async function fetchVisualPriors(photoPath: string) {
   }
 }
 
-router.post('/:id/identify-ai', jwtAuth, async (req, res) => {
+router.post('/:id/identify-ai', staffAuth, async (req, res) => {
   const parsed = IdentifyAiSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
@@ -288,7 +290,7 @@ router.post('/:id/identify-ai', jwtAuth, async (req, res) => {
   // Build PhotoForAnalysis[] from the group's photos in chronological order.
   const photosForAi: PhotoForAnalysis[] = group.photos.map((p, i) => ({
     index: i + 1,
-    filePath: p.optimizedPath || p.originalPath,
+    filePath: absPath(p.optimizedPath || p.originalPath),
     filename: p.originalPath.split('/').pop() ?? `photo-${i + 1}`,
     capturedAt: p.capturedAt,
     perceptualHash: p.perceptualHash,
@@ -419,7 +421,7 @@ const EbayAttachSchema = z.object({
     }),
 });
 
-router.post('/:id/identify-ebay', jwtAuth, async (req, res) => {
+router.post('/:id/identify-ebay', staffAuth, async (req, res) => {
   const parsed = EbayAttachSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
@@ -468,20 +470,17 @@ router.post('/:id/identify-ebay', jwtAuth, async (req, res) => {
 
     // Provenance: record the comp link. imageUrls are saved either way so
     // the user can revisit; import-to-Item only happens on approval.
-    await tx.soldCompLink.create({
-      data: {
-        itemId: newItem.id,
-        ebayItemId,
-        title: hit.title,
-        condition: hit.condition,
-        categoryPath: hit.categoryPath,
-        categoryId: hit.categoryId,
-        description: hit.description,
-        itemSpecifics:
-          (hit.itemSpecifics as unknown as Prisma.InputJsonValue | undefined) ?? undefined,
-        imageUrls: hit.imageUrls ?? [],
-        isPrimary: true,
-      },
+    await upsertCompAndLink(tx, newItem.id, {
+      ebayItemId,
+      title: hit.title,
+      condition: hit.condition,
+      categoryPath: hit.categoryPath,
+      categoryId: hit.categoryId,
+      description: hit.description,
+      itemSpecifics: hit.itemSpecifics,
+      imageUrls: hit.imageUrls ?? [],
+      isPrimary: true,
+      source: 'extension',
     });
 
     return newItem.id;
@@ -517,9 +516,10 @@ router.post('/:id/identify-ebay', jwtAuth, async (req, res) => {
 // item. Skips duplicates silently.
 async function importEbayImages(itemId: string, urls: string[]): Promise<void> {
   const { default: path } = await import('node:path');
+  const { default: os } = await import('node:os');
   const { sha256File } = await import('../util/sha256.js');
-  const { processImage, pendingGroupDir } = await import('../services/image.service.js');
-  const tempDir = pendingGroupDir(`ebay-${itemId.slice(-8)}`);
+  const { processImage, storeOriginal } = await import('../services/image.service.js');
+  const tempDir = path.join(os.tmpdir(), `listflow-ebay-${itemId.slice(-8)}`);
   fs.mkdirSync(tempDir, { recursive: true });
 
   for (let i = 0; i < urls.length; i++) {
@@ -537,11 +537,12 @@ async function importEbayImages(itemId: string, urls: string[]): Promise<void> {
         fs.unlinkSync(tempFile);
         continue;
       }
-      const processed = await processImage(tempFile, tempDir, sha256.slice(0, 12));
+      const originalRel = storeOriginal(tempFile, sha256);
+      const processed = await processImage(tempFile, sha256);
       await prisma.photo.create({
         data: {
           itemId,
-          originalPath: tempFile,
+          originalPath: originalRel,
           optimizedPath: processed.optimizedPath,
           thumbnailPath: processed.thumbnailPath,
           sha256,
@@ -550,8 +551,10 @@ async function importEbayImages(itemId: string, urls: string[]): Promise<void> {
           bytes: processed.bytes,
           mime: processed.mime,
           publicUrl: url, // preserve source URL as a fallback
+          source: 'EBAY_IMPORT',
         },
       });
+      fs.unlinkSync(tempFile);
     } catch (err) {
       logger.warn({ err, url }, 'ebay image download failed');
     }
@@ -564,7 +567,7 @@ async function importEbayImages(itemId: string, urls: string[]): Promise<void> {
 // wrapper around ebayBrowse.service.searchByImage.
 // ────────────────────────────────────────────────────────────────────
 
-router.post('/:id/image-search', jwtAuth, async (req, res) => {
+router.post('/:id/image-search', staffAuth, async (req, res) => {
   if (!ebayBrowseConfigured()) {
     res.status(503).json({ error: 'EBAY_BROWSE_CLIENT_ID / _SECRET not configured' });
     return;
@@ -583,7 +586,7 @@ router.post('/:id/image-search', jwtAuth, async (req, res) => {
     res.status(404).json({ error: 'Photo not in this group' });
     return;
   }
-  const source = photo.optimizedPath || photo.originalPath;
+  const source = absPath(photo.optimizedPath || photo.originalPath);
   try {
     const buf = await sharp(source)
       .rotate()

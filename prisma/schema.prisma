@@ -402,11 +402,16 @@ model SoldComp {
   ebayItemId     String    @unique
   itemUrl        String?
   title          String
-  soldPrice      Float
+  soldPrice      Float? // null when pulled from a live/detail page without sold data
   shippingPrice  Float?
   totalPrice     Float?
+  currency       String    @default("USD")
   condition      String?
   category       String?
+  categoryPath   String?
+  description    String?   @db.Text
+  itemSpecifics  Json?
+  imageUrls      String[]
   listingType    String?
   bidCount       Int?
   quantitySold   Int?

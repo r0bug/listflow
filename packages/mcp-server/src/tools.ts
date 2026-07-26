@@ -133,7 +133,10 @@ export async function getBatch(
     const photo = byId.get(pid);
     if (!photo) throw new Error(`batch ${batchId}: photo ${pid} not found`);
 
-    const source = photo.optimizedPath || photo.originalPath;
+    const sourceRel = photo.optimizedPath || photo.originalPath;
+    const fileRoot = process.env.FILE_ROOT ?? process.cwd();
+    const source =
+      sourceRel && !sourceRel.startsWith('/') ? `${fileRoot}/${sourceRel}` : sourceRel;
     if (!source || !fs.existsSync(source)) {
       throw new Error(`batch ${batchId}: photo ${pid} source missing on disk: ${source}`);
     }
@@ -180,13 +183,13 @@ export interface CommitBatchOutput {
 export async function commitBatchTool(
   prisma: PrismaClient,
   input: z.infer<typeof CommitBatchInput>,
-  config: { publicImagesDir: string; publicImageBaseUrl: string },
+  config: { fileRoot: string; publicImageBaseUrl: string },
 ): Promise<CommitBatchOutput> {
   return commitBatch({
     prisma,
     batchId: input.batchId,
     result: input.result,
-    publicImagesDir: config.publicImagesDir,
+    fileRoot: config.fileRoot,
     publicImageBaseUrl: config.publicImageBaseUrl,
   });
 }

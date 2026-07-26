@@ -20575,8 +20575,11 @@ export namespace Prisma {
     soldPrice: number | null
     shippingPrice: number | null
     totalPrice: number | null
+    currency: string | null
     condition: string | null
     category: string | null
+    categoryPath: string | null
+    description: string | null
     listingType: string | null
     bidCount: number | null
     quantitySold: number | null
@@ -20600,8 +20603,11 @@ export namespace Prisma {
     soldPrice: number | null
     shippingPrice: number | null
     totalPrice: number | null
+    currency: string | null
     condition: string | null
     category: string | null
+    categoryPath: string | null
+    description: string | null
     listingType: string | null
     bidCount: number | null
     quantitySold: number | null
@@ -20625,8 +20631,13 @@ export namespace Prisma {
     soldPrice: number
     shippingPrice: number
     totalPrice: number
+    currency: number
     condition: number
     category: number
+    categoryPath: number
+    description: number
+    itemSpecifics: number
+    imageUrls: number
     listingType: number
     bidCount: number
     quantitySold: number
@@ -20676,8 +20687,11 @@ export namespace Prisma {
     soldPrice?: true
     shippingPrice?: true
     totalPrice?: true
+    currency?: true
     condition?: true
     category?: true
+    categoryPath?: true
+    description?: true
     listingType?: true
     bidCount?: true
     quantitySold?: true
@@ -20701,8 +20715,11 @@ export namespace Prisma {
     soldPrice?: true
     shippingPrice?: true
     totalPrice?: true
+    currency?: true
     condition?: true
     category?: true
+    categoryPath?: true
+    description?: true
     listingType?: true
     bidCount?: true
     quantitySold?: true
@@ -20726,8 +20743,13 @@ export namespace Prisma {
     soldPrice?: true
     shippingPrice?: true
     totalPrice?: true
+    currency?: true
     condition?: true
     category?: true
+    categoryPath?: true
+    description?: true
+    itemSpecifics?: true
+    imageUrls?: true
     listingType?: true
     bidCount?: true
     quantitySold?: true
@@ -20835,11 +20857,16 @@ export namespace Prisma {
     ebayItemId: string
     itemUrl: string | null
     title: string
-    soldPrice: number
+    soldPrice: number | null
     shippingPrice: number | null
     totalPrice: number | null
+    currency: string
     condition: string | null
     category: string | null
+    categoryPath: string | null
+    description: string | null
+    itemSpecifics: JsonValue | null
+    imageUrls: string[]
     listingType: string | null
     bidCount: number | null
     quantitySold: number | null
@@ -20882,8 +20909,13 @@ export namespace Prisma {
     soldPrice?: boolean
     shippingPrice?: boolean
     totalPrice?: boolean
+    currency?: boolean
     condition?: boolean
     category?: boolean
+    categoryPath?: boolean
+    description?: boolean
+    itemSpecifics?: boolean
+    imageUrls?: boolean
     listingType?: boolean
     bidCount?: boolean
     quantitySold?: boolean
@@ -20911,8 +20943,13 @@ export namespace Prisma {
     soldPrice?: boolean
     shippingPrice?: boolean
     totalPrice?: boolean
+    currency?: boolean
     condition?: boolean
     category?: boolean
+    categoryPath?: boolean
+    description?: boolean
+    itemSpecifics?: boolean
+    imageUrls?: boolean
     listingType?: boolean
     bidCount?: boolean
     quantitySold?: boolean
@@ -20936,8 +20973,13 @@ export namespace Prisma {
     soldPrice?: boolean
     shippingPrice?: boolean
     totalPrice?: boolean
+    currency?: boolean
     condition?: boolean
     category?: boolean
+    categoryPath?: boolean
+    description?: boolean
+    itemSpecifics?: boolean
+    imageUrls?: boolean
     listingType?: boolean
     bidCount?: boolean
     quantitySold?: boolean
@@ -20961,8 +21003,13 @@ export namespace Prisma {
     soldPrice?: boolean
     shippingPrice?: boolean
     totalPrice?: boolean
+    currency?: boolean
     condition?: boolean
     category?: boolean
+    categoryPath?: boolean
+    description?: boolean
+    itemSpecifics?: boolean
+    imageUrls?: boolean
     listingType?: boolean
     bidCount?: boolean
     quantitySold?: boolean
@@ -20978,7 +21025,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type SoldCompOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ebayItemId" | "itemUrl" | "title" | "soldPrice" | "shippingPrice" | "totalPrice" | "condition" | "category" | "listingType" | "bidCount" | "quantitySold" | "totalSales" | "watchers" | "seller" | "sellerFeedback" | "imageUrl" | "localImage" | "soldDate" | "source" | "createdAt" | "updatedAt", ExtArgs["result"]["soldComp"]>
+  export type SoldCompOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ebayItemId" | "itemUrl" | "title" | "soldPrice" | "shippingPrice" | "totalPrice" | "currency" | "condition" | "category" | "categoryPath" | "description" | "itemSpecifics" | "imageUrls" | "listingType" | "bidCount" | "quantitySold" | "totalSales" | "watchers" | "seller" | "sellerFeedback" | "imageUrl" | "localImage" | "soldDate" | "source" | "createdAt" | "updatedAt", ExtArgs["result"]["soldComp"]>
   export type SoldCompInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     searches?: boolean | SoldComp$searchesArgs<ExtArgs>
     items?: boolean | SoldComp$itemsArgs<ExtArgs>
@@ -21000,11 +21047,16 @@ export namespace Prisma {
       ebayItemId: string
       itemUrl: string | null
       title: string
-      soldPrice: number
+      soldPrice: number | null
       shippingPrice: number | null
       totalPrice: number | null
+      currency: string
       condition: string | null
       category: string | null
+      categoryPath: string | null
+      description: string | null
+      itemSpecifics: Prisma.JsonValue | null
+      imageUrls: string[]
       listingType: string | null
       bidCount: number | null
       quantitySold: number | null
@@ -21451,8 +21503,13 @@ export namespace Prisma {
     readonly soldPrice: FieldRef<"SoldComp", 'Float'>
     readonly shippingPrice: FieldRef<"SoldComp", 'Float'>
     readonly totalPrice: FieldRef<"SoldComp", 'Float'>
+    readonly currency: FieldRef<"SoldComp", 'String'>
     readonly condition: FieldRef<"SoldComp", 'String'>
     readonly category: FieldRef<"SoldComp", 'String'>
+    readonly categoryPath: FieldRef<"SoldComp", 'String'>
+    readonly description: FieldRef<"SoldComp", 'String'>
+    readonly itemSpecifics: FieldRef<"SoldComp", 'Json'>
+    readonly imageUrls: FieldRef<"SoldComp", 'String[]'>
     readonly listingType: FieldRef<"SoldComp", 'String'>
     readonly bidCount: FieldRef<"SoldComp", 'Int'>
     readonly quantitySold: FieldRef<"SoldComp", 'Int'>
@@ -29316,8 +29373,13 @@ export namespace Prisma {
     soldPrice: 'soldPrice',
     shippingPrice: 'shippingPrice',
     totalPrice: 'totalPrice',
+    currency: 'currency',
     condition: 'condition',
     category: 'category',
+    categoryPath: 'categoryPath',
+    description: 'description',
+    itemSpecifics: 'itemSpecifics',
+    imageUrls: 'imageUrls',
     listingType: 'listingType',
     bidCount: 'bidCount',
     quantitySold: 'quantitySold',
@@ -31271,11 +31333,16 @@ export namespace Prisma {
     ebayItemId?: StringFilter<"SoldComp"> | string
     itemUrl?: StringNullableFilter<"SoldComp"> | string | null
     title?: StringFilter<"SoldComp"> | string
-    soldPrice?: FloatFilter<"SoldComp"> | number
+    soldPrice?: FloatNullableFilter<"SoldComp"> | number | null
     shippingPrice?: FloatNullableFilter<"SoldComp"> | number | null
     totalPrice?: FloatNullableFilter<"SoldComp"> | number | null
+    currency?: StringFilter<"SoldComp"> | string
     condition?: StringNullableFilter<"SoldComp"> | string | null
     category?: StringNullableFilter<"SoldComp"> | string | null
+    categoryPath?: StringNullableFilter<"SoldComp"> | string | null
+    description?: StringNullableFilter<"SoldComp"> | string | null
+    itemSpecifics?: JsonNullableFilter<"SoldComp">
+    imageUrls?: StringNullableListFilter<"SoldComp">
     listingType?: StringNullableFilter<"SoldComp"> | string | null
     bidCount?: IntNullableFilter<"SoldComp"> | number | null
     quantitySold?: IntNullableFilter<"SoldComp"> | number | null
@@ -31299,11 +31366,16 @@ export namespace Prisma {
     ebayItemId?: SortOrder
     itemUrl?: SortOrderInput | SortOrder
     title?: SortOrder
-    soldPrice?: SortOrder
+    soldPrice?: SortOrderInput | SortOrder
     shippingPrice?: SortOrderInput | SortOrder
     totalPrice?: SortOrderInput | SortOrder
+    currency?: SortOrder
     condition?: SortOrderInput | SortOrder
     category?: SortOrderInput | SortOrder
+    categoryPath?: SortOrderInput | SortOrder
+    description?: SortOrderInput | SortOrder
+    itemSpecifics?: SortOrderInput | SortOrder
+    imageUrls?: SortOrder
     listingType?: SortOrderInput | SortOrder
     bidCount?: SortOrderInput | SortOrder
     quantitySold?: SortOrderInput | SortOrder
@@ -31330,11 +31402,16 @@ export namespace Prisma {
     NOT?: SoldCompWhereInput | SoldCompWhereInput[]
     itemUrl?: StringNullableFilter<"SoldComp"> | string | null
     title?: StringFilter<"SoldComp"> | string
-    soldPrice?: FloatFilter<"SoldComp"> | number
+    soldPrice?: FloatNullableFilter<"SoldComp"> | number | null
     shippingPrice?: FloatNullableFilter<"SoldComp"> | number | null
     totalPrice?: FloatNullableFilter<"SoldComp"> | number | null
+    currency?: StringFilter<"SoldComp"> | string
     condition?: StringNullableFilter<"SoldComp"> | string | null
     category?: StringNullableFilter<"SoldComp"> | string | null
+    categoryPath?: StringNullableFilter<"SoldComp"> | string | null
+    description?: StringNullableFilter<"SoldComp"> | string | null
+    itemSpecifics?: JsonNullableFilter<"SoldComp">
+    imageUrls?: StringNullableListFilter<"SoldComp">
     listingType?: StringNullableFilter<"SoldComp"> | string | null
     bidCount?: IntNullableFilter<"SoldComp"> | number | null
     quantitySold?: IntNullableFilter<"SoldComp"> | number | null
@@ -31358,11 +31435,16 @@ export namespace Prisma {
     ebayItemId?: SortOrder
     itemUrl?: SortOrderInput | SortOrder
     title?: SortOrder
-    soldPrice?: SortOrder
+    soldPrice?: SortOrderInput | SortOrder
     shippingPrice?: SortOrderInput | SortOrder
     totalPrice?: SortOrderInput | SortOrder
+    currency?: SortOrder
     condition?: SortOrderInput | SortOrder
     category?: SortOrderInput | SortOrder
+    categoryPath?: SortOrderInput | SortOrder
+    description?: SortOrderInput | SortOrder
+    itemSpecifics?: SortOrderInput | SortOrder
+    imageUrls?: SortOrder
     listingType?: SortOrderInput | SortOrder
     bidCount?: SortOrderInput | SortOrder
     quantitySold?: SortOrderInput | SortOrder
@@ -31391,11 +31473,16 @@ export namespace Prisma {
     ebayItemId?: StringWithAggregatesFilter<"SoldComp"> | string
     itemUrl?: StringNullableWithAggregatesFilter<"SoldComp"> | string | null
     title?: StringWithAggregatesFilter<"SoldComp"> | string
-    soldPrice?: FloatWithAggregatesFilter<"SoldComp"> | number
+    soldPrice?: FloatNullableWithAggregatesFilter<"SoldComp"> | number | null
     shippingPrice?: FloatNullableWithAggregatesFilter<"SoldComp"> | number | null
     totalPrice?: FloatNullableWithAggregatesFilter<"SoldComp"> | number | null
+    currency?: StringWithAggregatesFilter<"SoldComp"> | string
     condition?: StringNullableWithAggregatesFilter<"SoldComp"> | string | null
     category?: StringNullableWithAggregatesFilter<"SoldComp"> | string | null
+    categoryPath?: StringNullableWithAggregatesFilter<"SoldComp"> | string | null
+    description?: StringNullableWithAggregatesFilter<"SoldComp"> | string | null
+    itemSpecifics?: JsonNullableWithAggregatesFilter<"SoldComp">
+    imageUrls?: StringNullableListFilter<"SoldComp">
     listingType?: StringNullableWithAggregatesFilter<"SoldComp"> | string | null
     bidCount?: IntNullableWithAggregatesFilter<"SoldComp"> | number | null
     quantitySold?: IntNullableWithAggregatesFilter<"SoldComp"> | number | null
@@ -33744,11 +33831,16 @@ export namespace Prisma {
     ebayItemId: string
     itemUrl?: string | null
     title: string
-    soldPrice: number
+    soldPrice?: number | null
     shippingPrice?: number | null
     totalPrice?: number | null
+    currency?: string
     condition?: string | null
     category?: string | null
+    categoryPath?: string | null
+    description?: string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompCreateimageUrlsInput | string[]
     listingType?: string | null
     bidCount?: number | null
     quantitySold?: number | null
@@ -33772,11 +33864,16 @@ export namespace Prisma {
     ebayItemId: string
     itemUrl?: string | null
     title: string
-    soldPrice: number
+    soldPrice?: number | null
     shippingPrice?: number | null
     totalPrice?: number | null
+    currency?: string
     condition?: string | null
     category?: string | null
+    categoryPath?: string | null
+    description?: string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompCreateimageUrlsInput | string[]
     listingType?: string | null
     bidCount?: number | null
     quantitySold?: number | null
@@ -33799,11 +33896,16 @@ export namespace Prisma {
     ebayItemId?: StringFieldUpdateOperationsInput | string
     itemUrl?: NullableStringFieldUpdateOperationsInput | string | null
     title?: StringFieldUpdateOperationsInput | string
-    soldPrice?: FloatFieldUpdateOperationsInput | number
+    soldPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     shippingPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: NullableFloatFieldUpdateOperationsInput | number | null
+    currency?: StringFieldUpdateOperationsInput | string
     condition?: NullableStringFieldUpdateOperationsInput | string | null
     category?: NullableStringFieldUpdateOperationsInput | string | null
+    categoryPath?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompUpdateimageUrlsInput | string[]
     listingType?: NullableStringFieldUpdateOperationsInput | string | null
     bidCount?: NullableIntFieldUpdateOperationsInput | number | null
     quantitySold?: NullableIntFieldUpdateOperationsInput | number | null
@@ -33827,11 +33929,16 @@ export namespace Prisma {
     ebayItemId?: StringFieldUpdateOperationsInput | string
     itemUrl?: NullableStringFieldUpdateOperationsInput | string | null
     title?: StringFieldUpdateOperationsInput | string
-    soldPrice?: FloatFieldUpdateOperationsInput | number
+    soldPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     shippingPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: NullableFloatFieldUpdateOperationsInput | number | null
+    currency?: StringFieldUpdateOperationsInput | string
     condition?: NullableStringFieldUpdateOperationsInput | string | null
     category?: NullableStringFieldUpdateOperationsInput | string | null
+    categoryPath?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompUpdateimageUrlsInput | string[]
     listingType?: NullableStringFieldUpdateOperationsInput | string | null
     bidCount?: NullableIntFieldUpdateOperationsInput | number | null
     quantitySold?: NullableIntFieldUpdateOperationsInput | number | null
@@ -33855,11 +33962,16 @@ export namespace Prisma {
     ebayItemId: string
     itemUrl?: string | null
     title: string
-    soldPrice: number
+    soldPrice?: number | null
     shippingPrice?: number | null
     totalPrice?: number | null
+    currency?: string
     condition?: string | null
     category?: string | null
+    categoryPath?: string | null
+    description?: string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompCreateimageUrlsInput | string[]
     listingType?: string | null
     bidCount?: number | null
     quantitySold?: number | null
@@ -33879,11 +33991,16 @@ export namespace Prisma {
     ebayItemId?: StringFieldUpdateOperationsInput | string
     itemUrl?: NullableStringFieldUpdateOperationsInput | string | null
     title?: StringFieldUpdateOperationsInput | string
-    soldPrice?: FloatFieldUpdateOperationsInput | number
+    soldPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     shippingPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: NullableFloatFieldUpdateOperationsInput | number | null
+    currency?: StringFieldUpdateOperationsInput | string
     condition?: NullableStringFieldUpdateOperationsInput | string | null
     category?: NullableStringFieldUpdateOperationsInput | string | null
+    categoryPath?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompUpdateimageUrlsInput | string[]
     listingType?: NullableStringFieldUpdateOperationsInput | string | null
     bidCount?: NullableIntFieldUpdateOperationsInput | number | null
     quantitySold?: NullableIntFieldUpdateOperationsInput | number | null
@@ -33904,11 +34021,16 @@ export namespace Prisma {
     ebayItemId?: StringFieldUpdateOperationsInput | string
     itemUrl?: NullableStringFieldUpdateOperationsInput | string | null
     title?: StringFieldUpdateOperationsInput | string
-    soldPrice?: FloatFieldUpdateOperationsInput | number
+    soldPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     shippingPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: NullableFloatFieldUpdateOperationsInput | number | null
+    currency?: StringFieldUpdateOperationsInput | string
     condition?: NullableStringFieldUpdateOperationsInput | string | null
     category?: NullableStringFieldUpdateOperationsInput | string | null
+    categoryPath?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompUpdateimageUrlsInput | string[]
     listingType?: NullableStringFieldUpdateOperationsInput | string | null
     bidCount?: NullableIntFieldUpdateOperationsInput | number | null
     quantitySold?: NullableIntFieldUpdateOperationsInput | number | null
@@ -35995,8 +36117,13 @@ export namespace Prisma {
     soldPrice?: SortOrder
     shippingPrice?: SortOrder
     totalPrice?: SortOrder
+    currency?: SortOrder
     condition?: SortOrder
     category?: SortOrder
+    categoryPath?: SortOrder
+    description?: SortOrder
+    itemSpecifics?: SortOrder
+    imageUrls?: SortOrder
     listingType?: SortOrder
     bidCount?: SortOrder
     quantitySold?: SortOrder
@@ -36032,8 +36159,11 @@ export namespace Prisma {
     soldPrice?: SortOrder
     shippingPrice?: SortOrder
     totalPrice?: SortOrder
+    currency?: SortOrder
     condition?: SortOrder
     category?: SortOrder
+    categoryPath?: SortOrder
+    description?: SortOrder
     listingType?: SortOrder
     bidCount?: SortOrder
     quantitySold?: SortOrder
@@ -36057,8 +36187,11 @@ export namespace Prisma {
     soldPrice?: SortOrder
     shippingPrice?: SortOrder
     totalPrice?: SortOrder
+    currency?: SortOrder
     condition?: SortOrder
     category?: SortOrder
+    categoryPath?: SortOrder
+    description?: SortOrder
     listingType?: SortOrder
     bidCount?: SortOrder
     quantitySold?: SortOrder
@@ -37481,6 +37614,10 @@ export namespace Prisma {
     update?: XOR<XOR<ItemUpdateToOneWithWhereWithoutSalesInput, ItemUpdateWithoutSalesInput>, ItemUncheckedUpdateWithoutSalesInput>
   }
 
+  export type SoldCompCreateimageUrlsInput = {
+    set: string[]
+  }
+
   export type SearchCompCreateNestedManyWithoutCompInput = {
     create?: XOR<SearchCompCreateWithoutCompInput, SearchCompUncheckedCreateWithoutCompInput> | SearchCompCreateWithoutCompInput[] | SearchCompUncheckedCreateWithoutCompInput[]
     connectOrCreate?: SearchCompCreateOrConnectWithoutCompInput | SearchCompCreateOrConnectWithoutCompInput[]
@@ -37521,6 +37658,11 @@ export namespace Prisma {
     connectOrCreate?: CollectionCompCreateOrConnectWithoutCompInput | CollectionCompCreateOrConnectWithoutCompInput[]
     createMany?: CollectionCompCreateManyCompInputEnvelope
     connect?: CollectionCompWhereUniqueInput | CollectionCompWhereUniqueInput[]
+  }
+
+  export type SoldCompUpdateimageUrlsInput = {
+    set?: string[]
+    push?: string | string[]
   }
 
   export type SearchCompUpdateManyWithoutCompNestedInput = {
@@ -41948,11 +42090,16 @@ export namespace Prisma {
     ebayItemId: string
     itemUrl?: string | null
     title: string
-    soldPrice: number
+    soldPrice?: number | null
     shippingPrice?: number | null
     totalPrice?: number | null
+    currency?: string
     condition?: string | null
     category?: string | null
+    categoryPath?: string | null
+    description?: string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompCreateimageUrlsInput | string[]
     listingType?: string | null
     bidCount?: number | null
     quantitySold?: number | null
@@ -41975,11 +42122,16 @@ export namespace Prisma {
     ebayItemId: string
     itemUrl?: string | null
     title: string
-    soldPrice: number
+    soldPrice?: number | null
     shippingPrice?: number | null
     totalPrice?: number | null
+    currency?: string
     condition?: string | null
     category?: string | null
+    categoryPath?: string | null
+    description?: string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompCreateimageUrlsInput | string[]
     listingType?: string | null
     bidCount?: number | null
     quantitySold?: number | null
@@ -42057,11 +42209,16 @@ export namespace Prisma {
     ebayItemId?: StringFieldUpdateOperationsInput | string
     itemUrl?: NullableStringFieldUpdateOperationsInput | string | null
     title?: StringFieldUpdateOperationsInput | string
-    soldPrice?: FloatFieldUpdateOperationsInput | number
+    soldPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     shippingPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: NullableFloatFieldUpdateOperationsInput | number | null
+    currency?: StringFieldUpdateOperationsInput | string
     condition?: NullableStringFieldUpdateOperationsInput | string | null
     category?: NullableStringFieldUpdateOperationsInput | string | null
+    categoryPath?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompUpdateimageUrlsInput | string[]
     listingType?: NullableStringFieldUpdateOperationsInput | string | null
     bidCount?: NullableIntFieldUpdateOperationsInput | number | null
     quantitySold?: NullableIntFieldUpdateOperationsInput | number | null
@@ -42084,11 +42241,16 @@ export namespace Prisma {
     ebayItemId?: StringFieldUpdateOperationsInput | string
     itemUrl?: NullableStringFieldUpdateOperationsInput | string | null
     title?: StringFieldUpdateOperationsInput | string
-    soldPrice?: FloatFieldUpdateOperationsInput | number
+    soldPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     shippingPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: NullableFloatFieldUpdateOperationsInput | number | null
+    currency?: StringFieldUpdateOperationsInput | string
     condition?: NullableStringFieldUpdateOperationsInput | string | null
     category?: NullableStringFieldUpdateOperationsInput | string | null
+    categoryPath?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompUpdateimageUrlsInput | string[]
     listingType?: NullableStringFieldUpdateOperationsInput | string | null
     bidCount?: NullableIntFieldUpdateOperationsInput | number | null
     quantitySold?: NullableIntFieldUpdateOperationsInput | number | null
@@ -42217,11 +42379,16 @@ export namespace Prisma {
     ebayItemId: string
     itemUrl?: string | null
     title: string
-    soldPrice: number
+    soldPrice?: number | null
     shippingPrice?: number | null
     totalPrice?: number | null
+    currency?: string
     condition?: string | null
     category?: string | null
+    categoryPath?: string | null
+    description?: string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompCreateimageUrlsInput | string[]
     listingType?: string | null
     bidCount?: number | null
     quantitySold?: number | null
@@ -42244,11 +42411,16 @@ export namespace Prisma {
     ebayItemId: string
     itemUrl?: string | null
     title: string
-    soldPrice: number
+    soldPrice?: number | null
     shippingPrice?: number | null
     totalPrice?: number | null
+    currency?: string
     condition?: string | null
     category?: string | null
+    categoryPath?: string | null
+    description?: string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompCreateimageUrlsInput | string[]
     listingType?: string | null
     bidCount?: number | null
     quantitySold?: number | null
@@ -42399,11 +42571,16 @@ export namespace Prisma {
     ebayItemId?: StringFieldUpdateOperationsInput | string
     itemUrl?: NullableStringFieldUpdateOperationsInput | string | null
     title?: StringFieldUpdateOperationsInput | string
-    soldPrice?: FloatFieldUpdateOperationsInput | number
+    soldPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     shippingPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: NullableFloatFieldUpdateOperationsInput | number | null
+    currency?: StringFieldUpdateOperationsInput | string
     condition?: NullableStringFieldUpdateOperationsInput | string | null
     category?: NullableStringFieldUpdateOperationsInput | string | null
+    categoryPath?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompUpdateimageUrlsInput | string[]
     listingType?: NullableStringFieldUpdateOperationsInput | string | null
     bidCount?: NullableIntFieldUpdateOperationsInput | number | null
     quantitySold?: NullableIntFieldUpdateOperationsInput | number | null
@@ -42426,11 +42603,16 @@ export namespace Prisma {
     ebayItemId?: StringFieldUpdateOperationsInput | string
     itemUrl?: NullableStringFieldUpdateOperationsInput | string | null
     title?: StringFieldUpdateOperationsInput | string
-    soldPrice?: FloatFieldUpdateOperationsInput | number
+    soldPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     shippingPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: NullableFloatFieldUpdateOperationsInput | number | null
+    currency?: StringFieldUpdateOperationsInput | string
     condition?: NullableStringFieldUpdateOperationsInput | string | null
     category?: NullableStringFieldUpdateOperationsInput | string | null
+    categoryPath?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompUpdateimageUrlsInput | string[]
     listingType?: NullableStringFieldUpdateOperationsInput | string | null
     bidCount?: NullableIntFieldUpdateOperationsInput | number | null
     quantitySold?: NullableIntFieldUpdateOperationsInput | number | null
@@ -42599,11 +42781,16 @@ export namespace Prisma {
     ebayItemId: string
     itemUrl?: string | null
     title: string
-    soldPrice: number
+    soldPrice?: number | null
     shippingPrice?: number | null
     totalPrice?: number | null
+    currency?: string
     condition?: string | null
     category?: string | null
+    categoryPath?: string | null
+    description?: string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompCreateimageUrlsInput | string[]
     listingType?: string | null
     bidCount?: number | null
     quantitySold?: number | null
@@ -42626,11 +42813,16 @@ export namespace Prisma {
     ebayItemId: string
     itemUrl?: string | null
     title: string
-    soldPrice: number
+    soldPrice?: number | null
     shippingPrice?: number | null
     totalPrice?: number | null
+    currency?: string
     condition?: string | null
     category?: string | null
+    categoryPath?: string | null
+    description?: string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompCreateimageUrlsInput | string[]
     listingType?: string | null
     bidCount?: number | null
     quantitySold?: number | null
@@ -42701,11 +42893,16 @@ export namespace Prisma {
     ebayItemId?: StringFieldUpdateOperationsInput | string
     itemUrl?: NullableStringFieldUpdateOperationsInput | string | null
     title?: StringFieldUpdateOperationsInput | string
-    soldPrice?: FloatFieldUpdateOperationsInput | number
+    soldPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     shippingPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: NullableFloatFieldUpdateOperationsInput | number | null
+    currency?: StringFieldUpdateOperationsInput | string
     condition?: NullableStringFieldUpdateOperationsInput | string | null
     category?: NullableStringFieldUpdateOperationsInput | string | null
+    categoryPath?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompUpdateimageUrlsInput | string[]
     listingType?: NullableStringFieldUpdateOperationsInput | string | null
     bidCount?: NullableIntFieldUpdateOperationsInput | number | null
     quantitySold?: NullableIntFieldUpdateOperationsInput | number | null
@@ -42728,11 +42925,16 @@ export namespace Prisma {
     ebayItemId?: StringFieldUpdateOperationsInput | string
     itemUrl?: NullableStringFieldUpdateOperationsInput | string | null
     title?: StringFieldUpdateOperationsInput | string
-    soldPrice?: FloatFieldUpdateOperationsInput | number
+    soldPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     shippingPrice?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: NullableFloatFieldUpdateOperationsInput | number | null
+    currency?: StringFieldUpdateOperationsInput | string
     condition?: NullableStringFieldUpdateOperationsInput | string | null
     category?: NullableStringFieldUpdateOperationsInput | string | null
+    categoryPath?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    itemSpecifics?: NullableJsonNullValueInput | InputJsonValue
+    imageUrls?: SoldCompUpdateimageUrlsInput | string[]
     listingType?: NullableStringFieldUpdateOperationsInput | string | null
     bidCount?: NullableIntFieldUpdateOperationsInput | number | null
     quantitySold?: NullableIntFieldUpdateOperationsInput | number | null

@@ -71,8 +71,8 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-const PUBLIC_IMAGES_DIR = process.env.PUBLIC_IMAGES_DIR ?? 'public-images';
-const PUBLIC_IMAGE_BASE_URL = process.env.PUBLIC_IMAGE_BASE_URL ?? 'http://localhost:3003';
+const FILE_ROOT = process.env.FILE_ROOT ?? process.cwd();
+const PUBLIC_IMAGE_BASE_URL = process.env.PUBLIC_IMAGE_BASE_URL ?? 'http://localhost:3005';
 
 const prisma = new PrismaClient({
   log: ['error'],
@@ -212,7 +212,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req: CallToolRequest) => 
     if (name === 'commit_batch') {
       const parsed = CommitBatchInput.parse(args);
       const out = await commitBatchTool(prisma, parsed, {
-        publicImagesDir: PUBLIC_IMAGES_DIR,
+        fileRoot: FILE_ROOT,
         publicImageBaseUrl: PUBLIC_IMAGE_BASE_URL,
       });
       return jsonResult(out);

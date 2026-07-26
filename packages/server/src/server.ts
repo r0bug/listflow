@@ -38,16 +38,16 @@ app.use(
 app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
 
-// Static: optimized image working dir + public hosted images.
-const uploadsDir = r(env.UPLOADS_DIR);
-const publicImagesDir = r(env.PUBLIC_IMAGES_DIR);
+// Static (Standards §4): hosted per-item images live under
+// FILE_ROOT/photos/items and are served at /i/<year>/<slug>/imageN.jpg —
+// exactly the URLs imageHosting writes onto Photo.publicUrl for eBay drafts.
+const FILE_ROOT = path.resolve(env.FILE_ROOT);
+const itemImagesDir = path.join(FILE_ROOT, 'photos', 'items');
 const distDir = r('dist');
-fs.mkdirSync(uploadsDir, { recursive: true });
-fs.mkdirSync(path.join(publicImagesDir, 'swiftlist'), { recursive: true });
+fs.mkdirSync(itemImagesDir, { recursive: true });
 fs.mkdirSync(distDir, { recursive: true });
-app.use('/uploads', express.static(uploadsDir));
-app.use('/public-images', express.static(publicImagesDir));
-// dist/ holds the install landing page + extension zip, served via nginx /swift/.
+app.use('/i', express.static(itemImagesDir, { immutable: true, maxAge: '7d' }));
+// dist/ holds the install landing page + extension zip.
 app.use('/dist', express.static(distDir));
 
 app.use('/api/v1', healthRoutes);
@@ -65,5 +65,5 @@ app.use('/api/v1/settings', settingsRoutes);
 app.use(errorHandler);
 
 app.listen(env.PORT, () => {
-  logger.info({ port: env.PORT }, 'swiftlist server started');
+  logger.info({ port: env.PORT }, 'listflow server started');
 });

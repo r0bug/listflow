@@ -20,19 +20,31 @@ if (envPath) dotenv.config({ path: envPath });
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().default(3003),
+  PORT: z.coerce.number().default(3005),
   DATABASE_URL: z.string().url().or(z.string().startsWith('postgresql://')),
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
-  PUBLIC_IMAGE_BASE_URL: z.string().default('http://localhost:3003'),
-  PUBLIC_IMAGES_DIR: z.string().default('public-images'),
-  UPLOADS_DIR: z.string().default('uploads'),
+
+  // Standards §4: single file root; DB stores paths relative to this.
+  FILE_ROOT: z.string().min(1),
+  PUBLIC_IMAGE_BASE_URL: z.string().default('http://localhost:3005'),
+
+  // Dev-only local login (until the TeamTime credential proxy lands in
+  // phase 3). Explicit opt-in flag — NOT keyed off NODE_ENV (Standards §8).
+  DEV_AUTH_ENABLED: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
+
+  // TeamTime credential proxy (phase 3) + roster sync
+  TEAMTIME_URL: z.string().optional(),
+  TEAMTIME_API_SECRET: z.string().optional(),
+
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-6'),
+  AI_PROVIDER: z.enum(['anthropic', 'external-mcp', 'mock']).optional(),
   AI_BATCH_SIZE: z.coerce.number().default(20),
-  SWIFTLIST_WATCH_FOLDER: z.string().optional(),
+
   IMAGE_MIRROR: z.enum(['', 's3']).default(''),
-  COMPTOOL_MIRROR_BASE: z.string().optional(),
-  COMPTOOL_MIRROR_API_KEY: z.string().optional(),
 });
 
 export const env = EnvSchema.parse(process.env);

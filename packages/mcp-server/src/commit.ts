@@ -65,7 +65,7 @@ export interface CommitBatchArgs {
   prisma: PrismaClient;
   batchId: string;
   result: AnalysisResult;
-  publicImagesDir: string;
+  fileRoot: string;
   publicImageBaseUrl: string;
 }
 
@@ -280,7 +280,7 @@ export async function commitBatch(args: CommitBatchArgs): Promise<CommitBatchOut
   // Post-commit (outside tx): host images + recompute completeness.
   for (const itemId of assignedItemIds) {
     try {
-      await hostItemImages(prisma, itemId, args.publicImagesDir, args.publicImageBaseUrl);
+      await hostItemImages(prisma, itemId, args.fileRoot, args.publicImageBaseUrl);
     } catch (err) {
       // Non-fatal — the commit already landed.
       console.error(`[mcp] hostItemImages failed for ${itemId}:`, (err as Error).message);
@@ -312,10 +312,13 @@ function makeSlug(title: string | null | undefined, idSuffix: string): string {
   return `${base || 'item'}-${idSuffix}`;
 }
 
+// Mirror of the server's imageHosting.service on the Standards §4 layout:
+// FILE_ROOT/photos/items/YYYY/<slug>/imageN.jpg served at /i/<year>/<slug>/…
+// (duplicated because this package deliberately avoids importing the server).
 async function hostItemImages(
   prisma: PrismaClient,
   itemId: string,
-  publicImagesDir: string,
+  fileRoot: string,
   publicImageBaseUrl: string,
 ): Promise<void> {
   const item = await prisma.item.findUnique({
@@ -324,21 +327,23 @@ async function hostItemImages(
   });
   if (!item || item.photos.length === 0) return;
 
+  const abs = (p: string) => (path.isAbsolute(p) ? p : path.resolve(fileRoot, p));
   const slug = makeSlug(item.title, item.id.slice(-8));
-  const destDir = path.resolve(publicImagesDir, 'swiftlist', slug);
+  const year = String(item.createdAt.getFullYear());
+  const destDir = path.join(fileRoot, 'photos', 'items', year, slug);
   fs.mkdirSync(destDir, { recursive: true });
 
   for (let i = 0; i < item.photos.length; i++) {
     const photo = item.photos[i]!;
-    const sourcePath = photo.optimizedPath || photo.originalPath;
-    if (!sourcePath || !fs.existsSync(sourcePath)) continue;
+    const sourceRel = photo.optimizedPath || photo.originalPath;
+    if (!sourceRel) continue;
+    const sourcePath = abs(sourceRel);
+    if (!fs.existsSync(sourcePath)) continue;
 
-    const ext = path.extname(sourcePath) || '.jpg';
-    const filename = `image${i + 1}${ext}`;
-    const destPath = path.join(destDir, filename);
-    fs.copyFileSync(sourcePath, destPath);
+    const filename = `image${i + 1}.jpg`;
+    fs.copyFileSync(sourcePath, path.join(destDir, filename));
 
-    const publicUrl = `${publicImageBaseUrl}/public-images/swiftlist/${slug}/${filename}`;
+    const publicUrl = `${publicImageBaseUrl}/i/${year}/${slug}/${filename}`;
     await prisma.photo.update({ where: { id: photo.id }, data: { publicUrl } });
   }
 }

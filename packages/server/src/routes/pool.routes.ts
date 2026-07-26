@@ -4,12 +4,12 @@
 import { Router } from 'express';
 import path from 'node:path';
 import { prisma } from '../db/prisma.js';
-import { jwtAuth } from '../middleware/auth.js';
+import { staffAuth } from '../middleware/auth.js';
 import { qstr } from '../util/req.js';
 
 const router = Router();
 
-router.get('/', jwtAuth, async (req, res) => {
+router.get('/', staffAuth, async (req, res) => {
   const cursor = qstr(req.query.cursor);
   const take = Math.min(Number(qstr(req.query.limit)) || 50, 200);
 

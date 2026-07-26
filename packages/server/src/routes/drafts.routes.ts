@@ -4,7 +4,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db/prisma.js';
-import { apiKeyAuth, apiKeyOrJwt, jwtAuth } from '../middleware/auth.js';
+import { machineAuth, staffOrMachine, staffAuth } from '../middleware/auth.js';
 import { buildAutofillPayload, buildDeltaPayload } from '../services/draft.service.js';
 import { qstr, pstr } from '../util/req.js';
 import type { Prisma } from '../generated/prisma/index.js';
@@ -12,7 +12,7 @@ import type { Prisma } from '../generated/prisma/index.js';
 const router = Router();
 
 // GET /api/v1/drafts — list latest drafts with their linked Item (web UI).
-router.get('/', jwtAuth, async (req, res) => {
+router.get('/', staffAuth, async (req, res) => {
   const cursor = qstr(req.query.cursor);
   const take = Math.min(Number(qstr(req.query.limit)) || 50, 200);
 
@@ -30,7 +30,7 @@ router.get('/', jwtAuth, async (req, res) => {
 });
 
 // GET /api/v1/drafts/by-url?url=…
-router.get('/by-url', apiKeyAuth, async (req, res) => {
+router.get('/by-url', machineAuth, async (req, res) => {
   const url = qstr(req.query.url);
   if (!url) {
     res.status(400).json({ error: 'url query required' });
@@ -49,7 +49,7 @@ router.get('/by-url', apiKeyAuth, async (req, res) => {
   res.json({ draft: draftCore, item, autofill });
 });
 
-router.get('/by-ebay-id/:ebayDraftId', apiKeyAuth, async (req, res) => {
+router.get('/by-ebay-id/:ebayDraftId', machineAuth, async (req, res) => {
   const draft = await prisma.ebayDraft.findUnique({
     where: { ebayDraftId: pstr(req.params.ebayDraftId) },
     include: { item: true },
@@ -71,7 +71,7 @@ const PatchSchema = z.object({
   ebayItemId: z.string().optional(),
 });
 
-router.patch('/:id', apiKeyOrJwt, async (req, res) => {
+router.patch('/:id', staffOrMachine, async (req, res) => {
   const parsed = PatchSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
@@ -105,7 +105,7 @@ router.patch('/:id', apiKeyOrJwt, async (req, res) => {
 });
 
 // POST /api/v1/drafts/:id/resume — returns the delta autofill payload.
-router.post('/:id/resume', apiKeyAuth, async (req, res) => {
+router.post('/:id/resume', machineAuth, async (req, res) => {
   const delta = await buildDeltaPayload(pstr(req.params.id));
   res.json(delta);
 });

@@ -4,9 +4,11 @@ import os from 'node:os';
 import path from 'node:path';
 import fsp from 'node:fs/promises';
 import { prisma } from '../db/prisma.js';
-import { jwtAuth, apiKeyAuth, apiKeyOrJwt } from '../middleware/auth.js';
+import { staffAuth, machineAuth, staffOrMachine } from '../middleware/auth.js';
+import { absPath } from '../util/paths.js';
 import { buildAutofillPayload } from '../services/draft.service.js';
-import { processImage, pendingGroupDir } from '../services/image.service.js';
+import { processImage, storeOriginal } from '../services/image.service.js';
+import { upsertCompAndLink, moveItemComps } from '../services/comps.service.js';
 import { computeCompleteness } from '../util/completeness.js';
 import { sha256File } from '../util/sha256.js';
 import { perceptualHash } from '../util/perceptualHash.js';
@@ -23,7 +25,7 @@ type ItemStage = (typeof ItemStages)[number];
 
 // ── List + read ────────────────────────────────────────────────────────
 
-router.get('/', jwtAuth, async (req, res) => {
+router.get('/', staffAuth, async (req, res) => {
   const status = qstr(req.query.status);
   const stage = qstr(req.query.stage);
   const q = qstr(req.query.q);
@@ -38,7 +40,7 @@ router.get('/', jwtAuth, async (req, res) => {
     },
     include: {
       photos: { take: 1, where: { isPrimary: true } },
-      _count: { select: { photos: true, soldComps: true, drafts: true } },
+      _count: { select: { photos: true, comps: true, drafts: true } },
     },
     take: take + 1,
     cursor: cursor ? { id: cursor } : undefined,
@@ -49,12 +51,12 @@ router.get('/', jwtAuth, async (req, res) => {
   res.json({ items, nextCursor });
 });
 
-router.get('/:id', jwtAuth, async (req, res) => {
+router.get('/:id', staffAuth, async (req, res) => {
   const item = await prisma.item.findUnique({
     where: { id: pstr(req.params.id) },
     include: {
       photos: { orderBy: { order: 'asc' } },
-      soldComps: { orderBy: { scrapedAt: 'desc' } },
+      comps: { include: { comp: true }, orderBy: { linkedAt: 'desc' } },
       drafts: { orderBy: { lastSeenAt: 'desc' } },
     },
   });
@@ -96,7 +98,7 @@ const ItemPatchSchema = z.object({
   ebayListingUrl: z.string().optional(),
 });
 
-router.patch('/:id', jwtAuth, async (req, res) => {
+router.patch('/:id', staffAuth, async (req, res) => {
   const parsed = ItemPatchSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
@@ -118,7 +120,7 @@ router.patch('/:id', jwtAuth, async (req, res) => {
 
 // ── Photos ────────────────────────────────────────────────────────────
 
-router.post('/:id/photos/reorder', jwtAuth, async (req, res) => {
+router.post('/:id/photos/reorder', staffAuth, async (req, res) => {
   const { photoIds } = req.body as { photoIds?: string[] };
   if (!Array.isArray(photoIds)) {
     res.status(400).json({ error: 'photoIds must be an array' });
@@ -130,7 +132,7 @@ router.post('/:id/photos/reorder', jwtAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/:id/photos/:photoId/primary', jwtAuth, async (req, res) => {
+router.post('/:id/photos/:photoId/primary', staffAuth, async (req, res) => {
   const id = pstr(req.params.id);
   const photoId = pstr(req.params.photoId);
   await prisma.$transaction([
@@ -140,14 +142,14 @@ router.post('/:id/photos/:photoId/primary', jwtAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/:id/photos/:photoId', jwtAuth, async (req, res) => {
+router.delete('/:id/photos/:photoId', staffAuth, async (req, res) => {
   await prisma.photo.delete({ where: { id: pstr(req.params.photoId) } });
   res.json({ ok: true });
 });
 
 // ── Autofill payload (extension reads this) ───────────────────────────
 
-router.get('/:id/autofill', apiKeyAuth, async (req, res) => {
+router.get('/:id/autofill', machineAuth, async (req, res) => {
   const payload = await buildAutofillPayload(pstr(req.params.id));
   res.json(payload);
 });
@@ -170,23 +172,16 @@ const SoldCompLinkSchema = z.object({
   isPrimary: z.boolean().default(false),
 });
 
-router.post('/:id/sold-comp-link', apiKeyAuth, async (req, res) => {
+router.post('/:id/sold-comp-link', machineAuth, async (req, res) => {
   const parsed = SoldCompLinkSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
     return;
   }
   const itemId = pstr(req.params.id);
-  const { ebayItemId, soldDate, itemSpecifics, ...rest } = parsed.data;
-  const baseData = {
-    ...rest,
-    soldDate: soldDate ? new Date(soldDate) : null,
-    itemSpecifics: itemSpecifics as unknown as Prisma.InputJsonValue | undefined,
-  };
-  const link = await prisma.soldCompLink.upsert({
-    where: { itemId_ebayItemId: { itemId, ebayItemId } },
-    create: { itemId, ebayItemId, ...baseData },
-    update: baseData,
+  const link = await upsertCompAndLink(prisma, itemId, {
+    ...parsed.data,
+    source: 'extension',
   });
 
   // Backfill null Item fields from this comp.
@@ -258,12 +253,12 @@ async function downloadAndAttachImage(itemId: string, url: string): Promise<stri
       return existing.id;
     }
     const phash = await perceptualHash(tmpPath).catch(() => null);
-    const dest = pendingGroupDir(sha256.slice(0, 8));
-    const processed = await processImage(tmpPath, dest, sha256.slice(0, 12));
+    const originalRel = storeOriginal(tmpPath, sha256);
+    const processed = await processImage(tmpPath, sha256);
     const photo = await prisma.photo.create({
       data: {
         itemId,
-        originalPath: tmpPath,
+        originalPath: originalRel,
         optimizedPath: processed.optimizedPath,
         thumbnailPath: processed.thumbnailPath,
         sha256,
@@ -272,8 +267,10 @@ async function downloadAndAttachImage(itemId: string, url: string): Promise<stri
         height: processed.height,
         bytes: processed.bytes,
         mime: processed.mime,
+        source: 'EBAY_IMPORT',
       },
     });
+    await fsp.unlink(tmpPath).catch(() => undefined);
     return photo.id;
   } catch (err) {
     logger.warn({ err, url }, 'import-from-active: image download failed');
@@ -282,7 +279,7 @@ async function downloadAndAttachImage(itemId: string, url: string): Promise<stri
   }
 }
 
-router.post('/:id/import-from-active', apiKeyAuth, async (req, res) => {
+router.post('/:id/import-from-active', machineAuth, async (req, res) => {
   const parsed = ImportFromActiveSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
@@ -369,7 +366,7 @@ router.post('/:id/import-from-active', apiKeyAuth, async (req, res) => {
 import sharp from 'sharp';
 import { searchByImage, ebayBrowseConfigured } from '../services/ebayBrowse.service.js';
 
-router.post('/photo/:photoId/image-search', apiKeyOrJwt, async (req, res) => {
+router.post('/photo/:photoId/image-search', staffOrMachine, async (req, res) => {
   if (!ebayBrowseConfigured()) {
     res.status(503).json({ error: 'EBAY_BROWSE_CLIENT_ID / _SECRET not configured in server env' });
     return;
@@ -415,7 +412,7 @@ router.post('/photo/:photoId/image-search', apiKeyOrJwt, async (req, res) => {
 
 import fs from 'node:fs';
 
-router.get('/photo/:photoId/thumb', apiKeyOrJwt, async (req, res) => {
+router.get('/photo/:photoId/thumb', staffOrMachine, async (req, res) => {
   const photoId = pstr(req.params.photoId);
   const photo = await prisma.photo.findUnique({
     where: { id: photoId },
@@ -425,9 +422,9 @@ router.get('/photo/:photoId/thumb', apiKeyOrJwt, async (req, res) => {
     res.status(404).json({ error: 'Photo not found' });
     return;
   }
-  const candidates = [photo.thumbnailPath, photo.optimizedPath, photo.originalPath].filter(
-    (p): p is string => !!p,
-  );
+  const candidates = [photo.thumbnailPath, photo.optimizedPath, photo.originalPath]
+    .filter((p): p is string => !!p)
+    .map((p) => absPath(p));
   const filePath = candidates.find((p) => {
     try {
       return fs.existsSync(p);
@@ -446,7 +443,7 @@ router.get('/photo/:photoId/thumb', apiKeyOrJwt, async (req, res) => {
 
 // ── Merge + photo move ────────────────────────────────────────────────
 
-router.post('/:id/merge-into', jwtAuth, async (req, res) => {
+router.post('/:id/merge-into', staffAuth, async (req, res) => {
   const sourceId = pstr(req.params.id);
   const targetId = (req.body as { targetId?: string } | undefined)?.targetId;
   if (!targetId || typeof targetId !== 'string') {
@@ -468,7 +465,7 @@ router.post('/:id/merge-into', jwtAuth, async (req, res) => {
   const merged = await prisma.$transaction(async (tx) => {
     await tx.photo.updateMany({ where: { itemId: sourceId }, data: { itemId: targetId } });
     await tx.photoGroup.updateMany({ where: { itemId: sourceId }, data: { itemId: targetId } });
-    await tx.soldCompLink.updateMany({ where: { itemId: sourceId }, data: { itemId: targetId } });
+    await moveItemComps(tx, sourceId, targetId);
     await tx.ebayDraft.updateMany({ where: { itemId: sourceId }, data: { itemId: targetId } });
     await tx.ingestEvent.updateMany({ where: { itemId: sourceId }, data: { itemId: targetId } });
     await tx.item.update({
@@ -496,7 +493,7 @@ const MovePhotosSchema = z.object({
   targetItemId: z.string().min(1),
 });
 
-router.post('/:id/photos/move', jwtAuth, async (req, res) => {
+router.post('/:id/photos/move', staffAuth, async (req, res) => {
   const sourceId = pstr(req.params.id);
   const parsed = MovePhotosSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -536,7 +533,7 @@ router.post('/:id/photos/move', jwtAuth, async (req, res) => {
 
 // ── Drafts for an item ────────────────────────────────────────────────
 
-router.get('/:id/drafts', apiKeyOrJwt, async (req, res) => {
+router.get('/:id/drafts', staffOrMachine, async (req, res) => {
   const drafts = await prisma.ebayDraft.findMany({
     where: { itemId: pstr(req.params.id) },
     orderBy: { lastSeenAt: 'desc' },
@@ -551,7 +548,7 @@ const CreateDraftSchema = z.object({
   currentValues: z.record(z.unknown()).optional(),
 });
 
-router.post('/:id/drafts', apiKeyAuth, async (req, res) => {
+router.post('/:id/drafts', machineAuth, async (req, res) => {
   const parsed = CreateDraftSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
@@ -559,6 +556,15 @@ router.post('/:id/drafts', apiKeyAuth, async (req, res) => {
   }
   const itemId = pstr(req.params.id);
   const cv = parsed.data.currentValues as unknown as Prisma.InputJsonValue | undefined;
+  // Resolve the extension's account hint (profile-pinned accountName) to an
+  // EbayAccount row; unmatched hints are kept visible in notes.
+  const account = parsed.data.accountHint
+    ? await prisma.ebayAccount.findFirst({
+        where: { accountName: { equals: parsed.data.accountHint, mode: 'insensitive' } },
+      })
+    : null;
+  const noteHint =
+    parsed.data.accountHint && !account ? `accountHint:${parsed.data.accountHint}` : undefined;
   const draft = await prisma.ebayDraft.upsert({
     where: parsed.data.ebayDraftId
       ? { ebayDraftId: parsed.data.ebayDraftId }
@@ -567,13 +573,15 @@ router.post('/:id/drafts', apiKeyAuth, async (req, res) => {
       itemId,
       ebayDraftId: parsed.data.ebayDraftId ?? null,
       ebayDraftUrl: parsed.data.ebayDraftUrl,
-      accountHint: parsed.data.accountHint ?? null,
+      ebayAccountId: account?.id ?? null,
+      notes: noteHint,
       currentValues: cv,
     },
     update: {
       itemId,
       ebayDraftUrl: parsed.data.ebayDraftUrl,
-      accountHint: parsed.data.accountHint ?? null,
+      ebayAccountId: account?.id ?? undefined,
+      notes: noteHint,
       currentValues: cv,
       lastSeenAt: new Date(),
     },

@@ -5,41 +5,39 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '../db/prisma.js';
-import { apiKeyAuth } from '../middleware/auth.js';
+import { machineAuth, staffAuth } from '../middleware/auth.js';
 import { sha256String } from '../util/sha256.js';
 import { logger } from '../util/logger.js';
 
 const router = Router();
 
-// POST /api/v1/extension/register — public; issues an API key for first install.
+// POST /api/v1/extension/register — issues this install's machine key.
+// NOT public (Standards §1): the lister logs into the extension popup first
+// (staff JWT), then the extension self-provisions its per-install key.
 const RegisterSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email().optional(),
+  name: z.string().min(1), // e.g. "extension: john @ front-desk chrome profile"
 });
 
-router.post('/register', async (req, res) => {
+router.post('/register', staffAuth, async (req, res) => {
   const parsed = RegisterSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
     return;
   }
-  const client = await prisma.client.create({
-    data: { name: parsed.data.name, email: parsed.data.email },
+  const rawKey = `lf_${randomBytes(24).toString('hex')}`;
+  const apiKey = await prisma.apiKey.create({
+    data: { keyHash: sha256String(rawKey), name: parsed.data.name, kind: 'machine' },
   });
-  const rawKey = `sl_${randomBytes(24).toString('hex')}`;
-  await prisma.apiKey.create({
-    data: { clientId: client.id, keyHash: sha256String(rawKey), name: 'default' },
-  });
-  res.status(201).json({ apiKey: rawKey, clientId: client.id });
+  res.status(201).json({ apiKey: rawKey, apiKeyId: apiKey.id });
 });
 
 // POST /api/v1/extension/identify-search — returns Items needing comp matches
 // + a generated eBay sold-search URL each.
-router.post('/identify-search', apiKeyAuth, async (_req, res) => {
+router.post('/identify-search', machineAuth, async (_req, res) => {
   const items = await prisma.item.findMany({
     where: {
       OR: [{ stage: 'IDENTIFIED' }, { stage: 'GROUPED' }, { stage: 'INGESTED' }],
-      soldComps: { none: {} },
+      comps: { none: {} },
     },
     take: 25,
     orderBy: { updatedAt: 'desc' },
@@ -56,26 +54,23 @@ router.post('/identify-search', apiKeyAuth, async (_req, res) => {
   res.json({ items: enriched });
 });
 
-// GET /api/v1/extension/patch — hot-patch payload (mirror comptool).
-router.get('/patch', apiKeyAuth, async (_req, res) => {
-  const setting = await prisma.setting.findUnique({ where: { key: 'extensionPatch' } });
-  if (!setting) {
-    res.json({ version: 0, scripts: {} });
-    return;
-  }
-  res.json(setting.value);
+// Hot-patch is RETIRED (Standards §6: no remote code execution in a
+// credential-holding extension). Old installs polling this get an empty
+// payload forever; the endpoint disappears once the merged extension ships.
+router.get('/patch', machineAuth, (_req, res) => {
+  res.json({ version: 0, scripts: {} });
 });
 
 // POST /api/v1/extension/telemetry — selector-failure logging.
-router.post('/telemetry', apiKeyAuth, async (req, res) => {
-  logger.warn({ telemetry: req.body, client: req.client?.id }, 'extension telemetry');
+router.post('/telemetry', machineAuth, async (req, res) => {
+  logger.warn({ telemetry: req.body, apiKeyId: req.machine?.apiKeyId }, 'extension telemetry');
   res.json({ ok: true });
 });
 
 // GET /api/v1/extension/unlisted-items — minimal item list (id + label) for
 // the "Import details to listing" picker on eBay item pages. Anything not
 // already LISTED is fair game (DRAFT, READY, IN_PROCESS, etc.).
-router.get('/unlisted-items', apiKeyAuth, async (_req, res) => {
+router.get('/unlisted-items', machineAuth, async (_req, res) => {
   const items = await prisma.item.findMany({
     where: { status: { not: 'LISTED' } },
     select: { id: true, title: true, brand: true, model: true, status: true, updatedAt: true },

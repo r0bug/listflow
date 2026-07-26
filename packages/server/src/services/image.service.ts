@@ -1,15 +1,17 @@
-// Sharp-based image processing. Resizes to optimized + thumbnail variants
-// and returns the saved paths + dimensions/bytes/mime metadata used by Photo.
+// Sharp-based image processing on the Standards §4 storage layout.
+// storeOriginal() copies the master into photos/originals/YYYY/MM/<sha16>.<ext>
+// (immutable, append-only); processImage() writes the regenerable variants to
+// photos/derived/<sha16>.opt.jpg|.thumb.jpg. All returned paths are
+// FILE_ROOT-relative — exactly what the Photo row stores.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
-import { env } from '../config/env.js';
-import { resolveConfigPath } from '../util/paths.js';
+import { absPath, derivedRelPaths, ensureDirFor, originalRelPath } from '../util/paths.js';
 
 export interface ProcessedImage {
-  optimizedPath: string;
-  thumbnailPath: string;
+  optimizedPath: string; // relative
+  thumbnailPath: string; // relative
   width: number;
   height: number;
   bytes: number;
@@ -21,47 +23,51 @@ const THUMBNAIL_LONG_EDGE = 400;
 const QUALITY_OPTIMIZED = 85;
 const QUALITY_THUMBNAIL = 70;
 
-export async function processImage(
-  sourcePath: string,
-  outputBase: string, // e.g. "<uploads>/<groupSlug>"
-  outputName: string, // e.g. "image1"
-): Promise<ProcessedImage> {
-  fs.mkdirSync(outputBase, { recursive: true });
-  const optimizedPath = path.join(outputBase, `${outputName}.jpg`);
-  const thumbnailPath = path.join(outputBase, `${outputName}.thumb.jpg`);
+/** Copy the source file into the immutable originals tree. Content-named, so
+ *  an existing destination is already the same bytes — skip silently. */
+export function storeOriginal(
+  sourceAbsPath: string,
+  sha256: string,
+  capturedAt?: Date | null,
+): string {
+  const rel = originalRelPath(sha256, path.extname(sourceAbsPath), capturedAt);
+  const dest = absPath(rel);
+  if (!fs.existsSync(dest)) {
+    ensureDirFor(dest);
+    fs.copyFileSync(sourceAbsPath, dest);
+  }
+  return rel;
+}
 
-  const meta = await sharp(sourcePath).metadata();
+/** Produce optimized + thumbnail variants keyed by content hash. */
+export async function processImage(sourceAbsPath: string, sha256: string): Promise<ProcessedImage> {
+  const rel = derivedRelPaths(sha256);
+  const optimizedAbs = absPath(rel.optimized);
+  const thumbnailAbs = absPath(rel.thumbnail);
+  ensureDirFor(optimizedAbs);
 
-  await sharp(sourcePath)
+  const meta = await sharp(sourceAbsPath).metadata();
+
+  await sharp(sourceAbsPath)
     .rotate() // honor EXIF orientation
     .resize(OPTIMIZED_LONG_EDGE, OPTIMIZED_LONG_EDGE, { fit: 'inside', withoutEnlargement: true })
     .jpeg({ quality: QUALITY_OPTIMIZED, mozjpeg: true })
-    .toFile(optimizedPath);
+    .toFile(optimizedAbs);
 
-  await sharp(sourcePath)
+  await sharp(sourceAbsPath)
     .rotate()
     .resize(THUMBNAIL_LONG_EDGE, THUMBNAIL_LONG_EDGE, { fit: 'inside', withoutEnlargement: true })
     .jpeg({ quality: QUALITY_THUMBNAIL })
-    .toFile(thumbnailPath);
+    .toFile(thumbnailAbs);
 
-  const stat = fs.statSync(optimizedPath);
+  const stat = fs.statSync(optimizedAbs);
 
   return {
-    optimizedPath,
-    thumbnailPath,
+    optimizedPath: rel.optimized,
+    thumbnailPath: rel.thumbnail,
     width: meta.width ?? 0,
     height: meta.height ?? 0,
     bytes: stat.size,
     mime: 'image/jpeg',
   };
-}
-
-/** Where a photo's working files live before it has an Item-derived slug. */
-export function pendingGroupDir(groupId: string): string {
-  return path.join(resolveConfigPath(env.UPLOADS_DIR), `pending-${groupId}`);
-}
-
-/** Where a photo's files live once its Item is identified and named. */
-export function itemGroupDir(slug: string): string {
-  return path.join(resolveConfigPath(env.UPLOADS_DIR), slug);
 }

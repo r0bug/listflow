@@ -8,7 +8,8 @@
 import { Router } from 'express';
 import fs from 'node:fs/promises';
 import { prisma } from '../db/prisma.js';
-import { jwtAuth } from '../middleware/auth.js';
+import { staffAuth } from '../middleware/auth.js';
+import { absPath } from '../util/paths.js';
 import { logger } from '../util/logger.js';
 import { pstr } from '../util/req.js';
 
@@ -17,14 +18,14 @@ const router = Router();
 async function unlinkIfPresent(p: string | null | undefined) {
   if (!p) return;
   try {
-    await fs.unlink(p);
+    await fs.unlink(absPath(p));
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code !== 'ENOENT') logger.warn({ err, path: p }, 'photo file unlink failed');
   }
 }
 
-router.delete('/:id', jwtAuth, async (req, res) => {
+router.delete('/:id', staffAuth, async (req, res) => {
   const id = pstr(req.params.id);
   const photo = await prisma.photo.findUnique({ where: { id } });
   if (!photo) {
