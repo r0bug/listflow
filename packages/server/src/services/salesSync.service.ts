@@ -46,6 +46,7 @@ interface FulfillmentOrder {
   orderId: string;
   creationDate: string;
   orderPaymentStatus?: string;
+  totalMarketplaceFee?: { value?: string };
   paymentSummary?: { payments?: Array<{ paymentDate?: string }> };
   buyer?: { username?: string };
   lineItems?: FulfillmentLineItem[];
@@ -136,8 +137,14 @@ class SalesSyncService {
         ) {
           continue; // unpaid / refunded / cancelled
         }
+        // Apportion the order-level marketplace fee across line items by
+        // their cost share — settlements split on NET after fees.
+        const orderFee = parseFloat(order.totalMarketplaceFee?.value || '0') || 0;
+        const orderItemTotal = (order.lineItems || [])
+          .map((li) => parseFloat(li.lineItemCost?.value || '0') || 0)
+          .reduce((a, b) => a + b, 0);
         for (const lineItem of order.lineItems || []) {
-          await this.ingestLineItem(account, order, lineItem, result);
+          await this.ingestLineItem(account, order, lineItem, result, orderFee, orderItemTotal);
         }
       }
 
@@ -151,6 +158,8 @@ class SalesSyncService {
     order: FulfillmentOrder,
     lineItem: FulfillmentLineItem,
     result: AccountSyncResult,
+    orderFee = 0,
+    orderItemTotal = 0,
   ) {
     const lineItemId = String(lineItem.lineItemId || '0');
     const legacyItemId = lineItem.legacyItemId ? String(lineItem.legacyItemId) : null;
@@ -162,6 +171,10 @@ class SalesSyncService {
       (lineItem.ebayCollectAndRemitTaxes || [])
         .map((t) => parseFloat(t.amount?.value || '0'))
         .reduce((a, b) => a + b, 0) || null;
+    const fees =
+      orderFee > 0 && orderItemTotal > 0
+        ? round2(orderFee * (itemTotal / orderItemTotal))
+        : null;
     const soldAt = new Date(order.creationDate);
     const paidAt = order.paymentSummary?.payments?.[0]?.paymentDate
       ? new Date(order.paymentSummary.payments[0]!.paymentDate!)
@@ -229,6 +242,7 @@ class SalesSyncService {
         itemPrice,
         shippingPrice: shipping,
         taxAmount: tax,
+        fees,
         totalPrice: round2(itemTotal + (shipping || 0) + (tax || 0)),
         currency: lineItem.lineItemCost?.currency || 'USD',
         buyerUsername: order.buyer?.username || null, // PII policy: username only
