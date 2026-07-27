@@ -19062,6 +19062,7 @@ export namespace Prisma {
     taxAmount: number | null
     totalPrice: number | null
     fees: number | null
+    refunds: number | null
   }
 
   export type SaleSumAggregateOutputType = {
@@ -19071,6 +19072,7 @@ export namespace Prisma {
     taxAmount: number | null
     totalPrice: number | null
     fees: number | null
+    refunds: number | null
   }
 
   export type SaleMinAggregateOutputType = {
@@ -19087,6 +19089,7 @@ export namespace Prisma {
     taxAmount: number | null
     totalPrice: number | null
     fees: number | null
+    refunds: number | null
     promoted: boolean | null
     currency: string | null
     buyerUsername: string | null
@@ -19125,6 +19128,7 @@ export namespace Prisma {
     taxAmount: number | null
     totalPrice: number | null
     fees: number | null
+    refunds: number | null
     promoted: boolean | null
     currency: string | null
     buyerUsername: string | null
@@ -19163,6 +19167,7 @@ export namespace Prisma {
     taxAmount: number
     totalPrice: number
     fees: number
+    refunds: number
     promoted: number
     currency: number
     buyerUsername: number
@@ -19197,6 +19202,7 @@ export namespace Prisma {
     taxAmount?: true
     totalPrice?: true
     fees?: true
+    refunds?: true
   }
 
   export type SaleSumAggregateInputType = {
@@ -19206,6 +19212,7 @@ export namespace Prisma {
     taxAmount?: true
     totalPrice?: true
     fees?: true
+    refunds?: true
   }
 
   export type SaleMinAggregateInputType = {
@@ -19222,6 +19229,7 @@ export namespace Prisma {
     taxAmount?: true
     totalPrice?: true
     fees?: true
+    refunds?: true
     promoted?: true
     currency?: true
     buyerUsername?: true
@@ -19260,6 +19268,7 @@ export namespace Prisma {
     taxAmount?: true
     totalPrice?: true
     fees?: true
+    refunds?: true
     promoted?: true
     currency?: true
     buyerUsername?: true
@@ -19298,6 +19307,7 @@ export namespace Prisma {
     taxAmount?: true
     totalPrice?: true
     fees?: true
+    refunds?: true
     promoted?: true
     currency?: true
     buyerUsername?: true
@@ -19424,6 +19434,7 @@ export namespace Prisma {
     taxAmount: number | null
     totalPrice: number
     fees: number | null
+    refunds: number | null
     promoted: boolean
     currency: string
     buyerUsername: string | null
@@ -19482,6 +19493,7 @@ export namespace Prisma {
     taxAmount?: boolean
     totalPrice?: boolean
     fees?: boolean
+    refunds?: boolean
     promoted?: boolean
     currency?: boolean
     buyerUsername?: boolean
@@ -19524,6 +19536,7 @@ export namespace Prisma {
     taxAmount?: boolean
     totalPrice?: boolean
     fees?: boolean
+    refunds?: boolean
     promoted?: boolean
     currency?: boolean
     buyerUsername?: boolean
@@ -19566,6 +19579,7 @@ export namespace Prisma {
     taxAmount?: boolean
     totalPrice?: boolean
     fees?: boolean
+    refunds?: boolean
     promoted?: boolean
     currency?: boolean
     buyerUsername?: boolean
@@ -19608,6 +19622,7 @@ export namespace Prisma {
     taxAmount?: boolean
     totalPrice?: boolean
     fees?: boolean
+    refunds?: boolean
     promoted?: boolean
     currency?: boolean
     buyerUsername?: boolean
@@ -19633,7 +19648,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type SaleOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ebayOrderId" | "lineItemId" | "salesRecordNumber" | "legacyItemId" | "customLabel" | "title" | "quantity" | "itemPrice" | "shippingPrice" | "taxAmount" | "totalPrice" | "fees" | "promoted" | "currency" | "buyerUsername" | "shipCity" | "shipState" | "shipCountry" | "soldAt" | "paidAt" | "shippedAt" | "trackingNumber" | "shippingService" | "imageUrl" | "imagePath" | "thumbnailPath" | "source" | "rawData" | "attributionStatus" | "listedById" | "consignmentGroupId" | "ebayAccountId" | "itemId" | "createdAt" | "updatedAt", ExtArgs["result"]["sale"]>
+  export type SaleOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ebayOrderId" | "lineItemId" | "salesRecordNumber" | "legacyItemId" | "customLabel" | "title" | "quantity" | "itemPrice" | "shippingPrice" | "taxAmount" | "totalPrice" | "fees" | "refunds" | "promoted" | "currency" | "buyerUsername" | "shipCity" | "shipState" | "shipCountry" | "soldAt" | "paidAt" | "shippedAt" | "trackingNumber" | "shippingService" | "imageUrl" | "imagePath" | "thumbnailPath" | "source" | "rawData" | "attributionStatus" | "listedById" | "consignmentGroupId" | "ebayAccountId" | "itemId" | "createdAt" | "updatedAt", ExtArgs["result"]["sale"]>
   export type SaleInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     listedBy?: boolean | Sale$listedByArgs<ExtArgs>
     ebayAccount?: boolean | EbayAccountDefaultArgs<ExtArgs>
@@ -19671,6 +19686,7 @@ export namespace Prisma {
       taxAmount: number | null
       totalPrice: number
       fees: number | null
+      refunds: number | null
       promoted: boolean
       currency: string
       buyerUsername: string | null
@@ -20133,6 +20149,7 @@ export namespace Prisma {
     readonly taxAmount: FieldRef<"Sale", 'Float'>
     readonly totalPrice: FieldRef<"Sale", 'Float'>
     readonly fees: FieldRef<"Sale", 'Float'>
+    readonly refunds: FieldRef<"Sale", 'Float'>
     readonly promoted: FieldRef<"Sale", 'Boolean'>
     readonly currency: FieldRef<"Sale", 'String'>
     readonly buyerUsername: FieldRef<"Sale", 'String'>
@@ -29415,6 +29432,7 @@ export namespace Prisma {
     taxAmount: 'taxAmount',
     totalPrice: 'totalPrice',
     fees: 'fees',
+    refunds: 'refunds',
     promoted: 'promoted',
     currency: 'currency',
     buyerUsername: 'buyerUsername',
@@ -31212,6 +31230,7 @@ export namespace Prisma {
     taxAmount?: FloatNullableFilter<"Sale"> | number | null
     totalPrice?: FloatFilter<"Sale"> | number
     fees?: FloatNullableFilter<"Sale"> | number | null
+    refunds?: FloatNullableFilter<"Sale"> | number | null
     promoted?: BoolFilter<"Sale"> | boolean
     currency?: StringFilter<"Sale"> | string
     buyerUsername?: StringNullableFilter<"Sale"> | string | null
@@ -31254,6 +31273,7 @@ export namespace Prisma {
     taxAmount?: SortOrderInput | SortOrder
     totalPrice?: SortOrder
     fees?: SortOrderInput | SortOrder
+    refunds?: SortOrderInput | SortOrder
     promoted?: SortOrder
     currency?: SortOrder
     buyerUsername?: SortOrderInput | SortOrder
@@ -31300,6 +31320,7 @@ export namespace Prisma {
     taxAmount?: FloatNullableFilter<"Sale"> | number | null
     totalPrice?: FloatFilter<"Sale"> | number
     fees?: FloatNullableFilter<"Sale"> | number | null
+    refunds?: FloatNullableFilter<"Sale"> | number | null
     promoted?: BoolFilter<"Sale"> | boolean
     currency?: StringFilter<"Sale"> | string
     buyerUsername?: StringNullableFilter<"Sale"> | string | null
@@ -31342,6 +31363,7 @@ export namespace Prisma {
     taxAmount?: SortOrderInput | SortOrder
     totalPrice?: SortOrder
     fees?: SortOrderInput | SortOrder
+    refunds?: SortOrderInput | SortOrder
     promoted?: SortOrder
     currency?: SortOrder
     buyerUsername?: SortOrderInput | SortOrder
@@ -31389,6 +31411,7 @@ export namespace Prisma {
     taxAmount?: FloatNullableWithAggregatesFilter<"Sale"> | number | null
     totalPrice?: FloatWithAggregatesFilter<"Sale"> | number
     fees?: FloatNullableWithAggregatesFilter<"Sale"> | number | null
+    refunds?: FloatNullableWithAggregatesFilter<"Sale"> | number | null
     promoted?: BoolWithAggregatesFilter<"Sale"> | boolean
     currency?: StringWithAggregatesFilter<"Sale"> | string
     buyerUsername?: StringNullableWithAggregatesFilter<"Sale"> | string | null
@@ -33670,6 +33693,7 @@ export namespace Prisma {
     taxAmount?: number | null
     totalPrice: number
     fees?: number | null
+    refunds?: number | null
     promoted?: boolean
     currency?: string
     buyerUsername?: string | null
@@ -33709,6 +33733,7 @@ export namespace Prisma {
     taxAmount?: number | null
     totalPrice: number
     fees?: number | null
+    refunds?: number | null
     promoted?: boolean
     currency?: string
     buyerUsername?: string | null
@@ -33748,6 +33773,7 @@ export namespace Prisma {
     taxAmount?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: FloatFieldUpdateOperationsInput | number
     fees?: NullableFloatFieldUpdateOperationsInput | number | null
+    refunds?: NullableFloatFieldUpdateOperationsInput | number | null
     promoted?: BoolFieldUpdateOperationsInput | boolean
     currency?: StringFieldUpdateOperationsInput | string
     buyerUsername?: NullableStringFieldUpdateOperationsInput | string | null
@@ -33787,6 +33813,7 @@ export namespace Prisma {
     taxAmount?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: FloatFieldUpdateOperationsInput | number
     fees?: NullableFloatFieldUpdateOperationsInput | number | null
+    refunds?: NullableFloatFieldUpdateOperationsInput | number | null
     promoted?: BoolFieldUpdateOperationsInput | boolean
     currency?: StringFieldUpdateOperationsInput | string
     buyerUsername?: NullableStringFieldUpdateOperationsInput | string | null
@@ -33826,6 +33853,7 @@ export namespace Prisma {
     taxAmount?: number | null
     totalPrice: number
     fees?: number | null
+    refunds?: number | null
     promoted?: boolean
     currency?: string
     buyerUsername?: string | null
@@ -33865,6 +33893,7 @@ export namespace Prisma {
     taxAmount?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: FloatFieldUpdateOperationsInput | number
     fees?: NullableFloatFieldUpdateOperationsInput | number | null
+    refunds?: NullableFloatFieldUpdateOperationsInput | number | null
     promoted?: BoolFieldUpdateOperationsInput | boolean
     currency?: StringFieldUpdateOperationsInput | string
     buyerUsername?: NullableStringFieldUpdateOperationsInput | string | null
@@ -33901,6 +33930,7 @@ export namespace Prisma {
     taxAmount?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: FloatFieldUpdateOperationsInput | number
     fees?: NullableFloatFieldUpdateOperationsInput | number | null
+    refunds?: NullableFloatFieldUpdateOperationsInput | number | null
     promoted?: BoolFieldUpdateOperationsInput | boolean
     currency?: StringFieldUpdateOperationsInput | string
     buyerUsername?: NullableStringFieldUpdateOperationsInput | string | null
@@ -36046,6 +36076,7 @@ export namespace Prisma {
     taxAmount?: SortOrder
     totalPrice?: SortOrder
     fees?: SortOrder
+    refunds?: SortOrder
     promoted?: SortOrder
     currency?: SortOrder
     buyerUsername?: SortOrder
@@ -36078,6 +36109,7 @@ export namespace Prisma {
     taxAmount?: SortOrder
     totalPrice?: SortOrder
     fees?: SortOrder
+    refunds?: SortOrder
   }
 
   export type SaleMaxOrderByAggregateInput = {
@@ -36094,6 +36126,7 @@ export namespace Prisma {
     taxAmount?: SortOrder
     totalPrice?: SortOrder
     fees?: SortOrder
+    refunds?: SortOrder
     promoted?: SortOrder
     currency?: SortOrder
     buyerUsername?: SortOrder
@@ -36132,6 +36165,7 @@ export namespace Prisma {
     taxAmount?: SortOrder
     totalPrice?: SortOrder
     fees?: SortOrder
+    refunds?: SortOrder
     promoted?: SortOrder
     currency?: SortOrder
     buyerUsername?: SortOrder
@@ -36163,6 +36197,7 @@ export namespace Prisma {
     taxAmount?: SortOrder
     totalPrice?: SortOrder
     fees?: SortOrder
+    refunds?: SortOrder
   }
 
   export type FloatWithAggregatesFilter<$PrismaModel = never> = {
@@ -38848,6 +38883,7 @@ export namespace Prisma {
     taxAmount?: number | null
     totalPrice: number
     fees?: number | null
+    refunds?: number | null
     promoted?: boolean
     currency?: string
     buyerUsername?: string | null
@@ -38886,6 +38922,7 @@ export namespace Prisma {
     taxAmount?: number | null
     totalPrice: number
     fees?: number | null
+    refunds?: number | null
     promoted?: boolean
     currency?: string
     buyerUsername?: string | null
@@ -39138,6 +39175,7 @@ export namespace Prisma {
     taxAmount?: FloatNullableFilter<"Sale"> | number | null
     totalPrice?: FloatFilter<"Sale"> | number
     fees?: FloatNullableFilter<"Sale"> | number | null
+    refunds?: FloatNullableFilter<"Sale"> | number | null
     promoted?: BoolFilter<"Sale"> | boolean
     currency?: StringFilter<"Sale"> | string
     buyerUsername?: StringNullableFilter<"Sale"> | string | null
@@ -39593,6 +39631,7 @@ export namespace Prisma {
     taxAmount?: number | null
     totalPrice: number
     fees?: number | null
+    refunds?: number | null
     promoted?: boolean
     currency?: string
     buyerUsername?: string | null
@@ -39631,6 +39670,7 @@ export namespace Prisma {
     taxAmount?: number | null
     totalPrice: number
     fees?: number | null
+    refunds?: number | null
     promoted?: boolean
     currency?: string
     buyerUsername?: string | null
@@ -40044,6 +40084,7 @@ export namespace Prisma {
     taxAmount?: number | null
     totalPrice: number
     fees?: number | null
+    refunds?: number | null
     promoted?: boolean
     currency?: string
     buyerUsername?: string | null
@@ -40082,6 +40123,7 @@ export namespace Prisma {
     taxAmount?: number | null
     totalPrice: number
     fees?: number | null
+    refunds?: number | null
     promoted?: boolean
     currency?: string
     buyerUsername?: string | null
@@ -43492,6 +43534,7 @@ export namespace Prisma {
     taxAmount?: number | null
     totalPrice: number
     fees?: number | null
+    refunds?: number | null
     promoted?: boolean
     currency?: string
     buyerUsername?: string | null
@@ -43781,6 +43824,7 @@ export namespace Prisma {
     taxAmount?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: FloatFieldUpdateOperationsInput | number
     fees?: NullableFloatFieldUpdateOperationsInput | number | null
+    refunds?: NullableFloatFieldUpdateOperationsInput | number | null
     promoted?: BoolFieldUpdateOperationsInput | boolean
     currency?: StringFieldUpdateOperationsInput | string
     buyerUsername?: NullableStringFieldUpdateOperationsInput | string | null
@@ -43819,6 +43863,7 @@ export namespace Prisma {
     taxAmount?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: FloatFieldUpdateOperationsInput | number
     fees?: NullableFloatFieldUpdateOperationsInput | number | null
+    refunds?: NullableFloatFieldUpdateOperationsInput | number | null
     promoted?: BoolFieldUpdateOperationsInput | boolean
     currency?: StringFieldUpdateOperationsInput | string
     buyerUsername?: NullableStringFieldUpdateOperationsInput | string | null
@@ -43857,6 +43902,7 @@ export namespace Prisma {
     taxAmount?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: FloatFieldUpdateOperationsInput | number
     fees?: NullableFloatFieldUpdateOperationsInput | number | null
+    refunds?: NullableFloatFieldUpdateOperationsInput | number | null
     promoted?: BoolFieldUpdateOperationsInput | boolean
     currency?: StringFieldUpdateOperationsInput | string
     buyerUsername?: NullableStringFieldUpdateOperationsInput | string | null
@@ -44182,6 +44228,7 @@ export namespace Prisma {
     taxAmount?: number | null
     totalPrice: number
     fees?: number | null
+    refunds?: number | null
     promoted?: boolean
     currency?: string
     buyerUsername?: string | null
@@ -44415,6 +44462,7 @@ export namespace Prisma {
     taxAmount?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: FloatFieldUpdateOperationsInput | number
     fees?: NullableFloatFieldUpdateOperationsInput | number | null
+    refunds?: NullableFloatFieldUpdateOperationsInput | number | null
     promoted?: BoolFieldUpdateOperationsInput | boolean
     currency?: StringFieldUpdateOperationsInput | string
     buyerUsername?: NullableStringFieldUpdateOperationsInput | string | null
@@ -44453,6 +44501,7 @@ export namespace Prisma {
     taxAmount?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: FloatFieldUpdateOperationsInput | number
     fees?: NullableFloatFieldUpdateOperationsInput | number | null
+    refunds?: NullableFloatFieldUpdateOperationsInput | number | null
     promoted?: BoolFieldUpdateOperationsInput | boolean
     currency?: StringFieldUpdateOperationsInput | string
     buyerUsername?: NullableStringFieldUpdateOperationsInput | string | null
@@ -44491,6 +44540,7 @@ export namespace Prisma {
     taxAmount?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: FloatFieldUpdateOperationsInput | number
     fees?: NullableFloatFieldUpdateOperationsInput | number | null
+    refunds?: NullableFloatFieldUpdateOperationsInput | number | null
     promoted?: BoolFieldUpdateOperationsInput | boolean
     currency?: StringFieldUpdateOperationsInput | string
     buyerUsername?: NullableStringFieldUpdateOperationsInput | string | null
@@ -44590,6 +44640,7 @@ export namespace Prisma {
     taxAmount?: number | null
     totalPrice: number
     fees?: number | null
+    refunds?: number | null
     promoted?: boolean
     currency?: string
     buyerUsername?: string | null
@@ -44827,6 +44878,7 @@ export namespace Prisma {
     taxAmount?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: FloatFieldUpdateOperationsInput | number
     fees?: NullableFloatFieldUpdateOperationsInput | number | null
+    refunds?: NullableFloatFieldUpdateOperationsInput | number | null
     promoted?: BoolFieldUpdateOperationsInput | boolean
     currency?: StringFieldUpdateOperationsInput | string
     buyerUsername?: NullableStringFieldUpdateOperationsInput | string | null
@@ -44865,6 +44917,7 @@ export namespace Prisma {
     taxAmount?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: FloatFieldUpdateOperationsInput | number
     fees?: NullableFloatFieldUpdateOperationsInput | number | null
+    refunds?: NullableFloatFieldUpdateOperationsInput | number | null
     promoted?: BoolFieldUpdateOperationsInput | boolean
     currency?: StringFieldUpdateOperationsInput | string
     buyerUsername?: NullableStringFieldUpdateOperationsInput | string | null
@@ -44903,6 +44956,7 @@ export namespace Prisma {
     taxAmount?: NullableFloatFieldUpdateOperationsInput | number | null
     totalPrice?: FloatFieldUpdateOperationsInput | number
     fees?: NullableFloatFieldUpdateOperationsInput | number | null
+    refunds?: NullableFloatFieldUpdateOperationsInput | number | null
     promoted?: BoolFieldUpdateOperationsInput | boolean
     currency?: StringFieldUpdateOperationsInput | string
     buyerUsername?: NullableStringFieldUpdateOperationsInput | string | null

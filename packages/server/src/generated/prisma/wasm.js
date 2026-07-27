@@ -350,6 +350,7 @@ exports.Prisma.SaleScalarFieldEnum = {
   taxAmount: 'taxAmount',
   totalPrice: 'totalPrice',
   fees: 'fees',
+  refunds: 'refunds',
   promoted: 'promoted',
   currency: 'currency',
   buyerUsername: 'buyerUsername',

@@ -18,6 +18,7 @@ import { prisma } from '../db/prisma.js';
 import { env } from '../config/env.js';
 import { staffAuth } from '../middleware/auth.js';
 import { salesImportService, parseCustomLabel } from '../services/salesImport.service.js';
+import { earningsImportService } from '../services/earningsImport.service.js';
 import { importsDirAbs } from '../util/paths.js';
 import { qstr, pstr } from '../util/req.js';
 
@@ -74,6 +75,28 @@ router.post('/import', staffAuth, upload.single('file'), async (req, res) => {
     // Archive the source report (Standards §5) — PII lives here, not in the DB.
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
     const name = `${stamp}-${accountId.slice(-6)}-${(req.file.originalname || 'orders.csv').replace(/[^a-zA-Z0-9._-]+/g, '_')}`;
+    fs.writeFileSync(path.join(importsDirAbs(), name), req.file.buffer);
+  }
+  res.json(result);
+});
+
+// eBay "Order earnings" report — enriches fees/refunds on existing sales.
+router.post('/import-earnings', staffAuth, upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ error: 'multipart field "file" required (Order earnings CSV)' });
+    return;
+  }
+  const accountId = (req.body?.ebayAccountId as string) || qstr(req.query.ebayAccountId);
+  if (!accountId) {
+    res.status(400).json({ error: 'ebayAccountId required' });
+    return;
+  }
+  const dryRun = qstr(req.query.dryRun) === '1' || req.body?.dryRun === 'true';
+  const createMissing = qstr(req.query.createMissing) === '1' || req.body?.createMissing === 'true';
+  const result = await earningsImportService.importEarnings(req.file.buffer, accountId, dryRun, createMissing);
+  if (!dryRun) {
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const name = `${stamp}-${accountId.slice(-6)}-${(req.file.originalname || 'earnings.csv').replace(/[^a-zA-Z0-9._-]+/g, '_')}`;
     fs.writeFileSync(path.join(importsDirAbs(), name), req.file.buffer);
   }
   res.json(result);
@@ -158,6 +181,7 @@ router.get('/feed', feedAuth, async (req, res) => {
         taxAmount: s.taxAmount,
         totalPrice: s.totalPrice,
         fees: s.fees,
+        refunds: s.refunds,
         promoted: s.promoted,
         currency: s.currency,
         soldAt: s.soldAt,

@@ -66,6 +66,8 @@ export function ItemDetailPage() {
         </div>
       </div>
 
+      <AssignmentCard item={data} onSaved={() => qc.invalidateQueries({ queryKey: ['item', id] })} />
+
       <section>
         <div className="flex items-baseline justify-between mb-2">
           <h3 className="text-sm uppercase text-neutral-500">Photos</h3>
@@ -408,5 +410,78 @@ function ItemPicker({
         </div>
       </div>
     </div>
+  );
+}
+
+
+/** Assignment: physical location (SKU|LOC label), consignment group (paste
+ *  the group ID from TeamTime → Admin → eBay Setup), and target eBay account.
+ *  The lister is assigned automatically — whoever is signed into the
+ *  extension when the draft gets filled. */
+function AssignmentCard({
+  item,
+  onSaved,
+}: {
+  item: { id: string; sku?: string | null; locationCode?: string | null; consignmentGroupId?: string | null; ebayAccountId?: string | null };
+  onSaved: () => void;
+}) {
+  const [loc, setLoc] = useState(item.locationCode ?? '');
+  const [group, setGroup] = useState(item.consignmentGroupId ?? '');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  async function save() {
+    setSaving(true);
+    setMsg('');
+    try {
+      await api.patchItem(item.id, {
+        locationCode: loc.trim() || null,
+        consignmentGroupId: group.trim() || null,
+      } as never);
+      setMsg('Saved.');
+      onSaved();
+    } catch (err) {
+      setMsg((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="border border-neutral-800 rounded p-4">
+      <h3 className="text-sm uppercase text-neutral-500 mb-3">Assignment</h3>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="text-xs text-neutral-400">
+          Location (Row-Shelf)
+          <input
+            value={loc}
+            onChange={(e) => setLoc(e.target.value)}
+            placeholder="R3-S2"
+            className="block mt-1 w-28 bg-neutral-950 border border-neutral-700 rounded px-2 py-1.5 text-sm"
+          />
+        </label>
+        <label className="text-xs text-neutral-400 flex-1 min-w-64">
+          Consignment group ID <span className="text-neutral-600">(TeamTime → Admin → eBay Setup → Copy ID)</span>
+          <input
+            value={group}
+            onChange={(e) => setGroup(e.target.value)}
+            placeholder="paste group id — blank = house item"
+            className="block mt-1 w-full bg-neutral-950 border border-neutral-700 rounded px-2 py-1.5 text-sm font-mono"
+          />
+        </label>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm disabled:opacity-40"
+        >
+          Save
+        </button>
+        {msg && <span className="text-xs text-neutral-400">{msg}</span>}
+      </div>
+      <p className="text-xs text-neutral-600 mt-2">
+        SKU {item.sku ?? '(assigned at first draft)'} · Lister is recorded automatically from whoever fills the
+        draft in the extension.
+      </p>
+    </section>
   );
 }

@@ -96,6 +96,9 @@ const ItemPatchSchema = z.object({
   stage: z.enum(ItemStages).optional(),
   ebayItemId: z.string().optional(),
   ebayListingUrl: z.string().optional(),
+  locationCode: z.string().max(20).nullable().optional(),
+  consignmentGroupId: z.string().max(60).nullable().optional(),
+  ebayAccountId: z.string().nullable().optional(),
 });
 
 router.patch('/:id', staffAuth, async (req, res) => {

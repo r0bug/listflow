@@ -328,6 +328,10 @@ export interface ItemRow {
 
 export interface ItemDetail extends ItemRow {
   description: string | null;
+  sku: string | null;
+  locationCode: string | null;
+  consignmentGroupId: string | null;
+  ebayAccountId: string | null;
   category: string | null;
   ebayCategoryId: string | null;
   condition: string | null;

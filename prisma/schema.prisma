@@ -355,7 +355,8 @@ model Sale {
   shippingPrice     Float? // "Shipping And Handling"
   taxAmount         Float? // "eBay Collected Tax" (eBay remits; never ours)
   totalPrice        Float // "Total Price" (incl. tax+shipping)
-  fees              Float? // enriched later from Payments report
+  fees              Float? // actual eBay expenses (earnings report / API); null until enriched
+  refunds           Float? // refunds issued (earnings report); reduces net
   promoted          Boolean @default(false) // "Sold Via Promoted Listings"
   currency          String  @default("USD")
 
