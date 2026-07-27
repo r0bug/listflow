@@ -12,7 +12,7 @@
 //   {type:'logout'}                      → {ok}
 //   {type:'auth-state'}                  → {user, hasKey, baseUrl, pinnedAccount}
 
-const DEFAULT_BASE_URL = 'http://localhost:3005';
+const DEFAULT_BASE_URL = 'https://listflow.robug.com';
 
 chrome.runtime.onInstalled.addListener(async () => {
   const { machineId } = await chrome.storage.local.get('machineId');
