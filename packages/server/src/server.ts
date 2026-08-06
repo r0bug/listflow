@@ -55,6 +55,10 @@ fs.mkdirSync(distDir, { recursive: true });
 app.use('/i', express.static(itemImagesDir, { immutable: true, maxAge: '7d' }));
 // dist/ holds the install landing page + extension zip.
 app.use('/dist', express.static(distDir));
+// Human-facing landing at / — points staff at /m, /f, and the extension.
+app.get('/', (_req, res) => {
+  res.sendFile(path.resolve(__dirname, '..', 'static', 'landing.html'));
+});
 // Mobile upload PWA (staff-only surface: static shell is public, every API
 // call it makes requires a staff JWT).
 app.use('/m', express.static(path.resolve(__dirname, '..', '..', 'mobile-upload')));
