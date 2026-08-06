@@ -71,25 +71,25 @@ router.post('/login', async (req, res) => {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
-    const staff = await prisma.staffUser.upsert({
-      where: { teamtimeUserId: verdict.user.id },
-      create: {
-        teamtimeUserId: verdict.user.id,
-        email,
-        name: verdict.user.name,
-        role: verdict.user.role,
-        canListOnEbay: verdict.user.canListOnEbay,
-        source: 'teamtime',
-        lastSyncedAt: new Date(),
-      },
-      update: {
-        email,
-        name: verdict.user.name,
-        role: verdict.user.role,
-        canListOnEbay: verdict.user.canListOnEbay,
-        lastSyncedAt: new Date(),
-      },
+    // Match by TeamTime id OR email: TeamTime user ids drift when the dev DB
+    // is recloned (and will again at dev→prod reconciliation), so an existing
+    // row found by email is relinked to the current id rather than colliding
+    // with the email unique constraint.
+    const fields = {
+      teamtimeUserId: verdict.user.id,
+      email,
+      name: verdict.user.name,
+      role: verdict.user.role,
+      canListOnEbay: verdict.user.canListOnEbay,
+      source: 'teamtime',
+      lastSyncedAt: new Date(),
+    };
+    const existing = await prisma.staffUser.findFirst({
+      where: { OR: [{ teamtimeUserId: verdict.user.id }, { email }] },
     });
+    const staff = existing
+      ? await prisma.staffUser.update({ where: { id: existing.id }, data: fields })
+      : await prisma.staffUser.create({ data: fields });
     issue(res, staff);
     return;
   }
