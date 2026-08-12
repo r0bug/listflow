@@ -622,6 +622,83 @@ keep local photo stores — they feed the ingest API; the store lives on the
 server host and is synced/backed up from there (fleet.sh coordination applies
 to any job touching this tree).
 
+## 3d. eBay draft import (inbound: Seller Hub draft → Item)
+
+Everything else in the draft path is **outbound** — ListFlow owns an Item, the
+extension fills an eBay draft from it, and the draft reports progress back
+(`by-url`, `PATCH /:id`, `/:id/resume`). A draft typed straight into Seller Hub
+therefore has no way into the system: `EbayDraft` rows are only ever created by
+linking an existing Item, so those drafts stay invisible. On
+`ebay.com/sh/lst/drafts*` they render as `not in swiftlist` and there is nothing
+the operator can do about it. This section closes that gap.
+
+**Two distinct operations, one endpoint.** Both are "adopt this eBay draft",
+they differ only in whether a matching Item already exists:
+
+- **Link** — operator picks an existing Item; we record the linkage. No Item is
+  created. This is what the `not in swiftlist` badge should have offered.
+- **Import** — no Item exists yet; create one *from the draft's own fields* and
+  link it. The eBay draft is the originating record.
+
+```
+POST /api/v1/drafts/import          auth: staffOrMachine
+{
+  ebayDraftUrl: string,             // required, the /lstng?…draftId=… URL
+  ebayDraftId?: string,             // parsed from the URL when eBay exposes it
+  ebayAccountId?: string,           // profile-pinned account, as elsewhere
+  itemId?: string,                  // present ⇒ LINK; absent ⇒ IMPORT
+  scraped?: {                       // ignored when itemId is given
+    title?, description?, brand?, condition?, categoryId?,
+    price?, quantity?, customLabel?, photoUrls?[]
+  }
+}
+→ 200 { draft, item, created: boolean, linked: boolean }
+```
+
+**Rules, and why:**
+
+1. **Idempotent by draft identity.** If an `EbayDraft` already exists for that
+   `ebayDraftId` (or `ebayDraftUrl` when eBay withholds the id), return it
+   unchanged with `created:false, linked:false`. The drafts *list* page fires
+   one lookup per row; a double-click or a re-scan must never mint a second
+   Item. `ebayDraftId` is already `@unique` — the collision is a 200, not a 500.
+2. **Import never invents a SKU.** `Item.sku` is `@unique` and is the join key
+   the Custom Label carries as `<SKU>|<LOC>` (Standards §6). If the draft's
+   customLabel parses as that pattern, adopt both halves — the draft came from
+   us originally (re-imaged station, lost DB row) and we are re-adopting our own
+   SKU. Otherwise leave `sku` null and let the normal SKU sequence assign one at
+   draft time. Guessing a SKU from a free-text label risks colliding with a live
+   Item.
+3. **Imported Items are quarantined, not `READY`.** `status: DRAFT`,
+   `stage: DRAFT_STARTED`. An imported Item has no photos in `FILE_ROOT`, no AI
+   analysis, no comps — it must not fall into any "ready to list" queue. The
+   operator finishes it deliberately.
+4. **`photoUrls` are recorded, not fetched.** They are eBay CDN URLs for images
+   we do not own the originals of. Storing them in `EbayDraft.currentValues`
+   keeps the provenance trail honest; writing them into `photos/originals/` would
+   put non-original bytes in the immutable content-named store (§3c) and lie
+   about where the file came from. Re-photographing is the correct path.
+5. **Scraped values land in `currentValues`, verbatim.** Same field the heartbeat
+   already writes, so `buildDeltaPayload` sees an accurate picture of what is on
+   the eBay form and only fills genuine gaps. Import must not make the delta
+   engine think the form is empty.
+6. **`status: OPEN`, `lastSeenAt: now`.** An imported draft is by definition an
+   open one — it is sitting in the operator's Seller Hub drafts list.
+
+**Extension surface.** `content-drafts-list.js` currently injects a static
+`not in swiftlist` span; its own header comment claims a
+`Link to swiftlist Item` button that was never implemented. That span becomes
+the affordance: clicking it offers the last-used Item (`lastSwiftlistItemId`,
+already in extension storage) or an Item picker, then calls this endpoint. The
+row's badge flips green in place. `content-draft.js` — the individual draft page
+— gets the same action for the case where the operator is already inside the
+draft.
+
+**Boundary check (Standards §3).** This does not move ownership: ListFlow still
+owns listing data, and the draft is listing data. Nothing here touches TeamTime,
+which consumes only `/api/v1/sales/feed` — sold items. Imported drafts are
+invisible to TeamTime until they sell, which is correct.
+
 ## 4. Migration & sequencing
 
 1. Scaffold merged repo on a branch in ~/listflow; bring swiftlist packages in
