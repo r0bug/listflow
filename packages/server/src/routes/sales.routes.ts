@@ -3,7 +3,10 @@
 //   GET   /            staff: list/filter sales
 //   POST  /import      staff: Seller Hub Orders CSV (multipart, ?dryRun=1);
 //                      original archived under FILE_ROOT/imports/
-//   PATCH /:id/attribution  staff: set lister / mark HOUSE
+//   PATCH /:id/attribution  staff: set lister / consignor / mark HOUSE
+//   POST  /bulk-attribution staff: same, across up to 1000 sales at once
+//   GET   /listers          staff: eBay-cleared staff, for the lister picker
+//   GET   /consignment-groups staff: proxied from TeamTime's registry
 //   GET   /feed        M2M for TeamTime (bearer LISTFLOW_API_SECRET) —
 //                      enriched with lister teamtimeUserId, consignment
 //                      group, promoted flag, tax; commission math happens
@@ -105,7 +108,40 @@ router.post('/import-earnings', staffAuth, upload.single('file'), async (req, re
 const AttributionSchema = z.object({
   listedById: z.string().nullable().optional(),
   house: z.boolean().optional(),
+  // TeamTime-owned registry id (Standards §3) — stored as an opaque
+  // reference; the settlement service resolves it on its side.
+  consignmentGroupId: z.string().nullable().optional(),
 });
+
+/**
+ * Attribution is three-state and the consignor is orthogonal to the lister:
+ * a HOUSE sale can still belong to a consignment group, and a group-less
+ * sale can still be credited to a lister. Callers that omit a key leave
+ * that side untouched; explicit null clears it.
+ */
+function attributionData(input: z.infer<typeof AttributionSchema>) {
+  const data: {
+    attributionStatus?: 'PENDING' | 'ATTRIBUTED' | 'HOUSE';
+    listedById?: string | null;
+    consignmentGroupId?: string | null;
+  } = {};
+
+  if (input.house) {
+    data.attributionStatus = 'HOUSE';
+    data.listedById = null;
+  } else if (input.listedById) {
+    data.attributionStatus = 'ATTRIBUTED';
+    data.listedById = input.listedById;
+  } else if (input.listedById === null) {
+    data.attributionStatus = 'PENDING';
+    data.listedById = null;
+  }
+
+  if (input.consignmentGroupId !== undefined) {
+    data.consignmentGroupId = input.consignmentGroupId;
+  }
+  return data;
+}
 
 router.patch('/:id/attribution', staffAuth, async (req, res) => {
   const parsed = AttributionSchema.safeParse(req.body);
@@ -120,13 +156,71 @@ router.patch('/:id/attribution', staffAuth, async (req, res) => {
   }
   const updated = await prisma.sale.update({
     where: { id: sale.id },
-    data: parsed.data.house
-      ? { attributionStatus: 'HOUSE', listedById: null }
-      : parsed.data.listedById
-        ? { attributionStatus: 'ATTRIBUTED', listedById: parsed.data.listedById }
-        : { attributionStatus: 'PENDING', listedById: null },
+    data: attributionData(parsed.data),
   });
   res.json(updated);
+});
+
+// Bulk attribution — the import backlog is thousands of rows deep, so the
+// per-sale PATCH above is not a usable clearing path.
+const BulkAttributionSchema = AttributionSchema.extend({
+  saleIds: z.array(z.string()).min(1).max(1000),
+});
+
+router.post('/bulk-attribution', staffAuth, async (req, res) => {
+  const parsed = BulkAttributionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
+    return;
+  }
+  const { saleIds, ...attribution } = parsed.data;
+  const data = attributionData(attribution);
+  if (Object.keys(data).length === 0) {
+    res.status(400).json({ error: 'Nothing to change: supply listedById, house, or consignmentGroupId' });
+    return;
+  }
+
+  const result = await prisma.sale.updateMany({ where: { id: { in: saleIds } }, data });
+  res.json({ ok: true, updated: result.count, requested: saleIds.length });
+});
+
+// Pickers for the assignment UI ─────────────────────────────────────────
+
+// Listers = staff cleared to list on eBay. Sourced from the TeamTime
+// roster sync; `manual` rows are included so a one-off lister still works.
+router.get('/listers', staffAuth, async (_req, res) => {
+  const listers = await prisma.staffUser.findMany({
+    where: { active: true, canListOnEbay: true },
+    select: { id: true, name: true, email: true, teamtimeUserId: true },
+    orderBy: { name: 'asc' },
+  });
+  res.json({ listers });
+});
+
+// Consignment groups live in TeamTime (Standards §3); ListFlow only ever
+// holds the id. Proxied so the UI has one origin and no second credential.
+router.get('/consignment-groups', staffAuth, async (_req, res) => {
+  if (!env.TEAMTIME_URL || !env.TEAMTIME_API_SECRET) {
+    res.json({ groups: [], source: 'unconfigured' });
+    return;
+  }
+  try {
+    const upstream = await fetch(`${env.TEAMTIME_URL}/api/ebay/groups`, {
+      headers: { Authorization: `Bearer ${env.TEAMTIME_API_SECRET}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!upstream.ok) {
+      res.status(502).json({ error: `TeamTime returned ${upstream.status}`, groups: [] });
+      return;
+    }
+    const body = (await upstream.json()) as { groups?: unknown[] } | unknown[];
+    const groups = Array.isArray(body) ? body : (body.groups ?? []);
+    res.json({ groups, source: 'teamtime' });
+  } catch (err) {
+    // Never hard-fail the page: assignment of listers must still work
+    // when TeamTime is unreachable.
+    res.status(502).json({ error: (err as Error).message, groups: [] });
+  }
 });
 
 // Manual API-sync trigger (staff) — runs all connected accounts now.

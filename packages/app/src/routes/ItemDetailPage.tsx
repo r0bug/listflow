@@ -430,6 +430,14 @@ function AssignmentCard({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
+  // Proxied from TeamTime's registry; empty array falls back to paste-an-id.
+  const { data: groupsData } = useQuery({
+    queryKey: ['consignment-groups'],
+    queryFn: () => api.listConsignmentGroups(),
+    retry: false,
+  });
+  const groups = groupsData?.groups ?? [];
+
   async function save() {
     setSaving(true);
     setMsg('');
@@ -461,13 +469,30 @@ function AssignmentCard({
           />
         </label>
         <label className="text-xs text-neutral-400 flex-1 min-w-64">
-          Consignment group ID <span className="text-neutral-600">(TeamTime → Admin → eBay Setup → Copy ID)</span>
-          <input
-            value={group}
-            onChange={(e) => setGroup(e.target.value)}
-            placeholder="paste group id — blank = house item"
-            className="block mt-1 w-full bg-neutral-950 border border-neutral-700 rounded px-2 py-1.5 text-sm font-mono"
-          />
+          Customer (consignment group)
+          {groups.length > 0 ? (
+            <select
+              value={group}
+              onChange={(e) => setGroup(e.target.value)}
+              className="block mt-1 w-full bg-neutral-950 border border-neutral-700 rounded px-2 py-1.5 text-sm"
+            >
+              <option value="">— house item —</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name ?? g.label ?? g.consignorName ?? g.id}
+                </option>
+              ))}
+            </select>
+          ) : (
+            // Registry unreachable — keep the paste path so assignment is
+            // never blocked on TeamTime being up.
+            <input
+              value={group}
+              onChange={(e) => setGroup(e.target.value)}
+              placeholder="paste group id — blank = house item"
+              className="block mt-1 w-full bg-neutral-950 border border-neutral-700 rounded px-2 py-1.5 text-sm font-mono"
+            />
+          )}
         </label>
         <button
           onClick={save}

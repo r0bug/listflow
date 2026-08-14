@@ -212,7 +212,73 @@ export const api = {
       `/items/photo/${photoId}/image-search`,
       { method: 'POST', body: JSON.stringify({ limit }) },
     ),
+
+  // ── Sales attribution ────────────────────────────────────────────────
+  listSales: (params?: {
+    accountId?: string;
+    attributionStatus?: string;
+    days?: number;
+    limit?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params?.accountId) qs.set('accountId', params.accountId);
+    if (params?.attributionStatus) qs.set('attributionStatus', params.attributionStatus);
+    if (params?.days) qs.set('days', String(params.days));
+    if (params?.limit) qs.set('limit', String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return http<{ sales: SaleRow[]; totals: { gross: number; count: number } }>(
+      `/sales${suffix}`,
+    );
+  },
+  listListers: () => http<{ listers: Lister[] }>('/sales/listers'),
+  listConsignmentGroups: () =>
+    http<{ groups: ConsignmentGroup[]; source?: string; error?: string }>(
+      '/sales/consignment-groups',
+    ),
+  bulkAttribution: (body: {
+    saleIds: string[];
+    listedById?: string | null;
+    house?: boolean;
+    consignmentGroupId?: string | null;
+  }) =>
+    http<{ ok: true; updated: number; requested: number }>('/sales/bulk-attribution', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 };
+
+export interface Lister {
+  id: string;
+  name: string;
+  email: string | null;
+  teamtimeUserId: string | null;
+}
+
+export interface ConsignmentGroup {
+  id: string;
+  name?: string;
+  label?: string;
+  consignorName?: string;
+}
+
+export interface SaleRow {
+  id: string;
+  ebayOrderId: string;
+  salesRecordNumber: string | null;
+  title: string;
+  quantity: number;
+  itemPrice: number;
+  totalPrice: number;
+  fees: number | null;
+  customLabel: string | null;
+  soldAt: string;
+  attributionStatus: 'PENDING' | 'ATTRIBUTED' | 'HOUSE';
+  listedById: string | null;
+  consignmentGroupId: string | null;
+  ebayAccount?: { accountName: string };
+  listedBy?: { id: string; name: string; teamtimeUserId: string | null } | null;
+  item?: { id: string; sku: string | null; locationCode: string | null } | null;
+}
 
 export interface EbayHit {
   itemId: string;
