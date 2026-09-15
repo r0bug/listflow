@@ -69,7 +69,22 @@ async function claimPendingRevise() {
     if (!pendingRevise) return null;
     const fresh = Date.now() - (pendingRevise.at || 0) < 10 * 60 * 1000;
     await chrome.storage.local.remove('pendingRevise');
+    // Keep the CONTEXT even after consuming the intent. The item page knew the
+    // eBay item number when the operator clicked Revise; the revise page (whose
+    // URL carries only a draftId) would otherwise have to go hunting for it.
+    if (fresh) await chrome.storage.local.set({ lastReviseContext: pendingRevise });
     return fresh ? pendingRevise.itemId : null;
+  } catch {
+    return null;
+  }
+}
+
+async function reviseContextItemNumber() {
+  try {
+    const { lastReviseContext } = await chrome.storage.local.get('lastReviseContext');
+    if (!lastReviseContext) return null;
+    const fresh = Date.now() - (lastReviseContext.at || 0) < 60 * 60 * 1000;
+    return fresh ? lastReviseContext.ebayItemId || null : null;
   } catch {
     return null;
   }
@@ -127,6 +142,8 @@ async function captureFromReviseForm(btn) {
   btn.textContent = 'Reading form…';
   try {
     const scraped = scrapeReviseForm();
+    // Carried from the item page, where the number was known for certain.
+    if (!scraped.ebayItemId) scraped.ebayItemId = await reviseContextItemNumber();
     if (!scraped.ebayItemId) {
       const typed = window.prompt(
         'Could not find the eBay item number on this page.\nEnter it (the 12-digit number from the listing URL):',
@@ -184,10 +201,13 @@ function scrapeReviseForm() {
   }
 
   const lengthIn = num(val(['Length'])); const widthIn = num(val(['Width'])); const heightIn = num(val(['Height']));
+  const desc = readFormDescription();
 
   return {
     ebayItemId,
     title,
+    description: desc.text || undefined,
+    descriptionHtml: desc.html || undefined,
     categoryPath: val(['Category']),
     ebayCategoryId: val([], ['[data-testid="category-id-input"]', 'input[name="categoryId"]']),
     condition: val(['Condition']),
@@ -198,6 +218,35 @@ function scrapeReviseForm() {
     postalCode: val(['ZIP code', 'Zip code', 'Postal code']),
     capturedFrom: 'revise-form',
   };
+}
+
+// The description on the seller's own form. Unlike the buyer-facing page this
+// is same-origin and is the seller's raw HTML — no tracking script, no doubled
+// copy, no page chrome to strip. It is simply the better source.
+function readFormDescription() {
+  for (const sel of [
+    'iframe[title*="description" i]',
+    'iframe#description_ifr',
+    'iframe[id*="desc" i]',
+  ]) {
+    const f = document.querySelector(sel);
+    try {
+      const body = f?.contentDocument?.body;
+      if (body && (body.innerHTML || '').trim()) {
+        return { html: body.innerHTML.trim(), text: (body.innerText || body.textContent || '').trim() };
+      }
+    } catch {
+      // Cross-origin after all; fall through to the other shapes.
+    }
+  }
+  const ta = document.querySelector('textarea[name="description"], textarea[aria-label*="description" i]');
+  if (ta && ta.value.trim()) return { html: ta.value.trim(), text: stripTags(ta.value) };
+  // Rich-text editors render into a contenteditable rather than an iframe.
+  const ce = document.querySelector('[contenteditable="true"][aria-label*="description" i], [role="textbox"][aria-label*="description" i]');
+  if (ce && (ce.innerHTML || '').trim()) {
+    return { html: ce.innerHTML.trim(), text: (ce.innerText || ce.textContent || '').trim() };
+  }
+  return { html: '', text: '' };
 }
 
 // ── Revise: Custom Label only ──────────────────────────────────────────
