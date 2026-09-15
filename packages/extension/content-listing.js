@@ -15,6 +15,7 @@
   // Expose the field-filler so content-draft.js can call it with either a
   // full autofill payload or a delta payload.
   window.swiftlist.fillForm = fillForm;
+  window.swiftlist.fillSpecificsDetailed = fillSpecificsDetailed;
 
   const url = new URL(location.href);
 
@@ -320,11 +321,103 @@ function fillCategory({ id }) {
 }
 
 function fillSpecifics(specifics) {
+  const r = fillSpecificsDetailed(specifics);
+  // Report failure to the caller when nothing landed, so the step cannot show
+  // "filled" over an untouched form.
+  return r.filled.length > 0;
+}
+
+// Per-specific fill with a per-specific result.
+//
+// eBay renders item specifics as a mix of free-text inputs, comboboxes and
+// selects, with labels that vary by category — so a single selector shape was
+// never going to match them all. What matters more is that the caller learns
+// WHICH ones missed: six specifics behind one "copy value" button is not a
+// recovery path, it is a shrug.
+function fillSpecificsDetailed(specifics) {
+  const filled = [];
+  const missed = [];
   for (const { name, values } of specifics) {
-    const v = values.join(', ');
-    const el = pick([`[aria-label="${cssEscape(name)}"]`, `[data-testid="spec-${cssEscape(name)}"]`, `input[name="spec_${cssEscape(name)}"]`]);
-    if (el) setReactValue(el, v);
+    const v = Array.isArray(values) ? values.join(', ') : String(values ?? '');
+    if (!v) continue;
+    const el = findSpecificField(name);
+    if (!el) {
+      missed.push({ name, value: v });
+      continue;
+    }
+    try {
+      if (el.tagName === 'SELECT') {
+        const opt = [...el.options].find(
+          (o) => o.text.trim().toLowerCase() === v.toLowerCase(),
+        );
+        if (!opt) {
+          missed.push({ name, value: v });
+          continue;
+        }
+        el.value = opt.value;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        setReactValue(el, v);
+      }
+      filled.push({ name, value: v });
+    } catch {
+      missed.push({ name, value: v });
+    }
   }
+  return { filled, missed };
+}
+
+// Selector ladder for one named specific, widest-useful first. Ends with label
+// proximity, which is what actually works when eBay gives the input no useful
+// attributes of its own.
+function findSpecificField(name) {
+  const esc = cssEscape(name);
+  const direct = pickTextInputOrSelect([
+    `[aria-label="${esc}"]`,
+    `[data-testid="spec-${esc}"]`,
+    `input[name="spec_${esc}"]`,
+    `[name="${esc}"]`,
+    `[aria-label^="${esc}"]`,
+    `[placeholder="${esc}"]`,
+  ]);
+  if (direct) return direct;
+
+  // Label proximity: find a label/legend whose text is this specific's name,
+  // then the first fillable control it points at or contains.
+  const want = name.trim().toLowerCase().replace(/\s*:\s*$/, '');
+  for (const lab of document.querySelectorAll('label, legend, span, div')) {
+    const text = (lab.textContent || '').trim().toLowerCase().replace(/\s*:\s*$/, '');
+    if (text !== want) continue;
+    const forId = lab.getAttribute && lab.getAttribute('for');
+    if (forId) {
+      const byFor = document.getElementById(forId);
+      if (byFor && (isFillableText(byFor) || byFor.tagName === 'SELECT')) return byFor;
+    }
+    const inside = lab.querySelector && lab.querySelector('input, select, textarea');
+    if (inside && (isFillableText(inside) || inside.tagName === 'SELECT')) return inside;
+    // The control is often the label's sibling or in the parent's next cell.
+    const near =
+      lab.parentElement?.querySelector('input, select, textarea') ||
+      lab.nextElementSibling?.querySelector?.('input, select, textarea');
+    if (near && (isFillableText(near) || near.tagName === 'SELECT')) return near;
+  }
+  return null;
+}
+
+function pickTextInputOrSelect(selectors) {
+  for (const sel of selectors) {
+    let nodes;
+    try {
+      nodes = document.querySelectorAll(sel);
+    } catch {
+      continue; // a name with characters that break the selector
+    }
+    for (const el of nodes) {
+      if (el.tagName === 'SELECT' && !el.disabled) return el;
+      if (isFillableText(el)) return el;
+    }
+  }
+  return null;
 }
 
 function fillDescription(html) {

@@ -170,6 +170,7 @@ const STEPS = [
   {
     key: 'itemSpecifics',
     label: 'Item specifics',
+    perField: true, // rendered as one row per specific, each separately copyable
     show: (p) =>
       p.itemSpecifics?.length
         ? p.itemSpecifics.map((s) => `${s.name}: ${s.values.join(', ')}`).join(' · ')
@@ -303,7 +304,21 @@ function renderStep(step, value, payload) {
     status.style.color = '#777';
     status.textContent = 'filling…';
     try {
-      if (step.photos) {
+      if (step.perField) {
+        // Specifics report individually: a step-level "filled" over six fields
+        // where two landed is a lie, and one copy button for six values is not
+        // a recovery path.
+        const r = window.listflow.fillSpecificsDetailed(payload.itemSpecifics || []);
+        renderPerField(card, r);
+        const total = r.filled.length + r.missed.length;
+        if (r.missed.length === 0) {
+          status.style.color = '#6c6';
+          status.textContent = `filled ${total}/${total}`;
+        } else {
+          status.style.color = r.filled.length ? '#ea4' : '#f66';
+          status.textContent = `${r.filled.length}/${total} filled`;
+        }
+      } else if (step.photos) {
         const n = await injectPhotos(payload.photos || []);
         status.style.color = n ? '#6c6' : '#ea4';
         status.textContent = n ? `added ${n}` : 'add manually →';
@@ -337,6 +352,47 @@ function renderStep(step, value, payload) {
   if (warnEl) card.appendChild(warnEl);
   card.appendChild(row);
   return card;
+}
+
+// One row per specific: name, value, whether it landed, and its own copy
+// button. The ones that missed are what the operator has to key in by hand, so
+// they are the ones that have to be readable and copyable individually.
+function renderPerField(card, result) {
+  card.querySelector('.lf-perfield')?.remove();
+  const box = document.createElement('div');
+  box.className = 'lf-perfield';
+  box.style.cssText = 'margin:6px 0;display:flex;flex-direction:column;gap:3px;';
+
+  const rows = [
+    ...result.missed.map((f) => ({ ...f, ok: false })),
+    ...result.filled.map((f) => ({ ...f, ok: true })),
+  ];
+  for (const f of rows) {
+    const row = document.createElement('div');
+    row.style.cssText =
+      'display:flex;align-items:center;gap:6px;font-size:11px;padding:2px 0;border-top:1px dotted #2a2a2a;';
+    const mark = document.createElement('span');
+    mark.textContent = f.ok ? '✓' : '✗';
+    mark.style.cssText = `flex:none;width:10px;color:${f.ok ? '#6c6' : '#f66'};`;
+    const txt = document.createElement('span');
+    txt.style.cssText = 'flex:1;min-width:0;color:#bbb;word-break:break-word;';
+    txt.innerHTML = `<b style="color:#eee">${esc(f.name)}</b>: ${esc(f.value)}`;
+    row.append(mark, txt);
+    if (!f.ok) {
+      const cp = document.createElement('button');
+      cp.textContent = 'copy';
+      cp.style.cssText =
+        'flex:none;background:#3a2a2a;color:#eee;border:1px solid #5a3a3a;border-radius:3px;padding:1px 6px;font:inherit;font-size:10px;cursor:pointer;';
+      cp.onclick = () => {
+        navigator.clipboard?.writeText(f.value);
+        cp.textContent = 'copied';
+        setTimeout(() => (cp.textContent = 'copy'), 1200);
+      };
+      row.appendChild(cp);
+    }
+    box.appendChild(row);
+  }
+  card.insertBefore(box, card.lastElementChild);
 }
 
 function addCopyButton(card, value) {
