@@ -153,18 +153,21 @@ const STEPS = [
     key: 'title',
     label: 'Title',
     show: (p) => p.title,
+    copyValue: (p) => p.title,
     slice: (p) => ({ title: p.title }),
   },
   {
     key: 'category',
     label: 'Category',
     show: (p) => p.category?.path || p.category?.id,
+    copyValue: (p) => p.category?.id || p.category?.path,
     slice: (p) => ({ category: p.category }),
   },
   {
     key: 'condition',
     label: 'Condition',
     show: (p) => p.condition?.label,
+    copyValue: (p) => p.condition?.label,
     slice: (p) => ({ condition: p.condition }),
   },
   {
@@ -181,6 +184,8 @@ const STEPS = [
     key: 'description',
     label: 'Description',
     show: (p) => (p.description?.html ? stripTagsLocal(p.description.html).slice(0, 300) : ''),
+    // The full text, not the 300-char preview the card shows.
+    copyValue: (p) => (p.description?.html ? stripTagsLocal(p.description.html) : ''),
     slice: (p) => ({ description: p.description }),
   },
   {
@@ -190,6 +195,14 @@ const STEPS = [
       [p.pricing?.buyNowPrice && `Buy It Now $${p.pricing.buyNowPrice}`,
        p.pricing?.startingPrice && `Start $${p.pricing.startingPrice}`,
        p.pricing?.format, p.pricing?.duration].filter(Boolean).join(' · '),
+    // The display string above is for READING. These are what get copied —
+    // pasting "Buy It Now $825 · FixedPrice · GTC" into a price box is useless.
+    values: (p) => [
+      p.pricing?.buyNowPrice != null && { name: 'Buy It Now price', value: String(p.pricing.buyNowPrice) },
+      p.pricing?.startingPrice != null && { name: 'Starting price', value: String(p.pricing.startingPrice) },
+      p.pricing?.format && { name: 'Format', value: p.pricing.format },
+      p.pricing?.duration && { name: 'Duration', value: p.pricing.duration },
+    ].filter(Boolean),
     slice: (p) => ({ pricing: p.pricing }),
   },
   {
@@ -198,6 +211,10 @@ const STEPS = [
     show: (p) =>
       [p.shipping?.weightOz && `${p.shipping.weightOz} oz`, p.shipping?.postalCode]
         .filter(Boolean).join(' · '),
+    values: (p) => [
+      p.shipping?.weightOz != null && { name: 'Weight (oz)', value: String(p.shipping.weightOz) },
+      p.shipping?.postalCode && { name: 'ZIP code', value: p.shipping.postalCode },
+    ].filter(Boolean),
     slice: (p) => ({ shipping: p.shipping }),
   },
   {
@@ -211,6 +228,7 @@ const STEPS = [
     label: 'Custom Label (SKU|shelf)',
     required: true,
     show: (p) => p.customLabel,
+    copyValue: (p) => p.customLabel,
     slice: (p) => ({ customLabel: p.customLabel }),
     // A label with no "|<shelf>" half locates nothing. Filling it silently
     // would produce a listing that looks complete and cannot be picked.
@@ -283,6 +301,10 @@ function renderStep(step, value, payload) {
   src.textContent = value || '— nothing captured —';
   if (!value) src.style.color = step.required ? '#f66' : '#666';
 
+  // Steps with several distinct values show them as separate copyable rows
+  // from the start — not only after a failed fill.
+  const values = step.values ? step.values(payload) : null;
+
   const warn = step.warnIf ? step.warnIf(payload) : null;
   let warnEl = null;
   if (warn) {
@@ -330,10 +352,12 @@ function renderStep(step, value, payload) {
           status.textContent = 'filled';
         } else {
           // A selector miss must never look like success: the value stays on
-          // screen and the operator can paste it.
+          // screen and the operator can paste it. Copy the RAW value, not the
+          // human-readable summary the card displays.
           status.style.color = '#f66';
           status.textContent = 'field not found — copy it';
-          addCopyButton(card, value);
+          const raw = step.copyValue ? step.copyValue(payload) : value;
+          if (raw) addCopyButton(card, raw);
         }
       }
     } catch (err) {
@@ -349,6 +373,10 @@ function renderStep(step, value, payload) {
   row.appendChild(btn);
 
   card.append(head, src);
+  if (values && values.length) {
+    card.appendChild(renderValueRows(values));
+    src.style.display = 'none'; // the rows replace the summary line
+  }
   if (warnEl) card.appendChild(warnEl);
   card.appendChild(row);
   return card;
@@ -357,6 +385,32 @@ function renderStep(step, value, payload) {
 // One row per specific: name, value, whether it landed, and its own copy
 // button. The ones that missed are what the operator has to key in by hand, so
 // they are the ones that have to be readable and copyable individually.
+// One row per value, each with its own copy button holding the raw value.
+function renderValueRows(values) {
+  const box = document.createElement('div');
+  box.style.cssText = 'margin:4px 0 6px;display:flex;flex-direction:column;gap:3px;';
+  for (const v of values) {
+    const row = document.createElement('div');
+    row.style.cssText =
+      'display:flex;align-items:center;gap:6px;font-size:11px;padding:2px 0;border-top:1px dotted #2a2a2a;';
+    const t = document.createElement('span');
+    t.style.cssText = 'flex:1;min-width:0;color:#bbb;word-break:break-word;';
+    t.innerHTML = `<b style="color:#eee">${esc(v.name)}</b>: ${esc(v.value)}`;
+    const cp = document.createElement('button');
+    cp.textContent = 'copy';
+    cp.style.cssText =
+      'flex:none;background:#2a2a2a;color:#eee;border:1px solid #3a3a3a;border-radius:3px;padding:1px 6px;font:inherit;font-size:10px;cursor:pointer;';
+    cp.onclick = () => {
+      navigator.clipboard?.writeText(v.value);
+      cp.textContent = 'copied';
+      setTimeout(() => (cp.textContent = 'copy'), 1200);
+    };
+    row.append(t, cp);
+    box.appendChild(row);
+  }
+  return box;
+}
+
 function renderPerField(card, result) {
   card.querySelector('.lf-perfield')?.remove();
   const box = document.createElement('div');

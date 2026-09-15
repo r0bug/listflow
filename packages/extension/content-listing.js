@@ -245,10 +245,22 @@ async function fillForm(payload, opts = {}) {
   if (payload.category?.id) safe(() => fillCategory(payload.category), 'category', filled);
   if (payload.itemSpecifics) safe(() => fillSpecifics(payload.itemSpecifics), 'itemSpecifics', filled);
   if (payload.description?.html) safe(() => fillDescription(payload.description.html), 'description', filled);
-  if (payload.pricing?.buyNowPrice) safe(() => setInput(['[name="binPrice"]', '[data-testid="buy-now-price"]'], payload.pricing.buyNowPrice), 'pricing.buyNowPrice', filled);
-  if (payload.pricing?.startingPrice) safe(() => setInput(['[name="startPrice"]', '[data-testid="starting-price"]'], payload.pricing.startingPrice), 'pricing.startingPrice', filled);
-  if (payload.shipping?.weightOz) safe(() => setInput(['[name="weightOz"]', '[data-testid="weight-oz"]'], payload.shipping.weightOz), 'shipping.weightOz', filled);
-  if (payload.shipping?.postalCode) safe(() => setInput(['[name="postalCode"]', '[data-testid="postal-code"]'], payload.shipping.postalCode), 'shipping.postalCode', filled);
+  if (payload.pricing?.buyNowPrice)
+    safe(() => setLabelled(['[name="binPrice"]', '[data-testid="buy-now-price"]'],
+      ['Buy It Now price', 'Buy it now price', 'Price', 'Item price'], payload.pricing.buyNowPrice),
+      'pricing.buyNowPrice', filled);
+  if (payload.pricing?.startingPrice)
+    safe(() => setLabelled(['[name="startPrice"]', '[data-testid="starting-price"]'],
+      ['Starting bid', 'Starting price', 'Start price'], payload.pricing.startingPrice),
+      'pricing.startingPrice', filled);
+  if (payload.shipping?.weightOz)
+    safe(() => setLabelled(['[name="weightOz"]', '[data-testid="weight-oz"]'],
+      ['Weight', 'Package weight', 'oz'], payload.shipping.weightOz),
+      'shipping.weightOz', filled);
+  if (payload.shipping?.postalCode)
+    safe(() => setLabelled(['[name="postalCode"]', '[data-testid="postal-code"]'],
+      ['ZIP code', 'Zip code', 'Postal code', 'Item location'], payload.shipping.postalCode),
+      'shipping.postalCode', filled);
   // Custom Label "<SKU>|<LOC>" (fleet Standards §6) — REQUIRED on every
   // draft: sale→item→lister attribution and pick/pack both depend on it.
   if (payload.customLabel) {
@@ -381,13 +393,19 @@ function findSpecificField(name) {
     `[placeholder="${esc}"]`,
   ]);
   if (direct) return direct;
+  return findFieldByLabel(name);
+}
 
-  // Label proximity: find a label/legend whose text is this specific's name,
-  // then the first fillable control it points at or contains.
-  const want = name.trim().toLowerCase().replace(/\s*:\s*$/, '');
+// Label proximity for ANY field. Built for item specifics, but eBay gives its
+// price and shipping inputs no stable name/testid either — the visible label is
+// the most durable handle on this form, so every selector ladder now ends here.
+function findFieldByLabel(name) {
+  const want = String(name).trim().toLowerCase().replace(/\s*:\s*$/, '');
+  if (!want) return null;
   for (const lab of document.querySelectorAll('label, legend, span, div')) {
     const text = (lab.textContent || '').trim().toLowerCase().replace(/\s*:\s*$/, '');
     if (text !== want) continue;
+
     const forId = lab.getAttribute && lab.getAttribute('for');
     if (forId) {
       const byFor = document.getElementById(forId);
@@ -491,6 +509,22 @@ function isFillableText(el) {
   // Rendered at all? A 0x0 box with no offsetParent is not a field a human
   // could fill, so we should not pretend we filled it either.
   if (el.offsetParent === null && el.getClientRects().length === 0) return false;
+  return true;
+}
+
+// Attribute selectors first, then the visible label. eBay's price and shipping
+// inputs carry no stable name/data-testid, so without the label fallback these
+// simply never matched — which is what "it does not detect the field" was.
+function setLabelled(selectors, labels, value) {
+  let el = pickTextInput(selectors);
+  if (!el) {
+    for (const l of labels) {
+      el = findFieldByLabel(l);
+      if (el) break;
+    }
+  }
+  if (!el) return false;
+  setReactValue(el, value);
   return true;
 }
 
