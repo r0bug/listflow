@@ -16,9 +16,19 @@
   // full autofill payload or a delta payload.
   window.swiftlist.fillForm = fillForm;
 
+  const url = new URL(location.href);
+
+  // Revise flow (docs/PHASE2-INVENTORY-AUDIT.md Flow 1): the on-page bar sent
+  // us here to stamp "<SKU>|<LOC>" onto an EXISTING listing. Only the Custom
+  // Label is touched — this is a live listing and nothing else may change.
+  const reviseItemId = url.searchParams.get('listflowItemId');
+  if (reviseItemId && /ReviseItem/i.test(url.search)) {
+    await runReviseFlow(reviseItemId);
+    return;
+  }
+
   // If the URL carries ?swiftlistItemId, auto-fill on first load (new listing
   // case). Draft pages let content-draft.js drive fills instead.
-  const url = new URL(location.href);
   const itemId = url.searchParams.get('swiftlistItemId');
   if (itemId && !looksLikeDraft(url)) {
     await window.swiftlist.setLastItem(itemId);
@@ -31,6 +41,111 @@
     }
   }
 })();
+
+// ── Revise: Custom Label only ──────────────────────────────────────────
+//
+// Deliberately narrow. A revise page is a LIVE listing; filling anything the
+// operator did not ask for risks changing price or shipping on something that
+// is currently selling. Custom Label is seller-private, so writing it does not
+// restart the listing or disturb the buyer-facing page.
+async function runReviseFlow(itemId) {
+  const banner = mountReviseBanner();
+  try {
+    const payload = await window.swiftlist.api(`/api/v1/items/${itemId}/autofill`);
+    const label = payload.customLabel;
+    if (!label) {
+      banner.set('No Custom Label to write — item has no SKU or shelf yet.', '#ea4');
+      return;
+    }
+
+    // eBay's revise form mounts progressively; the field may not exist yet.
+    const el = await waitForField(
+      [
+        '[name="customLabel"]',
+        '[data-testid="custom-label"]',
+        'input[aria-label*="Custom label" i]',
+        'input[aria-label*="SKU" i]',
+      ],
+      12_000,
+    );
+    if (!el) {
+      banner.set(
+        `Could not find the Custom Label field. Set it by hand to: ${label}`,
+        '#f66',
+        label,
+      );
+      window.swiftlist.telemetry({ where: 'content-listing.revise', field: 'customLabel', err: 'selector miss', url: location.href });
+      return;
+    }
+
+    const existing = (el.value || '').trim();
+    if (existing === label) {
+      banner.set(`Custom Label already ${label} — nothing to change.`, '#6c6');
+      return;
+    }
+
+    setReactValue(el, label);
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    banner.set(
+      existing
+        ? `Custom Label changed from "${existing}" to "${label}". Review, then click eBay's Revise/Save.`
+        : `Custom Label set to "${label}". Review, then click eBay's Revise/Save.`,
+      '#6c6',
+    );
+  } catch (err) {
+    banner.set(`Failed: ${err.message}`, '#f66');
+    window.swiftlist.telemetry({ where: 'content-listing.revise', err: err.message, url: location.href });
+  }
+}
+
+// The extension never clicks eBay's Save — the operator does. So the banner
+// has to be legible and stay put.
+function mountReviseBanner() {
+  const root = document.createElement('div');
+  root.style.cssText = [
+    'position:fixed','top:0','left:0','right:0','z-index:2147483600','background:#181818',
+    'color:#eee','border-bottom:1px solid #3a3a3a','padding:9px 14px','display:flex',
+    'align-items:center','gap:10px','font:13px -apple-system,system-ui,sans-serif',
+  ].join(';');
+  const brand = document.createElement('b');
+  brand.textContent = 'listflow · revise';
+  brand.style.cssText = 'color:#6af;flex:none;';
+  const msg = document.createElement('span');
+  msg.textContent = 'Writing Custom Label…';
+  msg.style.cssText = 'flex:1;';
+  root.append(brand, msg);
+  document.documentElement.appendChild(root);
+  const pad = document.createElement('style');
+  pad.textContent = 'body{padding-top:40px !important;}';
+  document.head.appendChild(pad);
+
+  return {
+    set(text, color, copyable) {
+      msg.textContent = text;
+      msg.style.color = color || '#eee';
+      if (copyable) {
+        const b = document.createElement('button');
+        b.textContent = 'Copy label';
+        b.style.cssText = 'background:#2a2a2a;color:#eee;border:1px solid #3a3a3a;border-radius:4px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer;flex:none;';
+        b.onclick = () => navigator.clipboard?.writeText(copyable);
+        root.appendChild(b);
+      }
+    },
+  };
+}
+
+function waitForField(selectors, timeout) {
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    const tick = () => {
+      const el = pick(selectors);
+      if (el) return resolve(el);
+      if (Date.now() - t0 > timeout) return resolve(null);
+      setTimeout(tick, 250);
+    };
+    tick();
+  });
+}
 
 function looksLikeDraft(url) {
   return url.searchParams.has('draftId') || url.pathname.includes('/lstng');

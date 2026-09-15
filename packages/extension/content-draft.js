@@ -17,6 +17,10 @@
   window.__swiftlist_draft_loaded = true;
 
   const url = new URL(location.href);
+  // A ReviseItem page is a LIVE listing, not a draft. content-listing.js owns
+  // it; without this, the draft banner also appears and offers to "link" a
+  // listing that was never a draft.
+  if (/ReviseItem/i.test(url.search)) return;
   const ebayDraftId = extractDraftId(url);
   const isDraftPage = !!ebayDraftId || url.pathname.includes('/lstng') || url.searchParams.has('mode') || hasDraftBadge();
   if (!isDraftPage) return;
@@ -151,8 +155,10 @@
 
 
 async function pinnedAccountName() {
-  const { pinnedAccountName } = await chrome.storage.sync.get('pinnedAccountName');
-  return pinnedAccountName || undefined;
+  // Via the service worker, not storage directly: the pin is profile-local
+  // (storage.local) and the SW is the one place that knows where it lives.
+  const { pinnedAccount } = await window.swiftlist.settings();
+  return pinnedAccount?.accountName || undefined;
 }
 
 function extractDraftId(url) {

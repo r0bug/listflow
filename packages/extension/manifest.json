@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "listflow",
-  "version": "1.0.0",
-  "description": "YF eBay suite front door: comps research, AI-identified items, draft autofill with SKU|LOC labels, draft resume, sale detection.",
+  "version": "1.1.0",
+  "description": "YF eBay suite front door: capture a live listing, stamp SKU|LOC shelf codes, rebuild it on the other account, plus comps research and draft resume.",
   "permissions": ["storage", "activeTab", "scripting", "tabs", "alarms"],
   "host_permissions": [
     "https://www.ebay.com/*",
@@ -66,7 +66,7 @@
         "https://www.ebay.com/sl/sell*",
         "https://www.ebay.com/lstng*"
       ],
-      "js": ["lib/api.js", "content-listing.js", "content-draft.js"],
+      "js": ["lib/api.js", "content-listing.js", "content-draft.js", "content-rebuild.js"],
       "run_at": "document_idle"
     },
     {

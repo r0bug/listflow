@@ -1,6 +1,8 @@
 # Phase 2 — Inventory audit, shelf codes, and cross-account relist
 
-Status: PLAN (not started) · Drafted 2026-09-14
+Status: **BUILT** (2.0–2.4) · Drafted 2026-09-14 · Built 2026-09-14
+Branch `feat/inventory-audit-locations`. Extension packed as v1.1.0.
+Deployed to shinobi prod: **NOT YET** — see §7.
 Companion to `PHASE1-DESIGN.md` · Fleet standards `~/.claude-fleet/STANDARDS.md` §6
 
 ## 1. The problem

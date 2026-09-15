@@ -23,6 +23,7 @@
 //   {type:'logout'}                      → {ok}
 //   {type:'auth-state'}                  → {user, hasKey, baseUrl, pinnedAccount}
 //   {type:'fetch-text', url}             → {ok, status, text}
+//   {type:'fetch-blob', url}             → {ok, dataUrl}
 
 const DEFAULT_BASE_URL = 'https://listflow.robug.com';
 
@@ -162,6 +163,31 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           }
           const r = await fetch(msg.url, { credentials: 'omit' });
           sendResponse({ ok: r.ok, status: r.status, text: await r.text() });
+          break;
+        }
+        // Fetches one of OUR OWN re-hosted photos and hands it back as a
+        // data URL, so the rebuild panel can synthesise a real file drop onto
+        // eBay's uploader. Restricted to the configured listflow server —
+        // this must never become a general-purpose fetch proxy.
+        case 'fetch-blob': {
+          const cfg = await config();
+          if (!cfg.baseUrl || !String(msg.url).startsWith(cfg.baseUrl)) {
+            sendResponse({ ok: false, error: 'url is not on the listflow server' });
+            break;
+          }
+          const r = await fetch(msg.url);
+          if (!r.ok) {
+            sendResponse({ ok: false, error: `HTTP ${r.status}` });
+            break;
+          }
+          const blob = await r.blob();
+          const dataUrl = await new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(fr.result);
+            fr.onerror = () => reject(fr.error);
+            fr.readAsDataURL(blob);
+          });
+          sendResponse({ ok: true, dataUrl });
           break;
         }
         case 'auth-state': {

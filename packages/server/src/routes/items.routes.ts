@@ -1,19 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import os from 'node:os';
-import path from 'node:path';
-import fsp from 'node:fs/promises';
 import { prisma } from '../db/prisma.js';
 import { staffAuth, machineAuth, staffOrMachine } from '../middleware/auth.js';
 import { absPath } from '../util/paths.js';
 import { buildAutofillPayload } from '../services/draft.service.js';
-import { processImage, storeOriginal } from '../services/image.service.js';
 import { upsertCompAndLink, moveItemComps } from '../services/comps.service.js';
 import { computeCompleteness } from '../util/completeness.js';
-import { sha256File } from '../util/sha256.js';
-import { perceptualHash } from '../util/perceptualHash.js';
-import { logger } from '../util/logger.js';
 import { qstr, pstr } from '../util/req.js';
+import { downloadAndAttachImage } from '../services/listingCapture.service.js';
 import {
   InvalidLocationCode,
   normalizeLocationCode,
@@ -37,12 +31,17 @@ router.get('/', staffAuth, async (req, res) => {
   const q = qstr(req.query.q);
   const cursor = qstr(req.query.cursor);
   const take = Math.min(Number(qstr(req.query.limit)) || 50, 200);
+  // hasLocation=0 is the audit's working view: what still needs a shelf.
+  const hasLocation = qstr(req.query.hasLocation);
+  const captured = qstr(req.query.captured);
 
   const items = await prisma.item.findMany({
     where: {
       status: status && ItemStatuses.includes(status as ItemStatus) ? (status as ItemStatus) : undefined,
       stage: stage && ItemStages.includes(stage as ItemStage) ? (stage as ItemStage) : undefined,
       title: q ? { contains: q, mode: 'insensitive' } : undefined,
+      locationCode: hasLocation === '0' ? null : hasLocation === '1' ? { not: null } : undefined,
+      capturedAt: captured === '1' ? { not: null } : undefined,
     },
     include: {
       photos: { take: 1, where: { isPrimary: true } },
@@ -302,53 +301,6 @@ const ImportFromActiveSchema = z.object({
   descriptionMode: z.enum(['overwrite', 'append']).default('overwrite'),
   imageUrls: z.array(z.string().url()).optional(),
 });
-
-async function downloadAndAttachImage(itemId: string, url: string): Promise<string | null> {
-  // Fetch → tmp file → processImage (uses sharp pipeline, identical to ingest).
-  // sha256-based dedup: if any Photo with this hash already exists, link or skip.
-  let tmpPath: string | null = null;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const buf = Buffer.from(await res.arrayBuffer());
-    const ext = (path.extname(new URL(url).pathname) || '.jpg').toLowerCase();
-    tmpPath = path.join(os.tmpdir(), `swiftlist-import-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
-    await fsp.writeFile(tmpPath, buf);
-    const sha256 = await sha256File(tmpPath);
-    const existing = await prisma.photo.findUnique({ where: { sha256 } });
-    if (existing) {
-      // Already in DB. If unattached or attached elsewhere, claim for this item only when free.
-      if (existing.itemId === null) {
-        await prisma.photo.update({ where: { id: existing.id }, data: { itemId } });
-      }
-      return existing.id;
-    }
-    const phash = await perceptualHash(tmpPath).catch(() => null);
-    const originalRel = storeOriginal(tmpPath, sha256);
-    const processed = await processImage(tmpPath, sha256);
-    const photo = await prisma.photo.create({
-      data: {
-        itemId,
-        originalPath: originalRel,
-        optimizedPath: processed.optimizedPath,
-        thumbnailPath: processed.thumbnailPath,
-        sha256,
-        perceptualHash: phash,
-        width: processed.width,
-        height: processed.height,
-        bytes: processed.bytes,
-        mime: processed.mime,
-        source: 'EBAY_IMPORT',
-      },
-    });
-    await fsp.unlink(tmpPath).catch(() => undefined);
-    return photo.id;
-  } catch (err) {
-    logger.warn({ err, url }, 'import-from-active: image download failed');
-    if (tmpPath) await fsp.unlink(tmpPath).catch(() => undefined);
-    return null;
-  }
-}
 
 router.post('/:id/import-from-active', machineAuth, async (req, res) => {
   const parsed = ImportFromActiveSchema.safeParse(req.body);

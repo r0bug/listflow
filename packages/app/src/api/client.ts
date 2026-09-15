@@ -99,10 +99,12 @@ export const api = {
     return http<{ ok: true }>('/auth/logout', { method: 'POST' });
   },
   me: async (): Promise<Me> => withAdmin(await http<Omit<Me, 'isAdmin'>>('/auth/me')),
-  listItems: (params?: { q?: string; status?: string }) => {
+  listItems: (params?: { q?: string; status?: string; hasLocation?: '0' | '1'; captured?: '1' }) => {
     const qs = new URLSearchParams();
     if (params?.q) qs.set('q', params.q);
     if (params?.status) qs.set('status', params.status);
+    if (params?.hasLocation) qs.set('hasLocation', params.hasLocation);
+    if (params?.captured) qs.set('captured', params.captured);
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
     return http<{ items: ItemRow[]; nextCursor: string | null }>(`/items${suffix}`);
   },
@@ -245,6 +247,34 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  // ── Storage locations (docs/PHASE2-INVENTORY-AUDIT.md Phase 2.0) ──
+  locations: (includeInactive = false) =>
+    http<{ locations: StorageLocationRow[] }>(
+      `/locations${includeInactive ? '?includeInactive=1' : ''}`,
+    ),
+  createLocation: (body: { code: string; label?: string; notes?: string }) =>
+    http<StorageLocationRow>('/locations', { method: 'POST', body: JSON.stringify(body) }),
+  seedLocations: (rows: number, shelves: number) =>
+    http<{ created: number; requested: number }>('/locations/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ rows, shelves }),
+    }),
+  updateLocation: (code: string, body: { label?: string; notes?: string; active?: boolean }) =>
+    http<StorageLocationRow>(`/locations/${encodeURIComponent(code)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  moveShelf: (from: string, to: string) =>
+    http<{ from: string; to: string; moved: number }>(
+      `/locations/${encodeURIComponent(from)}/move`,
+      { method: 'POST', body: JSON.stringify({ to }) },
+    ),
+  setItemLocation: (itemId: string, locationCode: string | null) =>
+    http<{ id: string; sku: string; locationCode: string | null; customLabel: string }>(
+      `/items/${itemId}/location`,
+      { method: 'POST', body: JSON.stringify({ locationCode }) },
+    ),
 };
 
 export interface Lister {
@@ -381,12 +411,26 @@ export interface GroupDetail {
   }>;
 }
 
+export interface StorageLocationRow {
+  id: string;
+  code: string;
+  row: number;
+  shelf: number;
+  label: string | null;
+  notes: string | null;
+  active: boolean;
+  itemCount: number;
+}
+
 export interface ItemRow {
   id: string;
   title: string | null;
   brand: string | null;
   status: string;
   stage: string;
+  sku: string | null;
+  locationCode: string | null;
+  capturedAt: string | null;
   completeness: { score?: number } | null;
   photos: { id: string; thumbnailPath: string | null; publicUrl: string | null }[];
   _count: { photos: number; comps: number; drafts: number };

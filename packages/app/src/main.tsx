@@ -12,6 +12,7 @@ import { DraftsPage } from './routes/DraftsPage.js';
 import { SalesPage } from './routes/SalesPage.js';
 import { DevicesPage } from './routes/DevicesPage.js';
 import { SettingsPage } from './routes/SettingsPage.js';
+import { LocationsPage } from './routes/LocationsPage.js';
 import { AuthProvider, RequireAuth, useAuth, useAuthErrorBoundary } from './hooks/useAuth.js';
 import { initApiOrigin } from './api/client.js';
 
@@ -30,6 +31,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           <NavItem to="/pool">Pool</NavItem>
           <NavItem to="/drafts">Drafts</NavItem>
           <NavItem to="/sales">Sales</NavItem>
+          <NavItem to="/locations">Shelves</NavItem>
           <NavItem to="/devices">Devices</NavItem>
           <NavItem to="/settings">Settings</NavItem>
         </div>
@@ -89,6 +91,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                       <Route path="/groups/:id" element={<GroupDetailPage />} />
                       <Route path="/drafts" element={<DraftsPage />} />
                       <Route path="/sales" element={<SalesPage />} />
+                      <Route path="/locations" element={<LocationsPage />} />
                       <Route path="/devices" element={<DevicesPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                     </Routes>

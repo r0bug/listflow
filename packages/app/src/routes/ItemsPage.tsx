@@ -3,10 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api, type GroupRow, type ItemRow } from '../api/client.js';
 
-type Tab = 'unidentified' | 'in-process' | 'draft' | 'listed' | 'sold';
+type Tab = 'unidentified' | 'needs-shelf' | 'in-process' | 'draft' | 'listed' | 'sold';
 
 const TABS: Array<{ key: Tab; label: string; status?: string }> = [
   { key: 'unidentified', label: 'Unidentified' },
+  // The audit's working view: captured from a live listing, no shelf yet.
+  { key: 'needs-shelf', label: 'Needs a shelf' },
   { key: 'in-process', label: 'In-process', status: 'IN_PROCESS' },
   { key: 'draft', label: 'Drafts', status: 'DRAFT' },
   { key: 'listed', label: 'Listed', status: 'LISTED' },
@@ -50,7 +52,7 @@ export function ItemsPage() {
       {tab === 'unidentified' ? (
         <UnidentifiedGrid />
       ) : (
-        <ItemsGrid status={activeTab.status!} />
+        activeTab.key === 'needs-shelf' ? <ItemsGrid needsShelf /> : <ItemsGrid status={activeTab.status!} />
       )}
     </div>
   );
@@ -105,10 +107,13 @@ function GroupCard({ group }: { group: GroupRow }) {
   );
 }
 
-function ItemsGrid({ status }: { status: string }) {
+function ItemsGrid({ status, needsShelf }: { status?: string; needsShelf?: boolean }) {
   const { data, isLoading, error } = useQuery({
-    queryKey: ['items', status],
-    queryFn: () => api.listItems({ status }),
+    queryKey: ['items', status ?? 'needs-shelf'],
+    queryFn: () =>
+      needsShelf
+        ? api.listItems({ captured: '1', hasLocation: '0' })
+        : api.listItems({ status }),
   });
 
   if (isLoading) return <div className="text-neutral-400">Loading…</div>;
@@ -116,7 +121,13 @@ function ItemsGrid({ status }: { status: string }) {
 
   const items = data?.items ?? [];
   if (items.length === 0) {
-    return <div className="text-neutral-500">No items in this state yet.</div>;
+    return (
+      <div className="text-neutral-500">
+        {needsShelf
+          ? 'Nothing captured is missing a shelf. Set shelves from the extension bar on the eBay listing page.'
+          : 'No items in this state yet.'}
+      </div>
+    );
   }
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -134,6 +145,15 @@ function ItemCard({ item }: { item: ItemRow }) {
       className="border border-neutral-800 rounded p-4 hover:border-neutral-600 block"
     >
       <div className="font-medium truncate">{item.title ?? '(untitled)'}</div>
+      <div className="text-xs text-neutral-500 mt-1">
+        {item.sku && <span className="font-mono text-neutral-400">{item.sku}</span>}
+        {item.sku && ' · '}
+        {item.locationCode ? (
+          <span className="text-green-500 font-mono">{item.locationCode}</span>
+        ) : (
+          <span className="text-amber-500">no shelf</span>
+        )}
+      </div>
       <div className="text-xs text-neutral-500 mt-1">
         {item.stage} · {item._count.photos} photos · {item.completeness?.score ?? 0}% complete
       </div>

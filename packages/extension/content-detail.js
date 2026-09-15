@@ -5,33 +5,324 @@
 // If the URL carries ?swiftlistItemId=…, the legacy auto-pull still fires
 // for the sold-comp flow.
 
+// Runs on https://www.ebay.com/itm/*.
+//
+// Injects THE bar (docs/PHASE2-INVENTORY-AUDIT.md §4.1) across the top of the
+// page. Everything is operator-initiated — nothing fires on load except a
+// single cheap status lookup, and the extension never navigates on its own.
+//
+// The bar is account-aware: the profile knows the eBay account it is pinned to
+// (one profile per account, Standards §6) and the page names its seller, so
+// "Revise" is offered only on listings this profile can actually revise.
+
 (async () => {
+  if (window.__listflow_bar_loaded) return;
+  window.__listflow_bar_loaded = true;
+
   const url = new URL(location.href);
   const preboundItemId = url.searchParams.get('swiftlistItemId');
   const ebayItemId = (location.pathname.match(/\/itm\/(?:[^/]+\/)?(\d{8,})/) || [])[1];
   if (!ebayItemId) return;
 
-  const wrap = document.createElement('div');
-  wrap.style.cssText =
-    'position:fixed;bottom:24px;right:24px;z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:flex-end;font:600 13px -apple-system, system-ui, sans-serif;';
-  document.body.appendChild(wrap);
+  const bar = mountBar();
+  await refreshBar(bar, ebayItemId);
 
-  const importBtn = document.createElement('button');
-  importBtn.textContent = '↑ Import details to listing';
-  importBtn.style.cssText =
-    'padding:10px 14px;background:#16a34a;color:#fff;border:0;border-radius:6px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
-  importBtn.addEventListener('click', () => openImportFlow(ebayItemId));
-  wrap.appendChild(importBtn);
-
-  const pullBtn = document.createElement('button');
-  pullBtn.textContent = preboundItemId ? '↧ Auto-pulling…' : '↧ Pull into swiftlist (sold comp)';
-  pullBtn.style.cssText =
-    'padding:10px 14px;background:#0064d2;color:#fff;border:0;border-radius:6px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
-  pullBtn.addEventListener('click', () => pullSoldComp(pullBtn, ebayItemId));
-  wrap.appendChild(pullBtn);
-
-  if (preboundItemId) setTimeout(() => pullSoldComp(pullBtn, ebayItemId, preboundItemId), 2_000);
+  // Legacy sold-comp auto-pull, unchanged.
+  if (preboundItemId) {
+    setTimeout(() => pullSoldComp(bar.ghostBtn, ebayItemId, preboundItemId), 2_000);
+  }
 })();
+
+// ── The bar ────────────────────────────────────────────────────────────
+
+function mountBar() {
+  document.getElementById('__listflow_bar')?.remove();
+
+  const root = document.createElement('div');
+  root.id = '__listflow_bar';
+  root.style.cssText = [
+    'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:2147483600',
+    'background:#181818', 'color:#eee', 'border-bottom:1px solid #3a3a3a',
+    'padding:7px 14px', 'display:flex', 'align-items:center', 'gap:12px',
+    'font:13px -apple-system,system-ui,sans-serif', 'box-shadow:0 2px 10px rgba(0,0,0,0.35)',
+  ].join(';');
+
+  const brand = document.createElement('span');
+  brand.textContent = 'listflow';
+  brand.style.cssText = 'font-weight:700;letter-spacing:0.02em;color:#6af;flex:none;';
+
+  const state = document.createElement('span');
+  state.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#bbb;';
+  state.textContent = 'checking…';
+
+  const actions = document.createElement('span');
+  actions.style.cssText = 'display:flex;gap:6px;flex:none;align-items:center;';
+
+  // Kept so the legacy sold-comp path still has a button to report progress on.
+  const ghostBtn = document.createElement('button');
+  ghostBtn.style.cssText = 'display:none;';
+
+  root.append(brand, state, actions, ghostBtn);
+  document.documentElement.appendChild(root);
+
+  // Push eBay's own page down so the bar never covers its header.
+  const pad = document.createElement('style');
+  pad.textContent = 'body{padding-top:38px !important;}';
+  document.head.appendChild(pad);
+
+  return { root, state, actions, ghostBtn };
+}
+
+function barButton(label, kind, onClick) {
+  const b = document.createElement('button');
+  b.textContent = label;
+  const bg = { primary: '#16a34a', normal: '#2a2a2a', quiet: 'transparent' }[kind] || '#2a2a2a';
+  b.style.cssText = [
+    `background:${bg}`, 'color:#eee', 'border:1px solid #3a3a3a', 'border-radius:4px',
+    'padding:5px 11px', 'font:inherit', 'font-size:12px', 'cursor:pointer', 'white-space:nowrap',
+  ].join(';');
+  b.addEventListener('click', () => onClick(b));
+  return b;
+}
+
+function setBarState(bar, html, color) {
+  bar.state.innerHTML = html;
+  bar.state.style.color = color || '#bbb';
+}
+
+async function refreshBar(bar, ebayItemId) {
+  bar.actions.innerHTML = '';
+  let status = null;
+  let pinned = null;
+  try {
+    const [s, cfg] = await Promise.all([
+      window.swiftlist.api(`/api/v1/capture/status/${ebayItemId}`),
+      window.swiftlist.settings(),
+    ]);
+    status = s;
+    pinned = cfg.pinnedAccount;
+  } catch (err) {
+    setBarState(bar, `not connected — ${escapeHtml(err.message)}`, '#f66');
+    bar.actions.appendChild(barButton('Retry', 'normal', () => refreshBar(bar, ebayItemId)));
+    return;
+  }
+
+  // Whose listing is this? The seller shown on the page vs the account this
+  // Chrome profile is pinned to. Without a pin we cannot claim it is ours.
+  const seller = (scrapeSellerName() || '').trim();
+  const isMine =
+    Boolean(pinned?.accountName) &&
+    seller.toLowerCase() === String(pinned.accountName).toLowerCase();
+
+  const item = status?.captured ? status.item : null;
+
+  if (!item) {
+    setBarState(bar, `not saved${seller ? ` · seller ${escapeHtml(seller)}` : ''}`, '#bbb');
+  } else {
+    const shelf = item.locationCode
+      ? `<b style="color:#6c6">${escapeHtml(item.locationCode)}</b>`
+      : '<b style="color:#ea4">no shelf</b>';
+    setBarState(
+      bar,
+      `<b style="color:#eee">${escapeHtml(item.sku || '(no sku)')}</b> · ${shelf} · ${item.photoCount} photo${item.photoCount === 1 ? '' : 's'}` +
+        (item.title ? ` · ${escapeHtml(item.title.slice(0, 48))}` : ''),
+      '#bbb',
+    );
+  }
+
+  // ── Set / change shelf ──
+  if (item) {
+    bar.actions.appendChild(
+      barButton(item.locationCode ? '📍 Change shelf' : '📍 Set shelf', item.locationCode ? 'normal' : 'primary', () =>
+        openShelfPrompt(bar, ebayItemId, item),
+      ),
+    );
+  }
+
+  // ── Revise (Flow 1) — only on our own listing, and only once it has a shelf ──
+  if (item && isMine) {
+    bar.actions.appendChild(
+      barButton('✎ Revise listing', 'normal', async (btn) => {
+        if (!item.locationCode) {
+          btn.textContent = 'Set a shelf first';
+          setTimeout(() => (btn.textContent = '✎ Revise listing'), 1800);
+          return;
+        }
+        // Navigation the OPERATOR asked for, on click. Not a crawl.
+        location.href = `https://www.ebay.com/lstng?mode=ReviseItem&itemId=${encodeURIComponent(
+          ebayItemId,
+        )}&listflowItemId=${encodeURIComponent(item.id)}`;
+      }),
+    );
+  } else if (item && pinned?.accountName) {
+    const note = document.createElement('span');
+    note.style.cssText = 'color:#777;font-size:11px;white-space:nowrap;';
+    note.textContent = `not ${pinned.accountName}'s listing`;
+    note.title = `This profile is pinned to ${pinned.accountName}; the page's seller is ${seller || 'unknown'}. Revise is only possible on your own listing.`;
+    bar.actions.appendChild(note);
+  } else if (item && !pinned?.accountName) {
+    const note = document.createElement('span');
+    note.style.cssText = 'color:#ea4;font-size:11px;white-space:nowrap;';
+    note.textContent = 'no eBay account pinned';
+    note.title = 'Pin this Chrome profile to an eBay account in the listflow popup to enable Revise.';
+    bar.actions.appendChild(note);
+  }
+
+  // ── Copy (Flow 2 step 1) ──
+  bar.actions.appendChild(
+    barButton(item ? '📋 Re-copy' : '📋 Copy listing', item ? 'normal' : 'primary', (btn) =>
+      doCapture(bar, btn, ebayItemId, pinned?.accountName),
+    ),
+  );
+
+  // ── Legacy flows, kept out of the way ──
+  bar.actions.appendChild(
+    barButton('⋯', 'quiet', (btn) => {
+      const menu = document.createElement('span');
+      menu.style.cssText = 'display:flex;gap:6px;';
+      menu.appendChild(barButton('↑ Into existing item', 'normal', () => openImportFlow(ebayItemId)));
+      menu.appendChild(barButton('↧ Sold comp', 'normal', (b) => pullSoldComp(b, ebayItemId)));
+      btn.replaceWith(menu);
+    }),
+  );
+}
+
+function scrapeSellerName() {
+  const el = document.querySelector(
+    '.x-sellercard-atf__info__about-seller a, .x-sellercard-atf__info__about-seller, span.mbg-nw, [data-testid="x-sellercard-atf"] a[href*="/usr/"]',
+  );
+  const raw = el ? el.textContent.trim() : '';
+  // eBay renders "seller (1,234) 99.8%" in some layouts; keep the handle.
+  return raw.split(/[\s(]/)[0] || '';
+}
+
+// ── Capture ────────────────────────────────────────────────────────────
+
+async function doCapture(bar, btn, ebayItemId, sourceAccountName) {
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = 'Reading page…';
+  try {
+    const scraped = await scrapeFull(ebayItemId);
+    btn.textContent = `Saving ${scraped.imageUrls?.length || 0} photo(s)…`;
+    const result = await window.swiftlist.api('/api/v1/capture/listing', {
+      method: 'POST',
+      body: JSON.stringify({
+        ebayItemId,
+        title: scraped.title || undefined,
+        brand: scraped.brand,
+        model: scraped.model,
+        categoryPath: scraped.categoryPath || undefined,
+        condition: scraped.condition,
+        description: scraped.description || undefined,
+        descriptionHtml: scraped.descriptionHtml || undefined,
+        itemSpecifics: scraped.itemSpecifics,
+        imageUrls: scraped.imageUrls,
+        price: typeof scraped.soldPrice === 'number' ? scraped.soldPrice : undefined,
+        sellerName: scraped.sellerName || undefined,
+        sourceAccountName: sourceAccountName || undefined,
+        raw: scraped,
+      }),
+    });
+    await window.swiftlist.setLastItem(result.item.id);
+    await refreshBar(bar, ebayItemId);
+    if (result.warnings?.length) showWarnings(result.warnings);
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = `Failed: ${err.message}`.slice(0, 48);
+    window.swiftlist.telemetry({ where: 'content-detail.capture', err: err.message, url: location.href });
+    setTimeout(() => (btn.textContent = original), 4000);
+  }
+}
+
+// Warnings are the gate on ending the source listing, so they are a blocking
+// dialog rather than a toast that scrolls away unread.
+function showWarnings(warnings) {
+  const overlay = mountOverlay();
+  setOverlayBody(
+    overlay,
+    `<div style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+      <div style="font-size:16px;font-weight:600;color:#b45309;">Saved — but check this before ending the original</div>
+      <ul style="margin:0;padding-left:20px;line-height:1.6;color:#444;">
+        ${warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}
+      </ul>
+      <div style="display:flex;justify-content:flex-end;">
+        <button id="lf-ok" style="padding:8px 14px;background:#0064d2;color:#fff;border:0;border-radius:4px;cursor:pointer;font:inherit;">Understood</button>
+      </div>
+    </div>`,
+  );
+  overlay.querySelector('#lf-ok').onclick = () => overlay.remove();
+}
+
+// ── Shelf entry ────────────────────────────────────────────────────────
+//
+// Scanner-friendly: the field takes focus, a barcode scanner types the code
+// and sends Enter, and that submits. No mouse needed at the shelf.
+async function openShelfPrompt(bar, ebayItemId, item) {
+  const overlay = mountOverlay();
+  let locations = [];
+  try {
+    const data = await window.swiftlist.api('/api/v1/locations');
+    locations = data.locations || [];
+  } catch {
+    /* validation still happens server-side; the datalist is a convenience */
+  }
+
+  setOverlayBody(
+    overlay,
+    `<div style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+      <div style="font-size:16px;font-weight:600;">Shelf for ${escapeHtml(item.sku || 'this item')}</div>
+      <div style="color:#666;font-size:12px;">Scan the shelf barcode or type a code like R3-S2.${
+        item.locationCode ? ` Currently <b>${escapeHtml(item.locationCode)}</b>.` : ''
+      }</div>
+      <input id="lf-shelf" list="lf-shelves" placeholder="R3-S2" autocomplete="off"
+        style="padding:10px;border:1px solid #ccc;border-radius:4px;font:inherit;font-size:18px;text-transform:uppercase;" />
+      <datalist id="lf-shelves">${locations.map((l) => `<option value="${escapeAttr(l.code)}">`).join('')}</datalist>
+      <div id="lf-shelf-msg" style="font-size:12px;color:#b91c1c;min-height:16px;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button id="lf-cancel" style="padding:8px 14px;background:#e5e7eb;border:0;border-radius:4px;cursor:pointer;font:inherit;">Cancel</button>
+        <button id="lf-save" style="padding:8px 14px;background:#16a34a;color:#fff;border:0;border-radius:4px;cursor:pointer;font:inherit;">Save shelf</button>
+      </div>
+    </div>`,
+  );
+
+  const input = overlay.querySelector('#lf-shelf');
+  const msg = overlay.querySelector('#lf-shelf-msg');
+  input.focus();
+  overlay.querySelector('#lf-cancel').onclick = () => overlay.remove();
+
+  const save = async () => {
+    const code = input.value.trim();
+    if (!code) return;
+    msg.style.color = '#666';
+    msg.textContent = 'Saving…';
+    try {
+      const res = await window.swiftlist.api(`/api/v1/items/${item.id}/location`, {
+        method: 'POST',
+        body: JSON.stringify({ locationCode: code }),
+      });
+      overlay.remove();
+      await refreshBar(bar, ebayItemId);
+      flashBar(bar, `shelf set — Custom Label will be ${res.customLabel}`);
+    } catch (err) {
+      msg.style.color = '#b91c1c';
+      msg.textContent = err.message;
+      input.select();
+    }
+  };
+
+  overlay.querySelector('#lf-save').onclick = save;
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); void save(); }
+    if (e.key === 'Escape') overlay.remove();
+  });
+}
+
+function flashBar(bar, text) {
+  const prev = bar.state.innerHTML;
+  setBarState(bar, escapeHtml(text), '#6c6');
+  setTimeout(() => { bar.state.innerHTML = prev; bar.state.style.color = '#bbb'; }, 4000);
+}
 
 // ─── sold-comp flow (legacy) ──────────────────────────────────────────
 async function pullSoldComp(btn, ebayItemId, prebound) {

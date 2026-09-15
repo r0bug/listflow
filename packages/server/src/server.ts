@@ -31,6 +31,7 @@ import compsRoutes from './routes/comps.routes.js';
 import ebayOauthRoutes from './routes/ebayOauth.routes.js';
 import collectionsRoutes from './routes/collections.routes.js';
 import locationsRoutes from './routes/locations.routes.js';
+import captureRoutes from './routes/capture.routes.js';
 import { startScheduler } from './jobs/scheduler.js';
 
 const app = express();
@@ -83,6 +84,7 @@ app.use('/api/v1/comps', compsRoutes);
 app.use('/api/v1/ebay/oauth', ebayOauthRoutes);
 app.use('/api/v1/collections', collectionsRoutes);
 app.use('/api/v1/locations', locationsRoutes);
+app.use('/api/v1/capture', captureRoutes);
 
 app.use(errorHandler);
 
