@@ -83,6 +83,14 @@ async function runReviseFlow(itemId) {
       return;
     }
 
+    // eBay does not render the Custom Label input at all unless the seller has
+    // switched it on under "See title options" (a persistent account-level form
+    // preference, name="customLabelPref"). No selector can find a field that
+    // does not exist, so enable the preference first — the whole audit depends
+    // on this one field, and leaving it to be set by hand on every listing is
+    // how it ends up not being set.
+    const enabled = await ensureCustomLabelEnabled(banner);
+
     // eBay's revise form mounts progressively; the field may not exist yet.
     const el = await waitForField(
       [
@@ -91,11 +99,11 @@ async function runReviseFlow(itemId) {
         'input[aria-label*="Custom label" i]',
         'input[aria-label*="SKU" i]',
       ],
-      12_000,
+      enabled ? 12_000 : 3_000,
     );
     if (!el) {
       banner.set(
-        `Could not find the Custom Label field. Set it by hand to: ${label}`,
+        `No Custom Label field on this page. Open "See title options" and switch on "Custom label (SKU)", then reload. Meanwhile set it by hand to: ${label}`,
         '#f66',
         label,
       );
@@ -121,6 +129,43 @@ async function runReviseFlow(itemId) {
     banner.set(`Failed: ${err.message}`, '#f66');
     window.swiftlist.telemetry({ where: 'content-listing.revise', err: err.message, url: location.href });
   }
+}
+
+// Turns on eBay's "Custom label (SKU)" title option if it is off, so the text
+// input is rendered. Returns whether the field should now exist.
+//
+// This flips a form PREFERENCE, not listing data — it changes which optional
+// field the form shows, and touches nothing a buyer sees. It is announced in
+// the banner rather than done quietly.
+async function ensureCustomLabelEnabled(banner) {
+  const pref =
+    document.querySelector('input[name="customLabelPref"]') ||
+    [...document.querySelectorAll('input[type="checkbox"], [role="switch"]')].find((el) =>
+      /custom label/i.test(el.getAttribute('aria-label') || ''),
+    );
+  if (!pref) return true; // nothing to toggle; maybe already rendered
+
+  if (pref.checked) return true;
+
+  // The switch often lives inside a collapsed "See title options" disclosure.
+  // Expand it first or the click may not register.
+  for (const d of document.querySelectorAll('details:not([open])')) d.open = true;
+  for (const b of document.querySelectorAll('button[aria-expanded="false"]')) {
+    if (/title option|more option|see more/i.test(b.textContent || '')) b.click();
+  }
+
+  banner.set('Turning on eBay\u2019s "Custom label (SKU)" title option\u2026', '#ea4');
+  pref.click();
+  await new Promise((r) => setTimeout(r, 600));
+
+  if (!pref.checked) {
+    banner.set(
+      'Could not turn on the "Custom label (SKU)" option. Open "See title options" on this page and switch it on, then reload.',
+      '#f66',
+    );
+    return false;
+  }
+  return true;
 }
 
 // The extension never clicks eBay's Save — the operator does. So the banner
@@ -325,8 +370,39 @@ function pick(selectors) {
   return null;
 }
 
+// Like pick(), but only returns something you can actually TYPE into.
+//
+// eBay's revise form carries a hidden 0x0 checkbox switch with
+// aria-label="Custom label (SKU)". The old selector list matched it, we set
+// .value on a checkbox, nothing threw, nothing happened, and the fill reported
+// success. Every "filled but the field is empty" report traces back to this
+// shape of bug, so the guard lives here rather than at one call site.
+function pickTextInput(selectors) {
+  for (const sel of selectors) {
+    for (const el of document.querySelectorAll(sel)) {
+      if (isFillableText(el)) return el;
+    }
+  }
+  return null;
+}
+
+function isFillableText(el) {
+  if (!el) return false;
+  const tag = el.tagName;
+  if (tag === 'TEXTAREA') return true;
+  if (tag !== 'INPUT') return false;
+  const type = (el.getAttribute('type') || 'text').toLowerCase();
+  if (!['text', 'search', 'number', 'tel', 'url', 'email', ''].includes(type)) return false;
+  if (el.disabled || el.readOnly) return false;
+  if (el.getAttribute('role') === 'switch') return false;
+  // Rendered at all? A 0x0 box with no offsetParent is not a field a human
+  // could fill, so we should not pretend we filled it either.
+  if (el.offsetParent === null && el.getClientRects().length === 0) return false;
+  return true;
+}
+
 function setInput(selectors, value) {
-  const el = pick(selectors);
+  const el = pickTextInput(selectors);
   if (!el) return false;
   setReactValue(el, value);
 }

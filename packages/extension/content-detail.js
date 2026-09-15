@@ -107,12 +107,19 @@ async function refreshBar(bar, ebayItemId) {
     return;
   }
 
-  // Whose listing is this? The seller shown on the page vs the account this
-  // Chrome profile is pinned to. Without a pin we cannot claim it is ours.
+  // Whose listing is this?
+  //
+  // Comparing the pinned account name to the seller shown on the page does NOT
+  // work: eBay renders the STORE DISPLAY NAME ("Yakima Finds"), not the user id
+  // ("yakimanet"), so the comparison could never succeed and Revise was hidden
+  // on listings that were plainly the operator's own.
+  //
+  // Ask the page instead of guessing at identity. When eBay believes you own a
+  // listing it says so, with seller-only affordances — that is a far better
+  // signal than any name we hold, and it is the same thing the operator sees.
   const seller = (scrapeSellerName() || '').trim();
-  const isMine =
-    Boolean(pinned?.accountName) &&
-    seller.toLowerCase() === String(pinned.accountName).toLowerCase();
+  const ownership = detectOwnListing(pinned?.accountName);
+  const isMine = ownership.mine;
 
   const item = status?.captured ? status.item : null;
 
@@ -158,11 +165,15 @@ async function refreshBar(bar, ebayItemId) {
         )}&listflowItemId=${encodeURIComponent(item.id)}`;
       }),
     );
-  } else if (item && pinned?.accountName) {
+  } else if (item) {
     const note = document.createElement('span');
-    note.style.cssText = 'color:#777;font-size:11px;white-space:nowrap;';
-    note.textContent = `not ${pinned.accountName}'s listing`;
-    note.title = `This profile is pinned to ${pinned.accountName}; the page's seller is ${seller || 'unknown'}. Revise is only possible on your own listing.`;
+    note.style.cssText = 'color:#777;font-size:11px;white-space:nowrap;cursor:help;';
+    note.textContent = "can't revise — not your listing";
+    note.title =
+      `No seller-only controls found on this page, so eBay does not consider this listing yours.\n` +
+      `Seller shown: ${seller || 'unknown'}\n` +
+      `Profile pinned to: ${pinned?.accountName || '(none)'}\n` +
+      `Checked for: ${ownership.checked.join(', ')}`;
     bar.actions.appendChild(note);
   } else if (item && !pinned?.accountName) {
     const note = document.createElement('span');
@@ -189,6 +200,37 @@ async function refreshBar(bar, ebayItemId) {
       btn.replaceWith(menu);
     }),
   );
+}
+
+// Ownership detection. Every signal here is something eBay only shows the
+// seller of the listing, so a hit means eBay itself believes this is ours.
+function detectOwnListing(pinnedAccountName) {
+  const checked = [];
+  const body = document.body?.innerText || '';
+
+  // 1. A link into the revise/relist flow — the strongest possible signal.
+  if (document.querySelector('a[href*="mode=ReviseItem"], a[href*="/lstng?"]')) {
+    checked.push('revise link');
+    return { mine: true, checked };
+  }
+  // 2. Seller-only copy in the seller box.
+  if (/your item is for sale|manage offers|revise your listing|sell similar item|end (my )?listing/i.test(body)) {
+    checked.push('seller-box copy');
+    return { mine: true, checked };
+  }
+  // 3. The seller handle in a /usr/ link matching the pinned account. This is
+  //    the user id, unlike the store name rendered in the seller card.
+  if (pinnedAccountName) {
+    for (const a of document.querySelectorAll('a[href*="/usr/"]')) {
+      const handle = (a.getAttribute('href').match(/\/usr\/([^/?#]+)/) || [])[1];
+      if (handle && handle.toLowerCase() === String(pinnedAccountName).toLowerCase()) {
+        checked.push('usr handle');
+        return { mine: true, checked };
+      }
+    }
+  }
+  checked.push('revise link', 'seller-box copy', 'usr handle');
+  return { mine: false, checked };
 }
 
 function scrapeSellerName() {
