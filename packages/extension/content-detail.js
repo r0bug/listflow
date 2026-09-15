@@ -45,7 +45,7 @@ async function pullSoldComp(btn, ebayItemId, prebound) {
       btn.disabled = false;
       return;
     }
-    const scraped = scrape(ebayItemId);
+    const scraped = await scrapeFull(ebayItemId);
     // sold-comp-link historically stored description as HTML; preserve that.
     const { descriptionHtml, ...rest } = scraped;
     const payload = { ...rest, description: descriptionHtml || rest.description };
@@ -129,12 +129,15 @@ function renderPicker(overlay, unlisted, ebayItemId) {
   next.addEventListener('click', () => {
     const opt = select.selectedOptions[0];
     if (!opt) return;
-    renderApproval(overlay, opt.value, opt.dataset.title || '', ebayItemId);
+    void renderApproval(overlay, opt.value, opt.dataset.title || '', ebayItemId);
   });
 }
 
-function renderApproval(overlay, targetItemId, targetTitle, ebayItemId) {
-  const scraped = scrape(ebayItemId);
+async function renderApproval(overlay, targetItemId, targetTitle, ebayItemId) {
+  // The description lives on another origin and has to be fetched, so this is
+  // no longer instant. Say so rather than showing an empty dialog.
+  setOverlayBody(overlay, '<div style="padding:24px">Reading listing…</div>');
+  const scraped = await scrapeFull(ebayItemId);
   const targetHasTitle = targetTitle.trim().length > 0;
 
   const specifics = scraped.itemSpecifics || {};
@@ -360,21 +363,22 @@ function scrape(ebayItemId) {
   const brand = specifics['Brand'] || undefined;
   const model = specifics['Model'] || specifics['Model Number'] || undefined;
 
+  // Same-origin read, which on a modern eBay item page almost never works —
+  // the iframe is served from vi.vipr.ebaydesc.com. fetchDescription() below
+  // is the path that actually returns content; this is just the free attempt.
   let descHtml = '';
   let descText = '';
   const descIframe = document.querySelector('iframe#desc_ifr');
   try {
-    if (descIframe?.contentDocument) {
+    if (descIframe?.contentDocument?.body) {
       descHtml = descIframe.contentDocument.body.innerHTML;
       descText = (descIframe.contentDocument.body.innerText || descIframe.contentDocument.body.textContent || '').trim();
     }
   } catch {
-    // cross-origin, skip
+    // cross-origin — expected; fetchDescription() handles it.
   }
 
-  const imageUrls = [...document.querySelectorAll('img.ux-image-carousel-item, img.img-zoom, img#icImg')]
-    .map((img) => img.src)
-    .filter(Boolean);
+  const imageUrls = collectFullResImages();
 
   const sellerName = textOf('.x-sellercard-atf__info__about-seller, span.mbg-nw');
 
@@ -402,4 +406,87 @@ function textOf(sel) {
 function parsePrice(s) {
   const m = (s || '').replace(/,/g, '').match(/[\d.]+/);
   return m ? Number(m[0]) : undefined;
+}
+
+
+// ── Full-resolution images ─────────────────────────────────────────────
+//
+// The carousel's `src` is a thumbnail (s-l140 / s-l500), and lazy-loaded
+// slides may still hold a 1×1 placeholder. Relisting from a thumbnail produces
+// a ruined listing, and by then the source listing is usually ended — so this
+// is a one-shot: get the original or get nothing.
+//
+// Every eBay image size lives at the same path with a different s-l<N>
+// segment, so the largest is a string rewrite away.
+function upgradeImageUrl(raw) {
+  if (!raw) return null;
+  let url = String(raw).trim();
+  if (!url || url.startsWith('data:')) return null; // placeholder
+  // eBay still emits protocol-relative URLs in places. Dropping them would
+  // silently lose a photo, which is the whole failure this function exists
+  // to prevent — so promote rather than reject.
+  if (url.startsWith('//')) url = `https:${url}`;
+  if (!/^https?:/.test(url)) return null;
+  if (!/\/s-l\d+\./.test(url)) return url; // not a sized eBay image; take as-is
+  // /thumbs/ is a separate small-image tree: an s-l1600 under it is still a
+  // thumbnail. The original lives at the same path with /thumbs/ removed.
+  url = url.replace('/thumbs/', '/');
+  return url.replace(/\/s-l\d+\./, '/s-l1600.');
+}
+
+function collectFullResImages() {
+  const out = [];
+  const nodes = document.querySelectorAll(
+    'img.ux-image-carousel-item, img.img-zoom, img#icImg, .ux-image-carousel-item img, [data-zoom-src]',
+  );
+  for (const el of nodes) {
+    // data-zoom-src is the original; data-src is the pre-lazy-load real URL;
+    // src is the last resort and the most likely to be a thumbnail.
+    const candidate =
+      el.getAttribute('data-zoom-src') || el.getAttribute('data-src') || el.getAttribute('src');
+    const url = upgradeImageUrl(candidate);
+    if (url) out.push(url);
+  }
+  return [...new Set(out)];
+}
+
+// ── Description (cross-origin) ─────────────────────────────────────────
+//
+// eBay serves the description iframe from vi.vipr.ebaydesc.com, so the page
+// cannot read it and the old try/catch silently yielded ''. Descriptions were
+// therefore never captured. The SW fetches it instead (see 'fetch-text').
+async function fetchDescription(alreadyHave) {
+  if (alreadyHave && alreadyHave.trim()) return { html: alreadyHave, text: stripTags(alreadyHave) };
+
+  const iframe = document.querySelector('iframe#desc_ifr, iframe[id*="desc" i]');
+  const src = iframe?.getAttribute('src') || iframe?.dataset?.src;
+  if (!src) return { html: '', text: '' };
+
+  const abs = new URL(src, location.href).href;
+  try {
+    const res = await chrome.runtime.sendMessage({ type: 'fetch-text', url: abs });
+    if (!res?.ok || !res.text) return { html: '', text: '' };
+    // Unwrap to the body so we store the description, not a whole document.
+    const doc = new DOMParser().parseFromString(res.text, 'text/html');
+    const body = doc.body;
+    if (!body) return { html: '', text: '' };
+    return { html: body.innerHTML.trim(), text: (body.textContent || '').trim() };
+  } catch (err) {
+    window.swiftlist.telemetry({ where: 'content-detail.fetchDescription', err: String(err?.message || err), url: abs });
+    return { html: '', text: '' };
+  }
+}
+
+function stripTags(html) {
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  return (d.textContent || '').trim();
+}
+
+// scrapeFull() = scrape() plus the async description fetch. Everything that
+// persists a listing must use this; scrape() alone loses descriptions.
+async function scrapeFull(ebayItemId) {
+  const base = scrape(ebayItemId);
+  const desc = await fetchDescription(base.descriptionHtml);
+  return { ...base, description: desc.text || base.description, descriptionHtml: desc.html || base.descriptionHtml };
 }

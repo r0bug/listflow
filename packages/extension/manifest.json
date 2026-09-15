@@ -9,7 +9,8 @@
     "https://www.worthpoint.com/*",
     "http://localhost:3005/*",
     "https://list.robug.com/*",
-    "https://listflow.robug.com/*"
+    "https://listflow.robug.com/*",
+    "https://*.ebaydesc.com/*"
   ],
   "background": { "service_worker": "background.js" },
   "action": {

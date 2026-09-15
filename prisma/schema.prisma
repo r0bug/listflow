@@ -132,8 +132,21 @@ model Item {
   postalCode        String?
 
   // Physical Row/Shelf — DB is authority; stamped into eBay Custom Label
-  // as "<SKU>|<LOC>" at draft time (Standards §6)
+  // as "<SKU>|<LOC>" at draft time (Standards §6). Plain string, not an FK:
+  // it must keep naming a location that was later retired, because the live
+  // eBay listing still carries that code until the listing is next revised.
   locationCode String?
+
+  // Capture provenance — set when an Item is created by copying a live eBay
+  // listing through the extension (Phase 2, docs/PHASE2-INVENTORY-AUDIT.md).
+  // capturedPayload is the VERBATIM scrape: eBay's DOM changes, and once the
+  // source listing is ended the page is gone, so the raw blob is the only
+  // thing that makes a parsing miss recoverable. Never overwrite it on
+  // re-capture without keeping the old one.
+  sourceEbayItemId    String?
+  sourceEbayAccountId String?
+  capturedAt          DateTime?
+  capturedPayload     Json?
 
   status       ItemStatus @default(IN_PROCESS)
   stage        ItemStage  @default(INGESTED)
@@ -172,6 +185,8 @@ model Item {
   @@index([fingerprint])
   @@index([ebayAccountId])
   @@index([consignmentGroupId])
+  @@index([sourceEbayItemId])
+  @@index([locationCode])
 }
 
 model Photo {
@@ -554,6 +569,30 @@ model ListingTemplate {
 
   @@index([name])
   @@index([isActive])
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Physical storage — the shelving system in the YF eBay room.
+// Codes are "R<row>-S<shelf>" (Standards §6), short, stable, and printed as
+// Code-128 barcodes so assignment is a scan rather than typing.
+// Item.locationCode is a plain string pointing at `code`, NOT a foreign key —
+// see the comment on Item.locationCode.
+// ────────────────────────────────────────────────────────────────────
+
+model StorageLocation {
+  id     String  @id @default(cuid())
+  code   String  @unique // "R3-S2" — matches /^R\d{1,3}-S\d{1,3}$/
+  row    Int
+  shelf  Int
+  label  String? // optional human name, e.g. "back wall, eye level"
+  notes  String?
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active])
+  @@index([row, shelf])
 }
 
 // ────────────────────────────────────────────────────────────────────

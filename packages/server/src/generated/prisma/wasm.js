@@ -205,6 +205,10 @@ exports.Prisma.ItemScalarFieldEnum = {
   returnPolicy: 'returnPolicy',
   postalCode: 'postalCode',
   locationCode: 'locationCode',
+  sourceEbayItemId: 'sourceEbayItemId',
+  sourceEbayAccountId: 'sourceEbayAccountId',
+  capturedAt: 'capturedAt',
+  capturedPayload: 'capturedPayload',
   status: 'status',
   stage: 'stage',
   aiAnalysis: 'aiAnalysis',
@@ -483,6 +487,18 @@ exports.Prisma.ListingTemplateScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.StorageLocationScalarFieldEnum = {
+  id: 'id',
+  code: 'code',
+  row: 'row',
+  shelf: 'shelf',
+  label: 'label',
+  notes: 'notes',
+  active: 'active',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -608,7 +624,8 @@ exports.Prisma.ModelName = {
   ItemComp: 'ItemComp',
   Collection: 'Collection',
   CollectionComp: 'CollectionComp',
-  ListingTemplate: 'ListingTemplate'
+  ListingTemplate: 'ListingTemplate',
+  StorageLocation: 'StorageLocation'
 };
 
 /**

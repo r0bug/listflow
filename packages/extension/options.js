@@ -12,7 +12,9 @@ document.getElementById('save').addEventListener('click', async () => {
   const apiKey = document.getElementById('apiKey').value.trim();
   const baseUrl = document.getElementById('baseUrl').value.trim().replace(/\/$/, '');
   const webUrl = document.getElementById('webUrl').value.trim().replace(/\/$/, '');
-  await chrome.storage.sync.set({ apiKey, baseUrl, webUrl });
+  // apiKey is profile-local; only the URLs are safe to sync across profiles.
+  await chrome.storage.local.set({ apiKey });
+  await chrome.storage.sync.set({ baseUrl, webUrl });
   try {
     const res = await fetch(`${baseUrl}/api/v1/health`);
     if (res.ok) {

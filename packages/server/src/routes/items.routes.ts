@@ -14,6 +14,12 @@ import { sha256File } from '../util/sha256.js';
 import { perceptualHash } from '../util/perceptualHash.js';
 import { logger } from '../util/logger.js';
 import { qstr, pstr } from '../util/req.js';
+import {
+  InvalidLocationCode,
+  normalizeLocationCode,
+  requireActiveLocation,
+} from '../services/location.service.js';
+import { ensureItemSku, composeCustomLabel } from '../services/sku.service.js';
 import type { Prisma } from '../generated/prisma/index.js';
 
 const router = Router();
@@ -96,7 +102,14 @@ const ItemPatchSchema = z.object({
   stage: z.enum(ItemStages).optional(),
   ebayItemId: z.string().optional(),
   ebayListingUrl: z.string().optional(),
-  locationCode: z.string().max(20).nullable().optional(),
+  // Validated, not free text — the same guard as POST /:id/location. A code
+  // that reaches a Custom Label unchecked is a mis-shelved item nobody can find.
+  locationCode: z
+    .string()
+    .max(20)
+    .nullable()
+    .optional()
+    .transform((v) => (v == null || v === '' ? v : normalizeLocationCode(v))),
   consignmentGroupId: z.string().max(60).nullable().optional(),
   ebayAccountId: z.string().nullable().optional(),
 });
@@ -119,6 +132,61 @@ router.patch('/:id', staffAuth, async (req, res) => {
     data: { completeness: report as unknown as Prisma.InputJsonValue },
   });
   res.json({ ...updated, completeness: report });
+});
+
+// ── Physical location ─────────────────────────────────────────────────
+
+// POST /api/v1/items/:id/location — assign/clear the shelf.
+//
+// This is what the extension's on-page bar calls when the operator scans a
+// shelf barcode before revising a listing, so it is machine-callable. It
+// returns the composed Custom Label the caller is about to write, rather than
+// making the extension re-derive "<SKU>|<LOC>" itself — one formatter, one
+// place (Standards §6).
+const SetLocationSchema = z.object({
+  locationCode: z.string().min(1).nullable(),
+});
+
+router.post('/:id/location', staffOrMachine, async (req, res) => {
+  const parsed = SetLocationSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
+    return;
+  }
+  const itemId = pstr(req.params.id);
+  const item = await prisma.item.findUnique({ where: { id: itemId } });
+  if (!item) {
+    res.status(404).json({ error: 'Item not found' });
+    return;
+  }
+
+  try {
+    const locationCode = parsed.data.locationCode
+      ? (await requireActiveLocation(parsed.data.locationCode)).code
+      : null;
+
+    // Allocate the SKU now if the item lacks one: an item being shelved is an
+    // item about to have a Custom Label written, and the label needs both halves.
+    const sku = await ensureItemSku(item);
+    const updated = await prisma.item.update({
+      where: { id: itemId },
+      data: { locationCode },
+    });
+
+    res.json({
+      id: updated.id,
+      sku,
+      locationCode: updated.locationCode,
+      customLabel: composeCustomLabel(sku, updated.locationCode),
+      previousLocationCode: item.locationCode,
+    });
+  } catch (err) {
+    if (err instanceof InvalidLocationCode) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
 });
 
 // ── Photos ────────────────────────────────────────────────────────────

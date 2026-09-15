@@ -67,7 +67,8 @@ async function loadPinnedAccountSelect(state) {
   }
   sel.onchange = async () => {
     const opt = sel.options[sel.selectedIndex];
-    await chrome.storage.sync.set({
+    // Profile-local, NOT synced — see the storage note in background.js.
+    await chrome.storage.local.set({
       pinnedAccountId: sel.value || '',
       pinnedAccountName: sel.value ? opt.textContent : '',
     });

@@ -118,6 +118,11 @@ export type CollectionComp = $Result.DefaultSelection<Prisma.$CollectionCompPayl
  * 
  */
 export type ListingTemplate = $Result.DefaultSelection<Prisma.$ListingTemplatePayload>
+/**
+ * Model StorageLocation
+ * 
+ */
+export type StorageLocation = $Result.DefaultSelection<Prisma.$StorageLocationPayload>
 
 /**
  * Enums
@@ -596,6 +601,16 @@ export class PrismaClient<
     * ```
     */
   get listingTemplate(): Prisma.ListingTemplateDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.storageLocation`: Exposes CRUD operations for the **StorageLocation** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more StorageLocations
+    * const storageLocations = await prisma.storageLocation.findMany()
+    * ```
+    */
+  get storageLocation(): Prisma.StorageLocationDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -1056,7 +1071,8 @@ export namespace Prisma {
     ItemComp: 'ItemComp',
     Collection: 'Collection',
     CollectionComp: 'CollectionComp',
-    ListingTemplate: 'ListingTemplate'
+    ListingTemplate: 'ListingTemplate',
+    StorageLocation: 'StorageLocation'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -1075,7 +1091,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "staffUser" | "apiKey" | "machine" | "setting" | "ebayAccount" | "item" | "photo" | "photoGroup" | "ingestEvent" | "watchFolder" | "device" | "externalAnalysisBatch" | "ebayDraft" | "sale" | "soldComp" | "search" | "searchComp" | "itemComp" | "collection" | "collectionComp" | "listingTemplate"
+      modelProps: "staffUser" | "apiKey" | "machine" | "setting" | "ebayAccount" | "item" | "photo" | "photoGroup" | "ingestEvent" | "watchFolder" | "device" | "externalAnalysisBatch" | "ebayDraft" | "sale" | "soldComp" | "search" | "searchComp" | "itemComp" | "collection" | "collectionComp" | "listingTemplate" | "storageLocation"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2633,6 +2649,80 @@ export namespace Prisma {
           }
         }
       }
+      StorageLocation: {
+        payload: Prisma.$StorageLocationPayload<ExtArgs>
+        fields: Prisma.StorageLocationFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.StorageLocationFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StorageLocationPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.StorageLocationFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StorageLocationPayload>
+          }
+          findFirst: {
+            args: Prisma.StorageLocationFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StorageLocationPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.StorageLocationFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StorageLocationPayload>
+          }
+          findMany: {
+            args: Prisma.StorageLocationFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StorageLocationPayload>[]
+          }
+          create: {
+            args: Prisma.StorageLocationCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StorageLocationPayload>
+          }
+          createMany: {
+            args: Prisma.StorageLocationCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.StorageLocationCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StorageLocationPayload>[]
+          }
+          delete: {
+            args: Prisma.StorageLocationDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StorageLocationPayload>
+          }
+          update: {
+            args: Prisma.StorageLocationUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StorageLocationPayload>
+          }
+          deleteMany: {
+            args: Prisma.StorageLocationDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.StorageLocationUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.StorageLocationUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StorageLocationPayload>[]
+          }
+          upsert: {
+            args: Prisma.StorageLocationUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StorageLocationPayload>
+          }
+          aggregate: {
+            args: Prisma.StorageLocationAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateStorageLocation>
+          }
+          groupBy: {
+            args: Prisma.StorageLocationGroupByArgs<ExtArgs>
+            result: $Utils.Optional<StorageLocationGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.StorageLocationCountArgs<ExtArgs>
+            result: $Utils.Optional<StorageLocationCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -2746,6 +2836,7 @@ export namespace Prisma {
     collection?: CollectionOmit
     collectionComp?: CollectionCompOmit
     listingTemplate?: ListingTemplateOmit
+    storageLocation?: StorageLocationOmit
   }
 
   /* Types for Logging */
@@ -9017,6 +9108,9 @@ export namespace Prisma {
     listingDuration: string | null
     postalCode: string | null
     locationCode: string | null
+    sourceEbayItemId: string | null
+    sourceEbayAccountId: string | null
+    capturedAt: Date | null
     status: $Enums.ItemStatus | null
     stage: $Enums.ItemStage | null
     aiCost: Decimal | null
@@ -9056,6 +9150,9 @@ export namespace Prisma {
     listingDuration: string | null
     postalCode: string | null
     locationCode: string | null
+    sourceEbayItemId: string | null
+    sourceEbayAccountId: string | null
+    capturedAt: Date | null
     status: $Enums.ItemStatus | null
     stage: $Enums.ItemStage | null
     aiCost: Decimal | null
@@ -9100,6 +9197,10 @@ export namespace Prisma {
     returnPolicy: number
     postalCode: number
     locationCode: number
+    sourceEbayItemId: number
+    sourceEbayAccountId: number
+    capturedAt: number
+    capturedPayload: number
     status: number
     stage: number
     aiAnalysis: number
@@ -9161,6 +9262,9 @@ export namespace Prisma {
     listingDuration?: true
     postalCode?: true
     locationCode?: true
+    sourceEbayItemId?: true
+    sourceEbayAccountId?: true
+    capturedAt?: true
     status?: true
     stage?: true
     aiCost?: true
@@ -9200,6 +9304,9 @@ export namespace Prisma {
     listingDuration?: true
     postalCode?: true
     locationCode?: true
+    sourceEbayItemId?: true
+    sourceEbayAccountId?: true
+    capturedAt?: true
     status?: true
     stage?: true
     aiCost?: true
@@ -9244,6 +9351,10 @@ export namespace Prisma {
     returnPolicy?: true
     postalCode?: true
     locationCode?: true
+    sourceEbayItemId?: true
+    sourceEbayAccountId?: true
+    capturedAt?: true
+    capturedPayload?: true
     status?: true
     stage?: true
     aiAnalysis?: true
@@ -9377,6 +9488,10 @@ export namespace Prisma {
     returnPolicy: JsonValue | null
     postalCode: string | null
     locationCode: string | null
+    sourceEbayItemId: string | null
+    sourceEbayAccountId: string | null
+    capturedAt: Date | null
+    capturedPayload: JsonValue | null
     status: $Enums.ItemStatus
     stage: $Enums.ItemStage
     aiAnalysis: JsonValue | null
@@ -9442,6 +9557,10 @@ export namespace Prisma {
     returnPolicy?: boolean
     postalCode?: boolean
     locationCode?: boolean
+    sourceEbayItemId?: boolean
+    sourceEbayAccountId?: boolean
+    capturedAt?: boolean
+    capturedPayload?: boolean
     status?: boolean
     stage?: boolean
     aiAnalysis?: boolean
@@ -9498,6 +9617,10 @@ export namespace Prisma {
     returnPolicy?: boolean
     postalCode?: boolean
     locationCode?: boolean
+    sourceEbayItemId?: boolean
+    sourceEbayAccountId?: boolean
+    capturedAt?: boolean
+    capturedPayload?: boolean
     status?: boolean
     stage?: boolean
     aiAnalysis?: boolean
@@ -9547,6 +9670,10 @@ export namespace Prisma {
     returnPolicy?: boolean
     postalCode?: boolean
     locationCode?: boolean
+    sourceEbayItemId?: boolean
+    sourceEbayAccountId?: boolean
+    capturedAt?: boolean
+    capturedPayload?: boolean
     status?: boolean
     stage?: boolean
     aiAnalysis?: boolean
@@ -9596,6 +9723,10 @@ export namespace Prisma {
     returnPolicy?: boolean
     postalCode?: boolean
     locationCode?: boolean
+    sourceEbayItemId?: boolean
+    sourceEbayAccountId?: boolean
+    capturedAt?: boolean
+    capturedPayload?: boolean
     status?: boolean
     stage?: boolean
     aiAnalysis?: boolean
@@ -9614,7 +9745,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type ItemOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "sku" | "title" | "description" | "brand" | "model" | "category" | "ebayCategoryId" | "condition" | "conditionId" | "features" | "keywords" | "itemSpecifics" | "upc" | "isbn" | "mpn" | "epid" | "startingPrice" | "buyNowPrice" | "shippingPrice" | "weightOz" | "packageDimensions" | "listingFormat" | "listingDuration" | "returnPolicy" | "postalCode" | "locationCode" | "status" | "stage" | "aiAnalysis" | "aiCost" | "completeness" | "sourceFolder" | "fingerprint" | "ebayItemId" | "ebayListingUrl" | "publishedAt" | "createdById" | "ebayAccountId" | "consignmentGroupId" | "templateId" | "createdAt" | "updatedAt", ExtArgs["result"]["item"]>
+  export type ItemOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "sku" | "title" | "description" | "brand" | "model" | "category" | "ebayCategoryId" | "condition" | "conditionId" | "features" | "keywords" | "itemSpecifics" | "upc" | "isbn" | "mpn" | "epid" | "startingPrice" | "buyNowPrice" | "shippingPrice" | "weightOz" | "packageDimensions" | "listingFormat" | "listingDuration" | "returnPolicy" | "postalCode" | "locationCode" | "sourceEbayItemId" | "sourceEbayAccountId" | "capturedAt" | "capturedPayload" | "status" | "stage" | "aiAnalysis" | "aiCost" | "completeness" | "sourceFolder" | "fingerprint" | "ebayItemId" | "ebayListingUrl" | "publishedAt" | "createdById" | "ebayAccountId" | "consignmentGroupId" | "templateId" | "createdAt" | "updatedAt", ExtArgs["result"]["item"]>
   export type ItemInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     createdBy?: boolean | Item$createdByArgs<ExtArgs>
     ebayAccount?: boolean | Item$ebayAccountArgs<ExtArgs>
@@ -9679,6 +9810,10 @@ export namespace Prisma {
       returnPolicy: Prisma.JsonValue | null
       postalCode: string | null
       locationCode: string | null
+      sourceEbayItemId: string | null
+      sourceEbayAccountId: string | null
+      capturedAt: Date | null
+      capturedPayload: Prisma.JsonValue | null
       status: $Enums.ItemStatus
       stage: $Enums.ItemStage
       aiAnalysis: Prisma.JsonValue | null
@@ -10154,6 +10289,10 @@ export namespace Prisma {
     readonly returnPolicy: FieldRef<"Item", 'Json'>
     readonly postalCode: FieldRef<"Item", 'String'>
     readonly locationCode: FieldRef<"Item", 'String'>
+    readonly sourceEbayItemId: FieldRef<"Item", 'String'>
+    readonly sourceEbayAccountId: FieldRef<"Item", 'String'>
+    readonly capturedAt: FieldRef<"Item", 'DateTime'>
+    readonly capturedPayload: FieldRef<"Item", 'Json'>
     readonly status: FieldRef<"Item", 'ItemStatus'>
     readonly stage: FieldRef<"Item", 'ItemStage'>
     readonly aiAnalysis: FieldRef<"Item", 'Json'>
@@ -29150,6 +29289,1091 @@ export namespace Prisma {
 
 
   /**
+   * Model StorageLocation
+   */
+
+  export type AggregateStorageLocation = {
+    _count: StorageLocationCountAggregateOutputType | null
+    _avg: StorageLocationAvgAggregateOutputType | null
+    _sum: StorageLocationSumAggregateOutputType | null
+    _min: StorageLocationMinAggregateOutputType | null
+    _max: StorageLocationMaxAggregateOutputType | null
+  }
+
+  export type StorageLocationAvgAggregateOutputType = {
+    row: number | null
+    shelf: number | null
+  }
+
+  export type StorageLocationSumAggregateOutputType = {
+    row: number | null
+    shelf: number | null
+  }
+
+  export type StorageLocationMinAggregateOutputType = {
+    id: string | null
+    code: string | null
+    row: number | null
+    shelf: number | null
+    label: string | null
+    notes: string | null
+    active: boolean | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type StorageLocationMaxAggregateOutputType = {
+    id: string | null
+    code: string | null
+    row: number | null
+    shelf: number | null
+    label: string | null
+    notes: string | null
+    active: boolean | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type StorageLocationCountAggregateOutputType = {
+    id: number
+    code: number
+    row: number
+    shelf: number
+    label: number
+    notes: number
+    active: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type StorageLocationAvgAggregateInputType = {
+    row?: true
+    shelf?: true
+  }
+
+  export type StorageLocationSumAggregateInputType = {
+    row?: true
+    shelf?: true
+  }
+
+  export type StorageLocationMinAggregateInputType = {
+    id?: true
+    code?: true
+    row?: true
+    shelf?: true
+    label?: true
+    notes?: true
+    active?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type StorageLocationMaxAggregateInputType = {
+    id?: true
+    code?: true
+    row?: true
+    shelf?: true
+    label?: true
+    notes?: true
+    active?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type StorageLocationCountAggregateInputType = {
+    id?: true
+    code?: true
+    row?: true
+    shelf?: true
+    label?: true
+    notes?: true
+    active?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type StorageLocationAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which StorageLocation to aggregate.
+     */
+    where?: StorageLocationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StorageLocations to fetch.
+     */
+    orderBy?: StorageLocationOrderByWithRelationInput | StorageLocationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: StorageLocationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StorageLocations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StorageLocations.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned StorageLocations
+    **/
+    _count?: true | StorageLocationCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: StorageLocationAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: StorageLocationSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: StorageLocationMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: StorageLocationMaxAggregateInputType
+  }
+
+  export type GetStorageLocationAggregateType<T extends StorageLocationAggregateArgs> = {
+        [P in keyof T & keyof AggregateStorageLocation]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateStorageLocation[P]>
+      : GetScalarType<T[P], AggregateStorageLocation[P]>
+  }
+
+
+
+
+  export type StorageLocationGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: StorageLocationWhereInput
+    orderBy?: StorageLocationOrderByWithAggregationInput | StorageLocationOrderByWithAggregationInput[]
+    by: StorageLocationScalarFieldEnum[] | StorageLocationScalarFieldEnum
+    having?: StorageLocationScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: StorageLocationCountAggregateInputType | true
+    _avg?: StorageLocationAvgAggregateInputType
+    _sum?: StorageLocationSumAggregateInputType
+    _min?: StorageLocationMinAggregateInputType
+    _max?: StorageLocationMaxAggregateInputType
+  }
+
+  export type StorageLocationGroupByOutputType = {
+    id: string
+    code: string
+    row: number
+    shelf: number
+    label: string | null
+    notes: string | null
+    active: boolean
+    createdAt: Date
+    updatedAt: Date
+    _count: StorageLocationCountAggregateOutputType | null
+    _avg: StorageLocationAvgAggregateOutputType | null
+    _sum: StorageLocationSumAggregateOutputType | null
+    _min: StorageLocationMinAggregateOutputType | null
+    _max: StorageLocationMaxAggregateOutputType | null
+  }
+
+  type GetStorageLocationGroupByPayload<T extends StorageLocationGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<StorageLocationGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof StorageLocationGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], StorageLocationGroupByOutputType[P]>
+            : GetScalarType<T[P], StorageLocationGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type StorageLocationSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    code?: boolean
+    row?: boolean
+    shelf?: boolean
+    label?: boolean
+    notes?: boolean
+    active?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["storageLocation"]>
+
+  export type StorageLocationSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    code?: boolean
+    row?: boolean
+    shelf?: boolean
+    label?: boolean
+    notes?: boolean
+    active?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["storageLocation"]>
+
+  export type StorageLocationSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    code?: boolean
+    row?: boolean
+    shelf?: boolean
+    label?: boolean
+    notes?: boolean
+    active?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["storageLocation"]>
+
+  export type StorageLocationSelectScalar = {
+    id?: boolean
+    code?: boolean
+    row?: boolean
+    shelf?: boolean
+    label?: boolean
+    notes?: boolean
+    active?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type StorageLocationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "code" | "row" | "shelf" | "label" | "notes" | "active" | "createdAt" | "updatedAt", ExtArgs["result"]["storageLocation"]>
+
+  export type $StorageLocationPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "StorageLocation"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      code: string
+      row: number
+      shelf: number
+      label: string | null
+      notes: string | null
+      active: boolean
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["storageLocation"]>
+    composites: {}
+  }
+
+  type StorageLocationGetPayload<S extends boolean | null | undefined | StorageLocationDefaultArgs> = $Result.GetResult<Prisma.$StorageLocationPayload, S>
+
+  type StorageLocationCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<StorageLocationFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: StorageLocationCountAggregateInputType | true
+    }
+
+  export interface StorageLocationDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['StorageLocation'], meta: { name: 'StorageLocation' } }
+    /**
+     * Find zero or one StorageLocation that matches the filter.
+     * @param {StorageLocationFindUniqueArgs} args - Arguments to find a StorageLocation
+     * @example
+     * // Get one StorageLocation
+     * const storageLocation = await prisma.storageLocation.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends StorageLocationFindUniqueArgs>(args: SelectSubset<T, StorageLocationFindUniqueArgs<ExtArgs>>): Prisma__StorageLocationClient<$Result.GetResult<Prisma.$StorageLocationPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one StorageLocation that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {StorageLocationFindUniqueOrThrowArgs} args - Arguments to find a StorageLocation
+     * @example
+     * // Get one StorageLocation
+     * const storageLocation = await prisma.storageLocation.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends StorageLocationFindUniqueOrThrowArgs>(args: SelectSubset<T, StorageLocationFindUniqueOrThrowArgs<ExtArgs>>): Prisma__StorageLocationClient<$Result.GetResult<Prisma.$StorageLocationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first StorageLocation that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StorageLocationFindFirstArgs} args - Arguments to find a StorageLocation
+     * @example
+     * // Get one StorageLocation
+     * const storageLocation = await prisma.storageLocation.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends StorageLocationFindFirstArgs>(args?: SelectSubset<T, StorageLocationFindFirstArgs<ExtArgs>>): Prisma__StorageLocationClient<$Result.GetResult<Prisma.$StorageLocationPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first StorageLocation that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StorageLocationFindFirstOrThrowArgs} args - Arguments to find a StorageLocation
+     * @example
+     * // Get one StorageLocation
+     * const storageLocation = await prisma.storageLocation.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends StorageLocationFindFirstOrThrowArgs>(args?: SelectSubset<T, StorageLocationFindFirstOrThrowArgs<ExtArgs>>): Prisma__StorageLocationClient<$Result.GetResult<Prisma.$StorageLocationPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more StorageLocations that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StorageLocationFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all StorageLocations
+     * const storageLocations = await prisma.storageLocation.findMany()
+     * 
+     * // Get first 10 StorageLocations
+     * const storageLocations = await prisma.storageLocation.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const storageLocationWithIdOnly = await prisma.storageLocation.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends StorageLocationFindManyArgs>(args?: SelectSubset<T, StorageLocationFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StorageLocationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a StorageLocation.
+     * @param {StorageLocationCreateArgs} args - Arguments to create a StorageLocation.
+     * @example
+     * // Create one StorageLocation
+     * const StorageLocation = await prisma.storageLocation.create({
+     *   data: {
+     *     // ... data to create a StorageLocation
+     *   }
+     * })
+     * 
+     */
+    create<T extends StorageLocationCreateArgs>(args: SelectSubset<T, StorageLocationCreateArgs<ExtArgs>>): Prisma__StorageLocationClient<$Result.GetResult<Prisma.$StorageLocationPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many StorageLocations.
+     * @param {StorageLocationCreateManyArgs} args - Arguments to create many StorageLocations.
+     * @example
+     * // Create many StorageLocations
+     * const storageLocation = await prisma.storageLocation.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends StorageLocationCreateManyArgs>(args?: SelectSubset<T, StorageLocationCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many StorageLocations and returns the data saved in the database.
+     * @param {StorageLocationCreateManyAndReturnArgs} args - Arguments to create many StorageLocations.
+     * @example
+     * // Create many StorageLocations
+     * const storageLocation = await prisma.storageLocation.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many StorageLocations and only return the `id`
+     * const storageLocationWithIdOnly = await prisma.storageLocation.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends StorageLocationCreateManyAndReturnArgs>(args?: SelectSubset<T, StorageLocationCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StorageLocationPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a StorageLocation.
+     * @param {StorageLocationDeleteArgs} args - Arguments to delete one StorageLocation.
+     * @example
+     * // Delete one StorageLocation
+     * const StorageLocation = await prisma.storageLocation.delete({
+     *   where: {
+     *     // ... filter to delete one StorageLocation
+     *   }
+     * })
+     * 
+     */
+    delete<T extends StorageLocationDeleteArgs>(args: SelectSubset<T, StorageLocationDeleteArgs<ExtArgs>>): Prisma__StorageLocationClient<$Result.GetResult<Prisma.$StorageLocationPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one StorageLocation.
+     * @param {StorageLocationUpdateArgs} args - Arguments to update one StorageLocation.
+     * @example
+     * // Update one StorageLocation
+     * const storageLocation = await prisma.storageLocation.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends StorageLocationUpdateArgs>(args: SelectSubset<T, StorageLocationUpdateArgs<ExtArgs>>): Prisma__StorageLocationClient<$Result.GetResult<Prisma.$StorageLocationPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more StorageLocations.
+     * @param {StorageLocationDeleteManyArgs} args - Arguments to filter StorageLocations to delete.
+     * @example
+     * // Delete a few StorageLocations
+     * const { count } = await prisma.storageLocation.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends StorageLocationDeleteManyArgs>(args?: SelectSubset<T, StorageLocationDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more StorageLocations.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StorageLocationUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many StorageLocations
+     * const storageLocation = await prisma.storageLocation.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends StorageLocationUpdateManyArgs>(args: SelectSubset<T, StorageLocationUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more StorageLocations and returns the data updated in the database.
+     * @param {StorageLocationUpdateManyAndReturnArgs} args - Arguments to update many StorageLocations.
+     * @example
+     * // Update many StorageLocations
+     * const storageLocation = await prisma.storageLocation.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more StorageLocations and only return the `id`
+     * const storageLocationWithIdOnly = await prisma.storageLocation.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends StorageLocationUpdateManyAndReturnArgs>(args: SelectSubset<T, StorageLocationUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StorageLocationPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one StorageLocation.
+     * @param {StorageLocationUpsertArgs} args - Arguments to update or create a StorageLocation.
+     * @example
+     * // Update or create a StorageLocation
+     * const storageLocation = await prisma.storageLocation.upsert({
+     *   create: {
+     *     // ... data to create a StorageLocation
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the StorageLocation we want to update
+     *   }
+     * })
+     */
+    upsert<T extends StorageLocationUpsertArgs>(args: SelectSubset<T, StorageLocationUpsertArgs<ExtArgs>>): Prisma__StorageLocationClient<$Result.GetResult<Prisma.$StorageLocationPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of StorageLocations.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StorageLocationCountArgs} args - Arguments to filter StorageLocations to count.
+     * @example
+     * // Count the number of StorageLocations
+     * const count = await prisma.storageLocation.count({
+     *   where: {
+     *     // ... the filter for the StorageLocations we want to count
+     *   }
+     * })
+    **/
+    count<T extends StorageLocationCountArgs>(
+      args?: Subset<T, StorageLocationCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], StorageLocationCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a StorageLocation.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StorageLocationAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends StorageLocationAggregateArgs>(args: Subset<T, StorageLocationAggregateArgs>): Prisma.PrismaPromise<GetStorageLocationAggregateType<T>>
+
+    /**
+     * Group by StorageLocation.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StorageLocationGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends StorageLocationGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: StorageLocationGroupByArgs['orderBy'] }
+        : { orderBy?: StorageLocationGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, StorageLocationGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetStorageLocationGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the StorageLocation model
+   */
+  readonly fields: StorageLocationFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for StorageLocation.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__StorageLocationClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the StorageLocation model
+   */
+  interface StorageLocationFieldRefs {
+    readonly id: FieldRef<"StorageLocation", 'String'>
+    readonly code: FieldRef<"StorageLocation", 'String'>
+    readonly row: FieldRef<"StorageLocation", 'Int'>
+    readonly shelf: FieldRef<"StorageLocation", 'Int'>
+    readonly label: FieldRef<"StorageLocation", 'String'>
+    readonly notes: FieldRef<"StorageLocation", 'String'>
+    readonly active: FieldRef<"StorageLocation", 'Boolean'>
+    readonly createdAt: FieldRef<"StorageLocation", 'DateTime'>
+    readonly updatedAt: FieldRef<"StorageLocation", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * StorageLocation findUnique
+   */
+  export type StorageLocationFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StorageLocation
+     */
+    select?: StorageLocationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StorageLocation
+     */
+    omit?: StorageLocationOmit<ExtArgs> | null
+    /**
+     * Filter, which StorageLocation to fetch.
+     */
+    where: StorageLocationWhereUniqueInput
+  }
+
+  /**
+   * StorageLocation findUniqueOrThrow
+   */
+  export type StorageLocationFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StorageLocation
+     */
+    select?: StorageLocationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StorageLocation
+     */
+    omit?: StorageLocationOmit<ExtArgs> | null
+    /**
+     * Filter, which StorageLocation to fetch.
+     */
+    where: StorageLocationWhereUniqueInput
+  }
+
+  /**
+   * StorageLocation findFirst
+   */
+  export type StorageLocationFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StorageLocation
+     */
+    select?: StorageLocationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StorageLocation
+     */
+    omit?: StorageLocationOmit<ExtArgs> | null
+    /**
+     * Filter, which StorageLocation to fetch.
+     */
+    where?: StorageLocationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StorageLocations to fetch.
+     */
+    orderBy?: StorageLocationOrderByWithRelationInput | StorageLocationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for StorageLocations.
+     */
+    cursor?: StorageLocationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StorageLocations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StorageLocations.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of StorageLocations.
+     */
+    distinct?: StorageLocationScalarFieldEnum | StorageLocationScalarFieldEnum[]
+  }
+
+  /**
+   * StorageLocation findFirstOrThrow
+   */
+  export type StorageLocationFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StorageLocation
+     */
+    select?: StorageLocationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StorageLocation
+     */
+    omit?: StorageLocationOmit<ExtArgs> | null
+    /**
+     * Filter, which StorageLocation to fetch.
+     */
+    where?: StorageLocationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StorageLocations to fetch.
+     */
+    orderBy?: StorageLocationOrderByWithRelationInput | StorageLocationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for StorageLocations.
+     */
+    cursor?: StorageLocationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StorageLocations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StorageLocations.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of StorageLocations.
+     */
+    distinct?: StorageLocationScalarFieldEnum | StorageLocationScalarFieldEnum[]
+  }
+
+  /**
+   * StorageLocation findMany
+   */
+  export type StorageLocationFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StorageLocation
+     */
+    select?: StorageLocationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StorageLocation
+     */
+    omit?: StorageLocationOmit<ExtArgs> | null
+    /**
+     * Filter, which StorageLocations to fetch.
+     */
+    where?: StorageLocationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StorageLocations to fetch.
+     */
+    orderBy?: StorageLocationOrderByWithRelationInput | StorageLocationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing StorageLocations.
+     */
+    cursor?: StorageLocationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StorageLocations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StorageLocations.
+     */
+    skip?: number
+    distinct?: StorageLocationScalarFieldEnum | StorageLocationScalarFieldEnum[]
+  }
+
+  /**
+   * StorageLocation create
+   */
+  export type StorageLocationCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StorageLocation
+     */
+    select?: StorageLocationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StorageLocation
+     */
+    omit?: StorageLocationOmit<ExtArgs> | null
+    /**
+     * The data needed to create a StorageLocation.
+     */
+    data: XOR<StorageLocationCreateInput, StorageLocationUncheckedCreateInput>
+  }
+
+  /**
+   * StorageLocation createMany
+   */
+  export type StorageLocationCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many StorageLocations.
+     */
+    data: StorageLocationCreateManyInput | StorageLocationCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * StorageLocation createManyAndReturn
+   */
+  export type StorageLocationCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StorageLocation
+     */
+    select?: StorageLocationSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the StorageLocation
+     */
+    omit?: StorageLocationOmit<ExtArgs> | null
+    /**
+     * The data used to create many StorageLocations.
+     */
+    data: StorageLocationCreateManyInput | StorageLocationCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * StorageLocation update
+   */
+  export type StorageLocationUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StorageLocation
+     */
+    select?: StorageLocationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StorageLocation
+     */
+    omit?: StorageLocationOmit<ExtArgs> | null
+    /**
+     * The data needed to update a StorageLocation.
+     */
+    data: XOR<StorageLocationUpdateInput, StorageLocationUncheckedUpdateInput>
+    /**
+     * Choose, which StorageLocation to update.
+     */
+    where: StorageLocationWhereUniqueInput
+  }
+
+  /**
+   * StorageLocation updateMany
+   */
+  export type StorageLocationUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update StorageLocations.
+     */
+    data: XOR<StorageLocationUpdateManyMutationInput, StorageLocationUncheckedUpdateManyInput>
+    /**
+     * Filter which StorageLocations to update
+     */
+    where?: StorageLocationWhereInput
+    /**
+     * Limit how many StorageLocations to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * StorageLocation updateManyAndReturn
+   */
+  export type StorageLocationUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StorageLocation
+     */
+    select?: StorageLocationSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the StorageLocation
+     */
+    omit?: StorageLocationOmit<ExtArgs> | null
+    /**
+     * The data used to update StorageLocations.
+     */
+    data: XOR<StorageLocationUpdateManyMutationInput, StorageLocationUncheckedUpdateManyInput>
+    /**
+     * Filter which StorageLocations to update
+     */
+    where?: StorageLocationWhereInput
+    /**
+     * Limit how many StorageLocations to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * StorageLocation upsert
+   */
+  export type StorageLocationUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StorageLocation
+     */
+    select?: StorageLocationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StorageLocation
+     */
+    omit?: StorageLocationOmit<ExtArgs> | null
+    /**
+     * The filter to search for the StorageLocation to update in case it exists.
+     */
+    where: StorageLocationWhereUniqueInput
+    /**
+     * In case the StorageLocation found by the `where` argument doesn't exist, create a new StorageLocation with this data.
+     */
+    create: XOR<StorageLocationCreateInput, StorageLocationUncheckedCreateInput>
+    /**
+     * In case the StorageLocation was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<StorageLocationUpdateInput, StorageLocationUncheckedUpdateInput>
+  }
+
+  /**
+   * StorageLocation delete
+   */
+  export type StorageLocationDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StorageLocation
+     */
+    select?: StorageLocationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StorageLocation
+     */
+    omit?: StorageLocationOmit<ExtArgs> | null
+    /**
+     * Filter which StorageLocation to delete.
+     */
+    where: StorageLocationWhereUniqueInput
+  }
+
+  /**
+   * StorageLocation deleteMany
+   */
+  export type StorageLocationDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which StorageLocations to delete
+     */
+    where?: StorageLocationWhereInput
+    /**
+     * Limit how many StorageLocations to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * StorageLocation without action
+   */
+  export type StorageLocationDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StorageLocation
+     */
+    select?: StorageLocationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StorageLocation
+     */
+    omit?: StorageLocationOmit<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -29263,6 +30487,10 @@ export namespace Prisma {
     returnPolicy: 'returnPolicy',
     postalCode: 'postalCode',
     locationCode: 'locationCode',
+    sourceEbayItemId: 'sourceEbayItemId',
+    sourceEbayAccountId: 'sourceEbayAccountId',
+    capturedAt: 'capturedAt',
+    capturedPayload: 'capturedPayload',
     status: 'status',
     stage: 'stage',
     aiAnalysis: 'aiAnalysis',
@@ -29587,6 +30815,21 @@ export namespace Prisma {
   };
 
   export type ListingTemplateScalarFieldEnum = (typeof ListingTemplateScalarFieldEnum)[keyof typeof ListingTemplateScalarFieldEnum]
+
+
+  export const StorageLocationScalarFieldEnum: {
+    id: 'id',
+    code: 'code',
+    row: 'row',
+    shelf: 'shelf',
+    label: 'label',
+    notes: 'notes',
+    active: 'active',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type StorageLocationScalarFieldEnum = (typeof StorageLocationScalarFieldEnum)[keyof typeof StorageLocationScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -30287,6 +31530,10 @@ export namespace Prisma {
     returnPolicy?: JsonNullableFilter<"Item">
     postalCode?: StringNullableFilter<"Item"> | string | null
     locationCode?: StringNullableFilter<"Item"> | string | null
+    sourceEbayItemId?: StringNullableFilter<"Item"> | string | null
+    sourceEbayAccountId?: StringNullableFilter<"Item"> | string | null
+    capturedAt?: DateTimeNullableFilter<"Item"> | Date | string | null
+    capturedPayload?: JsonNullableFilter<"Item">
     status?: EnumItemStatusFilter<"Item"> | $Enums.ItemStatus
     stage?: EnumItemStageFilter<"Item"> | $Enums.ItemStage
     aiAnalysis?: JsonNullableFilter<"Item">
@@ -30342,6 +31589,10 @@ export namespace Prisma {
     returnPolicy?: SortOrderInput | SortOrder
     postalCode?: SortOrderInput | SortOrder
     locationCode?: SortOrderInput | SortOrder
+    sourceEbayItemId?: SortOrderInput | SortOrder
+    sourceEbayAccountId?: SortOrderInput | SortOrder
+    capturedAt?: SortOrderInput | SortOrder
+    capturedPayload?: SortOrderInput | SortOrder
     status?: SortOrder
     stage?: SortOrder
     aiAnalysis?: SortOrderInput | SortOrder
@@ -30401,6 +31652,10 @@ export namespace Prisma {
     returnPolicy?: JsonNullableFilter<"Item">
     postalCode?: StringNullableFilter<"Item"> | string | null
     locationCode?: StringNullableFilter<"Item"> | string | null
+    sourceEbayItemId?: StringNullableFilter<"Item"> | string | null
+    sourceEbayAccountId?: StringNullableFilter<"Item"> | string | null
+    capturedAt?: DateTimeNullableFilter<"Item"> | Date | string | null
+    capturedPayload?: JsonNullableFilter<"Item">
     status?: EnumItemStatusFilter<"Item"> | $Enums.ItemStatus
     stage?: EnumItemStageFilter<"Item"> | $Enums.ItemStage
     aiAnalysis?: JsonNullableFilter<"Item">
@@ -30455,6 +31710,10 @@ export namespace Prisma {
     returnPolicy?: SortOrderInput | SortOrder
     postalCode?: SortOrderInput | SortOrder
     locationCode?: SortOrderInput | SortOrder
+    sourceEbayItemId?: SortOrderInput | SortOrder
+    sourceEbayAccountId?: SortOrderInput | SortOrder
+    capturedAt?: SortOrderInput | SortOrder
+    capturedPayload?: SortOrderInput | SortOrder
     status?: SortOrder
     stage?: SortOrder
     aiAnalysis?: SortOrderInput | SortOrder
@@ -30509,6 +31768,10 @@ export namespace Prisma {
     returnPolicy?: JsonNullableWithAggregatesFilter<"Item">
     postalCode?: StringNullableWithAggregatesFilter<"Item"> | string | null
     locationCode?: StringNullableWithAggregatesFilter<"Item"> | string | null
+    sourceEbayItemId?: StringNullableWithAggregatesFilter<"Item"> | string | null
+    sourceEbayAccountId?: StringNullableWithAggregatesFilter<"Item"> | string | null
+    capturedAt?: DateTimeNullableWithAggregatesFilter<"Item"> | Date | string | null
+    capturedPayload?: JsonNullableWithAggregatesFilter<"Item">
     status?: EnumItemStatusWithAggregatesFilter<"Item"> | $Enums.ItemStatus
     stage?: EnumItemStageWithAggregatesFilter<"Item"> | $Enums.ItemStage
     aiAnalysis?: JsonNullableWithAggregatesFilter<"Item">
@@ -32112,6 +33375,80 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"ListingTemplate"> | Date | string
   }
 
+  export type StorageLocationWhereInput = {
+    AND?: StorageLocationWhereInput | StorageLocationWhereInput[]
+    OR?: StorageLocationWhereInput[]
+    NOT?: StorageLocationWhereInput | StorageLocationWhereInput[]
+    id?: StringFilter<"StorageLocation"> | string
+    code?: StringFilter<"StorageLocation"> | string
+    row?: IntFilter<"StorageLocation"> | number
+    shelf?: IntFilter<"StorageLocation"> | number
+    label?: StringNullableFilter<"StorageLocation"> | string | null
+    notes?: StringNullableFilter<"StorageLocation"> | string | null
+    active?: BoolFilter<"StorageLocation"> | boolean
+    createdAt?: DateTimeFilter<"StorageLocation"> | Date | string
+    updatedAt?: DateTimeFilter<"StorageLocation"> | Date | string
+  }
+
+  export type StorageLocationOrderByWithRelationInput = {
+    id?: SortOrder
+    code?: SortOrder
+    row?: SortOrder
+    shelf?: SortOrder
+    label?: SortOrderInput | SortOrder
+    notes?: SortOrderInput | SortOrder
+    active?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StorageLocationWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    code?: string
+    AND?: StorageLocationWhereInput | StorageLocationWhereInput[]
+    OR?: StorageLocationWhereInput[]
+    NOT?: StorageLocationWhereInput | StorageLocationWhereInput[]
+    row?: IntFilter<"StorageLocation"> | number
+    shelf?: IntFilter<"StorageLocation"> | number
+    label?: StringNullableFilter<"StorageLocation"> | string | null
+    notes?: StringNullableFilter<"StorageLocation"> | string | null
+    active?: BoolFilter<"StorageLocation"> | boolean
+    createdAt?: DateTimeFilter<"StorageLocation"> | Date | string
+    updatedAt?: DateTimeFilter<"StorageLocation"> | Date | string
+  }, "id" | "code">
+
+  export type StorageLocationOrderByWithAggregationInput = {
+    id?: SortOrder
+    code?: SortOrder
+    row?: SortOrder
+    shelf?: SortOrder
+    label?: SortOrderInput | SortOrder
+    notes?: SortOrderInput | SortOrder
+    active?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: StorageLocationCountOrderByAggregateInput
+    _avg?: StorageLocationAvgOrderByAggregateInput
+    _max?: StorageLocationMaxOrderByAggregateInput
+    _min?: StorageLocationMinOrderByAggregateInput
+    _sum?: StorageLocationSumOrderByAggregateInput
+  }
+
+  export type StorageLocationScalarWhereWithAggregatesInput = {
+    AND?: StorageLocationScalarWhereWithAggregatesInput | StorageLocationScalarWhereWithAggregatesInput[]
+    OR?: StorageLocationScalarWhereWithAggregatesInput[]
+    NOT?: StorageLocationScalarWhereWithAggregatesInput | StorageLocationScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"StorageLocation"> | string
+    code?: StringWithAggregatesFilter<"StorageLocation"> | string
+    row?: IntWithAggregatesFilter<"StorageLocation"> | number
+    shelf?: IntWithAggregatesFilter<"StorageLocation"> | number
+    label?: StringNullableWithAggregatesFilter<"StorageLocation"> | string | null
+    notes?: StringNullableWithAggregatesFilter<"StorageLocation"> | string | null
+    active?: BoolWithAggregatesFilter<"StorageLocation"> | boolean
+    createdAt?: DateTimeWithAggregatesFilter<"StorageLocation"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"StorageLocation"> | Date | string
+  }
+
   export type StaffUserCreateInput = {
     id?: string
     teamtimeUserId?: string | null
@@ -32578,6 +33915,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -32630,6 +33971,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -32682,6 +34027,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -32734,6 +34083,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -32786,6 +34139,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -32832,6 +34189,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -32875,6 +34236,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -34717,6 +36082,90 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type StorageLocationCreateInput = {
+    id?: string
+    code: string
+    row: number
+    shelf: number
+    label?: string | null
+    notes?: string | null
+    active?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type StorageLocationUncheckedCreateInput = {
+    id?: string
+    code: string
+    row: number
+    shelf: number
+    label?: string | null
+    notes?: string | null
+    active?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type StorageLocationUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    code?: StringFieldUpdateOperationsInput | string
+    row?: IntFieldUpdateOperationsInput | number
+    shelf?: IntFieldUpdateOperationsInput | number
+    label?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    active?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StorageLocationUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    code?: StringFieldUpdateOperationsInput | string
+    row?: IntFieldUpdateOperationsInput | number
+    shelf?: IntFieldUpdateOperationsInput | number
+    label?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    active?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StorageLocationCreateManyInput = {
+    id?: string
+    code: string
+    row: number
+    shelf: number
+    label?: string | null
+    notes?: string | null
+    active?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type StorageLocationUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    code?: StringFieldUpdateOperationsInput | string
+    row?: IntFieldUpdateOperationsInput | number
+    shelf?: IntFieldUpdateOperationsInput | number
+    label?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    active?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StorageLocationUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    code?: StringFieldUpdateOperationsInput | string
+    row?: IntFieldUpdateOperationsInput | number
+    shelf?: IntFieldUpdateOperationsInput | number
+    label?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    active?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -35331,6 +36780,10 @@ export namespace Prisma {
     returnPolicy?: SortOrder
     postalCode?: SortOrder
     locationCode?: SortOrder
+    sourceEbayItemId?: SortOrder
+    sourceEbayAccountId?: SortOrder
+    capturedAt?: SortOrder
+    capturedPayload?: SortOrder
     status?: SortOrder
     stage?: SortOrder
     aiAnalysis?: SortOrder
@@ -35381,6 +36834,9 @@ export namespace Prisma {
     listingDuration?: SortOrder
     postalCode?: SortOrder
     locationCode?: SortOrder
+    sourceEbayItemId?: SortOrder
+    sourceEbayAccountId?: SortOrder
+    capturedAt?: SortOrder
     status?: SortOrder
     stage?: SortOrder
     aiCost?: SortOrder
@@ -35420,6 +36876,9 @@ export namespace Prisma {
     listingDuration?: SortOrder
     postalCode?: SortOrder
     locationCode?: SortOrder
+    sourceEbayItemId?: SortOrder
+    sourceEbayAccountId?: SortOrder
+    capturedAt?: SortOrder
     status?: SortOrder
     stage?: SortOrder
     aiCost?: SortOrder
@@ -36694,6 +38153,52 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumTemplateSourceTypeFilter<$PrismaModel>
     _max?: NestedEnumTemplateSourceTypeFilter<$PrismaModel>
+  }
+
+  export type StorageLocationCountOrderByAggregateInput = {
+    id?: SortOrder
+    code?: SortOrder
+    row?: SortOrder
+    shelf?: SortOrder
+    label?: SortOrder
+    notes?: SortOrder
+    active?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StorageLocationAvgOrderByAggregateInput = {
+    row?: SortOrder
+    shelf?: SortOrder
+  }
+
+  export type StorageLocationMaxOrderByAggregateInput = {
+    id?: SortOrder
+    code?: SortOrder
+    row?: SortOrder
+    shelf?: SortOrder
+    label?: SortOrder
+    notes?: SortOrder
+    active?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StorageLocationMinOrderByAggregateInput = {
+    id?: SortOrder
+    code?: SortOrder
+    row?: SortOrder
+    shelf?: SortOrder
+    label?: SortOrder
+    notes?: SortOrder
+    active?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StorageLocationSumOrderByAggregateInput = {
+    row?: SortOrder
+    shelf?: SortOrder
   }
 
   export type ItemCreateNestedManyWithoutCreatedByInput = {
@@ -38723,6 +40228,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -38774,6 +40283,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -39078,6 +40591,10 @@ export namespace Prisma {
     returnPolicy?: JsonNullableFilter<"Item">
     postalCode?: StringNullableFilter<"Item"> | string | null
     locationCode?: StringNullableFilter<"Item"> | string | null
+    sourceEbayItemId?: StringNullableFilter<"Item"> | string | null
+    sourceEbayAccountId?: StringNullableFilter<"Item"> | string | null
+    capturedAt?: DateTimeNullableFilter<"Item"> | Date | string | null
+    capturedPayload?: JsonNullableFilter<"Item">
     status?: EnumItemStatusFilter<"Item"> | $Enums.ItemStatus
     stage?: EnumItemStageFilter<"Item"> | $Enums.ItemStage
     aiAnalysis?: JsonNullableFilter<"Item">
@@ -39491,6 +41008,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -39542,6 +41063,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -40604,6 +42129,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -40655,6 +42184,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -40835,6 +42368,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -40886,6 +42423,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -40976,6 +42517,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -41027,6 +42572,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -41156,6 +42705,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -41207,6 +42760,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -41274,6 +42831,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -41325,6 +42886,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -41392,6 +42957,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -41443,6 +43012,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -41535,6 +43108,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -41586,6 +43163,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -41741,6 +43322,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -41792,6 +43377,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -41972,6 +43561,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -42023,6 +43616,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -42184,6 +43781,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -42235,6 +43836,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -42661,6 +44266,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -42712,6 +44321,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -42847,6 +44460,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -42898,6 +44515,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -43349,6 +44970,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -43400,6 +45025,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -43477,6 +45106,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -43613,6 +45246,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -43664,6 +45301,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -43715,6 +45356,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -44181,6 +45826,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -44281,6 +45930,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -44332,6 +45985,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -44383,6 +46040,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -45251,6 +46912,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: string | null
     locationCode?: string | null
+    sourceEbayItemId?: string | null
+    sourceEbayAccountId?: string | null
+    capturedAt?: Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: $Enums.ItemStatus
     stage?: $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -45296,6 +46961,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -45347,6 +47016,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue
@@ -45398,6 +47071,10 @@ export namespace Prisma {
     returnPolicy?: NullableJsonNullValueInput | InputJsonValue
     postalCode?: NullableStringFieldUpdateOperationsInput | string | null
     locationCode?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayItemId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceEbayAccountId?: NullableStringFieldUpdateOperationsInput | string | null
+    capturedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capturedPayload?: NullableJsonNullValueInput | InputJsonValue
     status?: EnumItemStatusFieldUpdateOperationsInput | $Enums.ItemStatus
     stage?: EnumItemStageFieldUpdateOperationsInput | $Enums.ItemStage
     aiAnalysis?: NullableJsonNullValueInput | InputJsonValue

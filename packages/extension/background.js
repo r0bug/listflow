@@ -2,8 +2,19 @@
 //
 //  - Staff JWT lives HERE (chrome.storage.session): content scripts never
 //    see it; they message the SW and the SW attaches credentials.
-//  - Machine key (per-install, hashed server-side) in storage.sync;
+//  - Machine key (per-install, hashed server-side) in storage.LOCAL —
 //    self-provisioned on first login via /api/v1/extension/register.
+//
+// PROFILE-LOCAL vs SYNCED (do not move these back):
+//   storage.local  apiKey, machineId, pinnedAccountId/Name, staffUser
+//   storage.sync   baseUrl, webUrl
+// storage.sync is shared across every Chrome profile signed into the SAME
+// Google account. We run one Chrome profile per eBay account (Standards §6),
+// so anything identifying the profile — its machine key and which eBay account
+// it is pinned to — MUST be profile-local. Put the pin in sync and two profiles
+// silently overwrite each other's eBay account and share one machine key, which
+// means captures get attributed to the account they were relisted INTO. Only
+// baseUrl/webUrl are safe to sync: they are identical on both profiles.
 //  - No hot-patch / remote code — removed per fleet Standards §6.
 //
 // Message API (chrome.runtime.sendMessage):
@@ -11,6 +22,7 @@
 //   {type:'login', email, pin}           → {ok, user} | {ok:false, error}
 //   {type:'logout'}                      → {ok}
 //   {type:'auth-state'}                  → {user, hasKey, baseUrl, pinnedAccount}
+//   {type:'fetch-text', url}             → {ok, status, text}
 
 const DEFAULT_BASE_URL = 'https://listflow.robug.com';
 
@@ -22,19 +34,50 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 async function config() {
-  const sync = await chrome.storage.sync.get(['baseUrl', 'apiKey', 'webUrl', 'pinnedAccountName', 'pinnedAccountId']);
-  const local = await chrome.storage.local.get(['machineId', 'staffUser']);
+  await migrateSyncedCredentials();
+  const sync = await chrome.storage.sync.get(['baseUrl', 'webUrl']);
+  const local = await chrome.storage.local.get([
+    'machineId',
+    'staffUser',
+    'apiKey',
+    'pinnedAccountId',
+    'pinnedAccountName',
+  ]);
   const session = await chrome.storage.session.get(['jwt']);
   return {
     baseUrl: (sync.baseUrl || DEFAULT_BASE_URL).replace(/\/$/, ''),
-    apiKey: sync.apiKey || '',
+    apiKey: local.apiKey || '',
     webUrl: (sync.webUrl || '').replace(/\/$/, ''),
-    pinnedAccountName: sync.pinnedAccountName || '',
-    pinnedAccountId: sync.pinnedAccountId || '',
+    pinnedAccountName: local.pinnedAccountName || '',
+    pinnedAccountId: local.pinnedAccountId || '',
     machineId: local.machineId || '',
     staffUser: local.staffUser || null,
     jwt: session.jwt || '',
   };
+}
+
+// One-time move of credentials that older builds wrote to storage.sync.
+// Without this an upgrade silently logs the install out and drops its eBay
+// account pin. Runs until it has nothing left to move, then costs one
+// storage.sync read.
+let migrationDone = false;
+async function migrateSyncedCredentials() {
+  if (migrationDone) return;
+  const stale = await chrome.storage.sync.get(['apiKey', 'pinnedAccountId', 'pinnedAccountName']);
+  const present = Object.keys(stale).filter((k) => stale[k]);
+  if (present.length === 0) {
+    migrationDone = true;
+    return;
+  }
+  const local = await chrome.storage.local.get(['apiKey', 'pinnedAccountId', 'pinnedAccountName']);
+  const carry = {};
+  // Never clobber a value this profile already set locally — if both exist,
+  // local is the one that belongs to THIS profile.
+  for (const k of present) if (!local[k]) carry[k] = stale[k];
+  if (Object.keys(carry).length) await chrome.storage.local.set(carry);
+  await chrome.storage.sync.remove(['apiKey', 'pinnedAccountId', 'pinnedAccountName']);
+  console.info('[listflow] migrated profile credentials out of storage.sync', Object.keys(carry));
+  migrationDone = true;
 }
 
 async function apiFetch(path, { method = 'GET', body } = {}) {
@@ -76,7 +119,7 @@ async function handleLogin(email, pin) {
     });
     const regData = await reg.json().catch(() => ({}));
     if (reg.ok && regData.apiKey) {
-      await chrome.storage.sync.set({ apiKey: regData.apiKey });
+      await chrome.storage.local.set({ apiKey: regData.apiKey });
     }
   }
   return { ok: true, user: data.user };
@@ -99,6 +142,26 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           await chrome.storage.session.remove('jwt');
           await chrome.storage.local.remove('staffUser');
           sendResponse({ ok: true });
+          break;
+        }
+        // Cross-origin GET on behalf of a content script. eBay serves item
+        // descriptions from vi.vipr.ebaydesc.com, so the page CANNOT read its
+        // own description iframe — the SW has to fetch it. Deliberately
+        // narrow: GET only, eBay description hosts only, no credentials.
+        case 'fetch-text': {
+          let host;
+          try {
+            host = new URL(msg.url).hostname;
+          } catch {
+            sendResponse({ ok: false, error: 'bad url' });
+            break;
+          }
+          if (!/(^|\.)ebaydesc\.com$/.test(host) && !/(^|\.)ebay\.com$/.test(host)) {
+            sendResponse({ ok: false, error: `refusing to fetch ${host}` });
+            break;
+          }
+          const r = await fetch(msg.url, { credentials: 'omit' });
+          sendResponse({ ok: r.ok, status: r.status, text: await r.text() });
           break;
         }
         case 'auth-state': {
