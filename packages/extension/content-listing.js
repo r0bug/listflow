@@ -28,14 +28,13 @@
   // flows (/lstng <-> /sl/list) and drops params it does not recognise, which
   // previously meant the whole thing silently did nothing.
   const reviseItemId = url.searchParams.get('listflowItemId') || (await claimPendingRevise());
-  if (/ReviseItem/i.test(url.search)) {
-    // A revise page is the RICHEST capture source we have: it is the seller's
-    // own form, so package dimensions, the numeric category id, the exact
-    // condition and the real specifics are present as field values. The public
-    // item page shows none of that. Offer the capture here regardless of
-    // whether we were sent to revise a label.
-    mountReviseCapture();
-  }
+  // The seller's own form is the RICHEST capture source we have: package
+  // dimensions, the numeric category id, the exact condition and the real
+  // specifics are all field VALUES here, none of which the public item page
+  // shows. Offer it on any listing form that is editing a real listing —
+  // revise pages and drafts of existing items alike. A brand-new listing with
+  // no item number behind it has nothing to capture, so the button stays away.
+  if (isEditingExistingListing(url)) mountReviseCapture();
   if (reviseItemId) {
     await runReviseFlow(reviseItemId);
     return;
@@ -78,20 +77,48 @@ async function claimPendingRevise() {
 
 // ── Capture from the revise form ───────────────────────────────────────
 
+function isEditingExistingListing(url) {
+  if (/ReviseItem/i.test(url.search)) return true;
+  if (!url.pathname.includes('/lstng') && !url.pathname.includes('/sl/')) return false;
+  // A draft of an existing listing still shows its item number somewhere.
+  return Boolean(findEbayItemNumberOnPage());
+}
+
+function findEbayItemNumberOnPage() {
+  return (
+    (document.body?.innerText?.match(/item\s*(?:number|id)\s*:?\s*(\d{9,})/i) || [])[1] ||
+    (document.querySelector('a[href*="/itm/"]')?.href.match(/\/itm\/(?:[^/]+\/)?(\d{9,})/) || [])[1] ||
+    null
+  );
+}
+
 function mountReviseCapture() {
   if (document.getElementById('__listflow_revise_capture')) return;
   const b = document.createElement('button');
   b.id = '__listflow_revise_capture';
   b.textContent = '\u{1F4CB} Copy this listing (full detail)';
   b.title = 'Capture from this form — includes dimensions, category id and condition that the public item page does not show';
+  // The rebuild panel is 340px down the right edge and its launcher sits at
+  // bottom-right too — a fixed button there is invisible under one and stacked
+  // on the other. Sit clear of both, and re-check as the panel opens or closes.
+  const place = () => {
+    const panel = document.getElementById('__listflow_panel');
+    const launcher = [...document.querySelectorAll('button')].find(
+      (x) => x !== b && /Rebuild from saved listing/.test(x.textContent || ''),
+    );
+    b.style.right = panel ? '356px' : '22px';
+    b.style.bottom = !panel && launcher ? '68px' : '22px';
+  };
   b.style.cssText = [
-    'position:fixed', 'bottom:22px', 'right:22px', 'z-index:2147483600',
+    'position:fixed', 'bottom:22px', 'right:22px', 'z-index:2147483601',
     'background:#0064d2', 'color:#fff', 'border:0', 'border-radius:6px',
     'padding:10px 14px', 'font:600 13px -apple-system,system-ui,sans-serif',
     'cursor:pointer', 'box-shadow:0 4px 14px rgba(0,0,0,0.35)',
   ].join(';');
   b.addEventListener('click', () => captureFromReviseForm(b));
   document.body.appendChild(b);
+  place();
+  new MutationObserver(place).observe(document.documentElement, { childList: true, subtree: true });
 }
 
 async function captureFromReviseForm(btn) {
@@ -144,9 +171,7 @@ function scrapeReviseForm() {
 
   // Item number: eBay prints it on the revise page; fall back to any 12-digit
   // token in a URL on the page.
-  let ebayItemId =
-    (document.body.innerText.match(/item\s*(?:number|id)\s*:?\s*(\d{9,})/i) || [])[1] ||
-    (document.querySelector('a[href*="/itm/"]')?.href.match(/\/itm\/(?:[^/]+\/)?(\d{9,})/) || [])[1];
+  let ebayItemId = findEbayItemNumberOnPage();
 
   const specifics = {};
   for (const lab of document.querySelectorAll('label')) {
