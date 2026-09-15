@@ -21,14 +21,24 @@
   // Revise flow (docs/PHASE2-INVENTORY-AUDIT.md Flow 1): the on-page bar sent
   // us here to stamp "<SKU>|<LOC>" onto an EXISTING listing. Only the Custom
   // Label is touched — this is a live listing and nothing else may change.
-  const reviseItemId = url.searchParams.get('listflowItemId');
-  if (reviseItemId && /ReviseItem/i.test(url.search)) {
+  //
+  // Two ways to learn we were sent: the URL params, and a stash the bar wrote
+  // before navigating. The stash is the reliable one — eBay redirects these
+  // flows (/lstng <-> /sl/list) and drops params it does not recognise, which
+  // previously meant the whole thing silently did nothing.
+  const reviseItemId = url.searchParams.get('listflowItemId') || (await claimPendingRevise());
+  if (reviseItemId) {
     await runReviseFlow(reviseItemId);
     return;
   }
 
   // If the URL carries ?swiftlistItemId, auto-fill on first load (new listing
   // case). Draft pages let content-draft.js drive fills instead.
+  // Silence was the worst part of the last bug: with no content script running
+  // there was nothing to tell anyone. A tiny marker makes "is listflow even
+  // here?" answerable at a glance on any listing page.
+  markPresence();
+
   const itemId = url.searchParams.get('swiftlistItemId');
   if (itemId && !looksLikeDraft(url)) {
     await window.swiftlist.setLastItem(itemId);
@@ -41,6 +51,21 @@
     }
   }
 })();
+
+// Reads and clears a revise intent stashed by the item-page bar. Ignores
+// anything older than 10 minutes so a stale stash cannot ambush an unrelated
+// listing the operator opens later.
+async function claimPendingRevise() {
+  try {
+    const { pendingRevise } = await chrome.storage.local.get('pendingRevise');
+    if (!pendingRevise) return null;
+    const fresh = Date.now() - (pendingRevise.at || 0) < 10 * 60 * 1000;
+    await chrome.storage.local.remove('pendingRevise');
+    return fresh ? pendingRevise.itemId : null;
+  } catch {
+    return null;
+  }
+}
 
 // ── Revise: Custom Label only ──────────────────────────────────────────
 //
@@ -145,6 +170,18 @@ function waitForField(selectors, timeout) {
     };
     tick();
   });
+}
+
+function markPresence() {
+  if (document.getElementById('__listflow_present')) return;
+  const dot = document.createElement('div');
+  dot.id = '__listflow_present';
+  dot.title = 'listflow content script is running on this page';
+  dot.textContent = 'listflow';
+  dot.style.cssText =
+    'position:fixed;bottom:6px;left:6px;z-index:2147483600;background:#181818;color:#6af;' +
+    'border:1px solid #3a3a3a;border-radius:3px;padding:2px 6px;font:11px -apple-system,system-ui,sans-serif;opacity:0.65;';
+  document.documentElement.appendChild(dot);
 }
 
 function looksLikeDraft(url) {

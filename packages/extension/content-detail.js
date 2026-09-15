@@ -151,6 +151,7 @@ async function refreshBar(bar, ebayItemId) {
           if (!set) return;
           item = { ...item, locationCode: set };
         }
+        await armRevise(item.id, ebayItemId);
         // Navigation the OPERATOR asked for, on click. Not a crawl.
         location.href = `https://www.ebay.com/lstng?mode=ReviseItem&itemId=${encodeURIComponent(
           ebayItemId,
@@ -309,9 +310,8 @@ async function openShelfPrompt(bar, ebayItemId, item, opts = {}) {
       await refreshBar(bar, ebayItemId);
       flashBar(bar, `shelf set — Custom Label will be ${res.customLabel}`);
       if (opts.thenRevise) {
-        location.href = `https://www.ebay.com/lstng?mode=ReviseItem&itemId=${encodeURIComponent(
-          ebayItemId,
-        )}&listflowItemId=${encodeURIComponent(item.id)}`;
+        await armRevise(item.id, ebayItemId);
+        location.href = reviseUrl(ebayItemId, item.id);
       }
       resolve(res.locationCode);
     } catch (err) {
@@ -908,4 +908,23 @@ function normalizeCondition(raw) {
   if (prefix) return prefix;
 
   return s.slice(0, 60);
+}
+
+
+// ── Revise hand-off ────────────────────────────────────────────────────
+//
+// eBay redirects its listing flows and drops query params it does not know, so
+// "?listflowItemId=…" cannot be trusted to survive the navigation. The intent
+// is therefore stashed in extension storage before leaving the page, and
+// content-listing.js picks it up wherever it lands.
+async function armRevise(itemId, ebayItemId) {
+  await chrome.storage.local.set({
+    pendingRevise: { itemId, ebayItemId, at: Date.now() },
+  });
+}
+
+function reviseUrl(ebayItemId, itemId) {
+  return `https://www.ebay.com/lstng?mode=ReviseItem&itemId=${encodeURIComponent(
+    ebayItemId,
+  )}&listflowItemId=${encodeURIComponent(itemId)}`;
 }
