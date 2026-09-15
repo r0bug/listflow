@@ -121,7 +121,7 @@ async function refreshBar(bar, ebayItemId) {
   } else {
     const shelf = item.locationCode
       ? `<b style="color:#6c6">${escapeHtml(item.locationCode)}</b>`
-      : '<b style="color:#ea4">no shelf</b>';
+      : '<b style="color:#111;background:#ea4;padding:1px 6px;border-radius:3px;">NO SHELF</b>';
     setBarState(
       bar,
       `<b style="color:#eee">${escapeHtml(item.sku || '(no sku)')}</b> · ${shelf} · ${item.photoCount} photo${item.photoCount === 1 ? '' : 's'}` +
@@ -142,11 +142,14 @@ async function refreshBar(bar, ebayItemId) {
   // ── Revise (Flow 1) — only on our own listing, and only once it has a shelf ──
   if (item && isMine) {
     bar.actions.appendChild(
-      barButton('✎ Revise listing', 'normal', async (btn) => {
+      barButton('✎ Revise listing', item.locationCode ? 'normal' : 'primary', async (btn) => {
+        // No shelf yet? Ask for one here rather than sending the operator away.
+        // Revising with a bare SKU writes a Custom Label that cannot locate the
+        // item, which is the whole thing this tool exists to prevent.
         if (!item.locationCode) {
-          btn.textContent = 'Set a shelf first';
-          setTimeout(() => (btn.textContent = '✎ Revise listing'), 1800);
-          return;
+          const set = await openShelfPrompt(bar, ebayItemId, item, { thenRevise: true });
+          if (!set) return;
+          item = { ...item, locationCode: set };
         }
         // Navigation the OPERATOR asked for, on click. Not a crawl.
         location.href = `https://www.ebay.com/lstng?mode=ReviseItem&itemId=${encodeURIComponent(
@@ -258,7 +261,8 @@ function showWarnings(warnings) {
 //
 // Scanner-friendly: the field takes focus, a barcode scanner types the code
 // and sends Enter, and that submits. No mouse needed at the shelf.
-async function openShelfPrompt(bar, ebayItemId, item) {
+async function openShelfPrompt(bar, ebayItemId, item, opts = {}) {
+  return new Promise(async (resolve) => {
   const overlay = mountOverlay();
   let locations = [];
   try {
@@ -289,7 +293,7 @@ async function openShelfPrompt(bar, ebayItemId, item) {
   const input = overlay.querySelector('#lf-shelf');
   const msg = overlay.querySelector('#lf-shelf-msg');
   input.focus();
-  overlay.querySelector('#lf-cancel').onclick = () => overlay.remove();
+  overlay.querySelector('#lf-cancel').onclick = () => { overlay.remove(); resolve(null); };
 
   const save = async () => {
     const code = input.value.trim();
@@ -304,6 +308,12 @@ async function openShelfPrompt(bar, ebayItemId, item) {
       overlay.remove();
       await refreshBar(bar, ebayItemId);
       flashBar(bar, `shelf set — Custom Label will be ${res.customLabel}`);
+      if (opts.thenRevise) {
+        location.href = `https://www.ebay.com/lstng?mode=ReviseItem&itemId=${encodeURIComponent(
+          ebayItemId,
+        )}&listflowItemId=${encodeURIComponent(item.id)}`;
+      }
+      resolve(res.locationCode);
     } catch (err) {
       msg.style.color = '#b91c1c';
       msg.textContent = err.message;
@@ -314,7 +324,8 @@ async function openShelfPrompt(bar, ebayItemId, item) {
   overlay.querySelector('#lf-save').onclick = save;
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); void save(); }
-    if (e.key === 'Escape') overlay.remove();
+    if (e.key === 'Escape') { overlay.remove(); resolve(null); }
+  });
   });
 }
 

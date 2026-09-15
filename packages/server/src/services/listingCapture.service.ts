@@ -240,6 +240,14 @@ export async function captureListing(input: CaptureInput): Promise<CaptureResult
   }
   if (!input.title) warnings.push('No title captured.');
 
+  // The shelf is the entire point of the audit and the one field eBay cannot
+  // tell us later — so it is nagged at capture, not left to be noticed.
+  if (!item.locationCode) {
+    warnings.push(
+      'NO SHELF SET. Set one now — without it the Custom Label carries only the SKU and this item cannot be found on the floor.',
+    );
+  }
+
   if (!created && keptFromBefore.length) {
     warnings.push(
       `Re-copy: the page gave nothing for ${keptFromBefore.join(', ')} — kept the previously stored value. If that looks wrong, the scraper may need updating for a changed eBay layout.`,

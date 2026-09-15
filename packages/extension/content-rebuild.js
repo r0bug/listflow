@@ -171,6 +171,11 @@ const STEPS = [
     required: true,
     show: (p) => p.customLabel,
     slice: (p) => ({ customLabel: p.customLabel }),
+    // A label with no "|<shelf>" half locates nothing. Filling it silently
+    // would produce a listing that looks complete and cannot be picked.
+    warnIf: (p) => (!p.customLabel || !p.customLabel.includes('|')
+      ? 'No shelf — this label cannot locate the item. Set a shelf on the source listing first.'
+      : null),
   },
 ];
 
@@ -194,6 +199,16 @@ async function openPanel(itemId, existing) {
   for (const step of STEPS) {
     const value = step.show(payload) || '';
     wrap.appendChild(renderStep(step, value, payload));
+  }
+
+  if (!payload.customLabel || !payload.customLabel.includes('|')) {
+    const nag = document.createElement('div');
+    nag.style.cssText =
+      'background:#ea4;color:#111;border-radius:4px;padding:8px 10px;margin-bottom:10px;font-size:12px;line-height:1.4;';
+    nag.innerHTML =
+      '<b>No shelf set.</b> Rebuild this and the new listing carries a Custom Label that cannot locate the item. ' +
+      'Set a shelf on the source listing (its page bar \u2192 \u201cSet shelf\u201d) before publishing.';
+    wrap.insertBefore(nag, wrap.firstChild);
   }
 
   const foot = document.createElement('div');
@@ -226,6 +241,15 @@ function renderStep(step, value, payload) {
     'font-size:11px;color:#9a9a9a;margin:4px 0 6px;max-height:70px;overflow:auto;white-space:pre-wrap;word-break:break-word;';
   src.textContent = value || '— nothing captured —';
   if (!value) src.style.color = step.required ? '#f66' : '#666';
+
+  const warn = step.warnIf ? step.warnIf(payload) : null;
+  let warnEl = null;
+  if (warn) {
+    warnEl = document.createElement('div');
+    warnEl.style.cssText =
+      'font-size:11px;color:#111;background:#ea4;border-radius:3px;padding:4px 6px;margin-bottom:6px;';
+    warnEl.textContent = warn;
+  }
 
   const btn = document.createElement('button');
   btn.textContent = step.photos ? 'Add photos' : 'Fill this step';
@@ -269,7 +293,9 @@ function renderStep(step, value, payload) {
   row.style.cssText = 'display:flex;gap:6px;';
   row.appendChild(btn);
 
-  card.append(head, src, row);
+  card.append(head, src);
+  if (warnEl) card.appendChild(warnEl);
+  card.appendChild(row);
   return card;
 }
 
