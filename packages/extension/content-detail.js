@@ -802,15 +802,48 @@ async function fetchDescription(alreadyHave) {
   try {
     const res = await chrome.runtime.sendMessage({ type: 'fetch-text', url: abs });
     if (!res?.ok || !res.text) return { html: '', text: '' };
-    // Unwrap to the body so we store the description, not a whole document.
-    const doc = new DOMParser().parseFromString(res.text, 'text/html');
-    const body = doc.body;
-    if (!body) return { html: '', text: '' };
-    return { html: body.innerHTML.trim(), text: (body.textContent || '').trim() };
+    return extractDescription(res.text);
   } catch (err) {
     window.swiftlist.telemetry({ where: 'content-detail.fetchDescription', err: String(err?.message || err), url: abs });
     return { html: '', text: '' };
   }
+}
+
+// Pulls the seller's description out of eBay's description-VIEWER page.
+//
+// That page is not bare description HTML: it carries eBay's own tracking
+// script, a large "$M_…" JSON model that contains a SECOND copy of the
+// description, and page chrome like "Make me an offer". Taking body.innerHTML
+// swept all of it in, and body.textContent made it worse — textContent does not
+// skip <script>, so executable JS landed in the stored description.
+function extractDescription(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+
+  // Scripts first, always. This is what put "(window.$ebay||…)" in the text.
+  doc.querySelectorAll('script, style, noscript, link, meta, iframe, template').forEach((n) => n.remove());
+
+  // Then narrow to the seller's own content. Whole-body is the last resort,
+  // because that is what dragged eBay's chrome in alongside it.
+  const container =
+    doc.querySelector('#ds_div') ||
+    doc.querySelector('.x-item-description-child') ||
+    doc.querySelector('[itemprop="description"]') ||
+    doc.querySelector('#desc_wrapper, #descriptionContent, .desc-wrapper') ||
+    doc.body;
+  if (!container) return { html: '', text: '' };
+
+  const htmlOut = container.innerHTML.trim();
+  const textOut = collapseRepeat((container.innerText || container.textContent || '').replace(/\s+\n/g, '\n').trim());
+  return { html: htmlOut, text: textOut };
+}
+
+// eBay's viewer page can render the description twice (once as markup, once
+// out of its JSON model). If the text is exactly a doubled block, halve it.
+function collapseRepeat(text) {
+  const t = text.trim();
+  if (t.length < 80 || t.length % 2 !== 0) return t;
+  const half = t.length / 2;
+  return t.slice(0, half).trim() === t.slice(half).trim() ? t.slice(0, half).trim() : t;
 }
 
 function stripTags(html) {
