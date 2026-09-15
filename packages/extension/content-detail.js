@@ -794,6 +794,7 @@ function collectItemSpecifics() {
     if (k.length > 60 || v.length > 300) return;          // a paragraph, not a spec
     if (/^(more information|about this item|read more|see all)/i.test(k)) return;
     if (k.toLowerCase() === v.toLowerCase()) return;      // label echoed as value
+    if (isListingMeta(k, v)) return;
     if (!(k in out)) out[k] = v;
   };
 
@@ -820,6 +821,31 @@ function collectItemSpecifics() {
   }
 
   return out;
+}
+
+// The generic label/value sweep also lands on eBay's sale-details panel —
+// Views, Start time, Buy It Now Price, Shipping, Returns, Duration. Those are
+// listing metadata, not item attributes. Copying them into a NEW listing's
+// item specifics is wrong at best and rejected by eBay at worst, so they are
+// dropped here rather than cleaned up by whoever is filling the form.
+const LISTING_META_KEYS = new Set([
+  'condition', 'price', 'buy it now price', 'current bid', 'starting bid', 'was',
+  'shipping', 'postage', 'delivery', 'returns', 'payments', 'payment methods',
+  'duration', 'start time', 'end time', 'time left', 'bids', 'views', 'watchers',
+  'quantity', 'quantity available', 'sold', 'item number', 'item location',
+  'located in', 'ships to', 'ships from', 'seller', 'seller assumes all responsibility',
+  'best offer', 'listed', 'last updated', 'sale ends', 'you save', 'breathe easy',
+  'free shipping', 'pickup', 'after receiving the item',
+]);
+
+function isListingMeta(key, value) {
+  const k = key.toLowerCase().trim();
+  if (LISTING_META_KEYS.has(k)) return true;
+  // Value-shape fallbacks for labels we have not seen yet.
+  if (/see details|read more about|get it between|learn more/i.test(value)) return true;
+  if (/^us \$[\d,.]+/i.test(value)) return true;                       // a price
+  if (/^\w{3} \d{1,2}, \d{4}\b/.test(value)) return true;             // "Apr 26, 2025 …"
+  return false;
 }
 
 function textIn(el) {
