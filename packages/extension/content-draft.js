@@ -21,6 +21,14 @@
   // it; without this, the draft banner also appears and offers to "link" a
   // listing that was never a draft.
   if (/ReviseItem/i.test(url.search)) return;
+
+  // Stay out of the way of a rebuild. This banner offers an older, unrelated
+  // workflow ("link this draft to your last Item"), and popping it up in the
+  // middle of a cross-account rebuild is pure confusion — two panels, two
+  // different jobs, no indication which one the operator wants.
+  const { pendingRebuild } = await chrome.storage.local.get('pendingRebuild').catch(() => ({}));
+  if (pendingRebuild || window.__listflow_rebuilding) return;
+
   const ebayDraftId = extractDraftId(url);
   const isDraftPage = !!ebayDraftId || url.pathname.includes('/lstng') || url.searchParams.has('mode') || hasDraftBadge();
   if (!isDraftPage) return;

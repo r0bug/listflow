@@ -18,25 +18,49 @@
   const url = new URL(location.href);
   if (/ReviseItem/i.test(url.search)) return; // revise is content-listing.js's job
 
+  // eBay's sell entry point is a funnel: /sl/prelist/identify -> "find a match"
+  // -> the real form at /lstng. We must do NOTHING on the funnel pages. The
+  // first version claimed the popup's stash on /sl/prelist/identify, deleted it,
+  // and tried to open a panel on a page with no form — so by the time the
+  // operator reached the actual form the intent was gone.
+  if (!isListingForm(url)) return;
+
   // Three ways to arrive, in order of directness. The stash is what the popup
-  // uses: eBay's listing entry points move around (/sl/sell is retired, the
-  // form is /lstng), so "open eBay and carry the intent" beats asking anyone to
-  // land on a particular URL.
-  const explicit = url.searchParams.get('listflowRebuild') || (await claimPendingRebuild());
+  // uses: eBay's listing entry points move around (/sl/sell is retired), so
+  // "carry the intent" beats asking anyone to land on a particular URL.
+  const explicit = url.searchParams.get('listflowRebuild') || (await peekPendingRebuild());
   if (explicit) {
+    window.__listflow_rebuilding = true;
     await openPanel(explicit);
+    // Only consume the stash once a panel is actually up on a real form.
+    await chrome.storage.local.remove('pendingRebuild');
   } else {
     mountLauncher();
   }
 })();
 
-async function claimPendingRebuild() {
+// The real listing form, not a step of eBay's prelist funnel.
+function isListingForm(url) {
+  if (/\/sl\/prelist|\/sl\/sell\/?$|\/sl\/identify/i.test(url.pathname)) return false;
+  if (url.pathname.includes('/lstng')) return true;
+  // Fallback: a page carrying a title input is the form, whatever it is called.
+  return Boolean(
+    document.querySelector('[data-testid="title-input"], [name="title"], input[aria-label*="Title" i]'),
+  );
+}
+
+// Read WITHOUT deleting — the stash must survive every page of eBay's funnel
+// and is only consumed once a panel is open on the real form.
+async function peekPendingRebuild() {
   try {
     const { pendingRebuild } = await chrome.storage.local.get('pendingRebuild');
     if (!pendingRebuild) return null;
-    const fresh = Date.now() - (pendingRebuild.at || 0) < 10 * 60 * 1000;
-    await chrome.storage.local.remove('pendingRebuild');
-    return fresh ? pendingRebuild.itemId : null;
+    const fresh = Date.now() - (pendingRebuild.at || 0) < 30 * 60 * 1000;
+    if (!fresh) {
+      await chrome.storage.local.remove('pendingRebuild');
+      return null;
+    }
+    return pendingRebuild.itemId;
   } catch {
     return null;
   }
