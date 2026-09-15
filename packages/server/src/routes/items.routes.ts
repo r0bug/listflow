@@ -11,7 +11,7 @@ import { downloadAndAttachImage } from '../services/listingCapture.service.js';
 import {
   InvalidLocationCode,
   normalizeLocationCode,
-  requireActiveLocation,
+  resolveOrCreateLocation,
 } from '../services/location.service.js';
 import { ensureItemSku, composeCustomLabel } from '../services/sku.service.js';
 import type { Prisma } from '../generated/prisma/index.js';
@@ -160,8 +160,10 @@ router.post('/:id/location', staffOrMachine, async (req, res) => {
   }
 
   try {
+    // Unknown locations are created, not rejected: the operator at the shelf is
+    // the authority on what exists (a shelf may be "A-1" or "johns garage").
     const locationCode = parsed.data.locationCode
-      ? (await requireActiveLocation(parsed.data.locationCode)).code
+      ? (await resolveOrCreateLocation(parsed.data.locationCode)).code
       : null;
 
     // Allocate the SKU now if the item lacks one: an item being shelved is an

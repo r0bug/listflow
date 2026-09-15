@@ -1,68 +1,81 @@
-// Physical storage locations — the YF eBay room shelving.
+// Physical storage locations — wherever an item actually is.
 //
-// The DB is the authority for where an item physically is (Standards §6); the
-// eBay Custom Label "<SKU>|<LOC>" is a copy that goes stale until the listing
-// is next revised. Everything here exists to keep the authoritative half
-// clean: one canonical spelling per shelf, validated on every write, so a
-// typo can never reach a Custom Label.
+// A location code is JUST A STRING. The shop's printed labels happen to read
+// "A-1".."Z-6" (vendor kiosk ~/shelf-labels.sh), but a location may equally be
+// "johns garage", "back room pallet", or anything else someone writes on a
+// shelf. The app does not impose a scheme and must never reject a code for not
+// looking like one — the physical world is the authority, not us.
+//
+// What we DO enforce is the one real constraint: the code is stamped into
+// eBay's Custom Label as "<SKU>|<LOC>", which eBay caps at 50 characters.
 
 import { prisma } from '../db/prisma.js';
 
-/** Canonical shelf-code shape (Standards §6): R<row>-S<shelf>. */
-export const LOCATION_CODE_RE = /^R(\d{1,3})-S(\d{1,3})$/;
+/** The shop's printed-label convention. Used to sort nicely, never to validate. */
+const LETTER_SHELF_RE = /^([A-Za-z]{1,3})-(\d{1,3})$/;
+
+/** Longest location we accept: "YF001234|" is 9 chars of a 50-char Custom Label. */
+export const MAX_LOCATION_CODE = 40;
 
 export class InvalidLocationCode extends Error {
-  /**
-   * `reason` replaces the default "wrong shape" message. A code can be
-   * perfectly well-formed and still unusable (no such shelf, retired shelf),
-   * and telling the operator "R9-S9 is not a valid location code" when the
-   * problem is that R9-S9 does not exist sends them off fixing the wrong thing.
-   */
   constructor(code: string, reason?: string) {
-    super(
-      reason
-        ? `${code}: ${reason}`
-        : `"${code}" is not a valid location code — expected R<row>-S<shelf>, e.g. R3-S2`,
-    );
+    super(reason ? `${code}: ${reason}` : `"${code}" cannot be used as a location`);
     this.name = 'InvalidLocationCode';
   }
 }
 
 /**
- * Normalises operator input to the canonical code, or throws.
+ * Tidies operator input without changing its meaning.
  *
- * Accepts the sloppy forms a barcode scanner or a tired operator produces —
- * lowercase, stray whitespace, zero padding ("r03 - s2") — because rejecting
- * those outright just means the code gets typed into the Custom Label by hand
- * instead, which is the failure we are trying to prevent.
+ * Collapses whitespace and trims. Deliberately does NOT uppercase, reformat, or
+ * pattern-match: "johns garage" must survive as "johns garage". The one
+ * exception is the printed-label convention — "a1" / "A-01" from a scanner or a
+ * hurried keyboard becomes "A-1", because those are unambiguous and the shop
+ * has hundreds of such labels already on the wall.
  */
 export function normalizeLocationCode(raw: string): string {
-  const compact = String(raw ?? '').trim().toUpperCase().replace(/\s+/g, '');
-  const m = LOCATION_CODE_RE.exec(compact);
-  if (!m) throw new InvalidLocationCode(raw);
-  const row = Number(m[1]);
-  const shelf = Number(m[2]);
-  if (row < 1 || shelf < 1) throw new InvalidLocationCode(raw);
-  return `R${row}-S${shelf}`; // strips zero padding: "R03-S02" → "R3-S2"
+  const s = String(raw ?? '').replace(/\s+/g, ' ').trim();
+  if (!s) throw new InvalidLocationCode(String(raw), 'location cannot be empty');
+  if (s.length > MAX_LOCATION_CODE) {
+    throw new InvalidLocationCode(
+      s.slice(0, 20) + '…',
+      `too long (${s.length} chars; max ${MAX_LOCATION_CODE}, because it has to fit in eBay's 50-character Custom Label alongside the SKU)`,
+    );
+  }
+
+  // Printed-label shorthand only: "a1" -> "A-1", "A-01" -> "A-1".
+  const compact = s.replace(/\s+/g, '');
+  const shorthand = /^([A-Za-z]{1,3})-?(\d{1,3})$/.exec(compact);
+  if (shorthand) return `${shorthand[1]!.toUpperCase()}-${Number(shorthand[2])}`;
+
+  return s;
 }
 
-export function parseLocationCode(code: string): { row: number; shelf: number } {
-  const m = LOCATION_CODE_RE.exec(normalizeLocationCode(code));
-  return { row: Number(m![1]), shelf: Number(m![2]) };
+/** Sort keys for the shelf list. Null for anything not following the convention. */
+export function parseLocationCode(code: string): { row: string | null; shelf: number | null } {
+  const m = LETTER_SHELF_RE.exec(code);
+  if (!m) return { row: null, shelf: null };
+  return { row: m[1]!.toUpperCase(), shelf: Number(m[2]) };
 }
 
 /**
- * Resolves a code to an ACTIVE StorageLocation, or throws.
+ * Resolves a code to a StorageLocation, CREATING it if it is new.
  *
- * Assignment goes through here so an item can never be parked on a shelf that
- * does not exist. Retired shelves deliberately still resolve for *reads* (an
- * Item may legitimately still carry a retired code until it is moved) — this
- * is the write path only.
+ * Auto-create is deliberate: the operator at the shelf is the authority on what
+ * exists, and making them pre-register a location before they can put something
+ * on it is friction that ends with the code going only into eBay and never into
+ * the DB. Unknown codes therefore succeed and show up in the shelf list, where a
+ * typo is visible and fixable, rather than being blocked at the point of use.
  */
-export async function requireActiveLocation(raw: string) {
+export async function resolveOrCreateLocation(raw: string) {
   const code = normalizeLocationCode(raw);
-  const loc = await prisma.storageLocation.findUnique({ where: { code } });
-  if (!loc) throw new InvalidLocationCode(code, 'no such shelf — create it first');
-  if (!loc.active) throw new InvalidLocationCode(code, 'that shelf is retired');
-  return loc;
+  const existing = await prisma.storageLocation.findUnique({ where: { code } });
+  if (existing) {
+    if (!existing.active) {
+      await prisma.storageLocation.update({ where: { code }, data: { active: true } });
+    }
+    return existing;
+  }
+  const { row, shelf } = parseLocationCode(code);
+  return prisma.storageLocation.create({ data: { code, row, shelf } });
 }

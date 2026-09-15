@@ -573,17 +573,21 @@ model ListingTemplate {
 
 // ────────────────────────────────────────────────────────────────────
 // Physical storage — the shelving system in the YF eBay room.
-// Codes are "R<row>-S<shelf>" (Standards §6), short, stable, and printed as
-// Code-128 barcodes so assignment is a scan rather than typing.
+//
+// A location code is JUST A STRING. The shop's printed labels read "A-1".."Z-6"
+// (vendor kiosk ~/shelf-labels.sh), but a location may equally be "johns garage".
+// The app imposes no scheme — row/shelf are parsed opportunistically for sorting
+// and are null for anything free-form. The only hard limit is length: the code
+// is stamped into eBay's 50-char Custom Label as "<SKU>|<LOC>".
 // Item.locationCode is a plain string pointing at `code`, NOT a foreign key —
 // see the comment on Item.locationCode.
 // ────────────────────────────────────────────────────────────────────
 
 model StorageLocation {
   id     String  @id @default(cuid())
-  code   String  @unique // "R3-S2" — matches /^R\d{1,3}-S\d{1,3}$/
-  row    Int
-  shelf  Int
+  code   String  @unique // free text: "A-1", "johns garage", whatever is on the shelf
+  row    String? // section letter when the code follows the printed-label convention
+  shelf  Int? // shelf number likewise; both null for a free-form location
   label  String? // optional human name, e.g. "back wall, eye level"
   notes  String?
   active Boolean @default(true)

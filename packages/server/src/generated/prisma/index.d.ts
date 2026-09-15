@@ -29301,19 +29301,17 @@ export namespace Prisma {
   }
 
   export type StorageLocationAvgAggregateOutputType = {
-    row: number | null
     shelf: number | null
   }
 
   export type StorageLocationSumAggregateOutputType = {
-    row: number | null
     shelf: number | null
   }
 
   export type StorageLocationMinAggregateOutputType = {
     id: string | null
     code: string | null
-    row: number | null
+    row: string | null
     shelf: number | null
     label: string | null
     notes: string | null
@@ -29325,7 +29323,7 @@ export namespace Prisma {
   export type StorageLocationMaxAggregateOutputType = {
     id: string | null
     code: string | null
-    row: number | null
+    row: string | null
     shelf: number | null
     label: string | null
     notes: string | null
@@ -29349,12 +29347,10 @@ export namespace Prisma {
 
 
   export type StorageLocationAvgAggregateInputType = {
-    row?: true
     shelf?: true
   }
 
   export type StorageLocationSumAggregateInputType = {
-    row?: true
     shelf?: true
   }
 
@@ -29484,8 +29480,8 @@ export namespace Prisma {
   export type StorageLocationGroupByOutputType = {
     id: string
     code: string
-    row: number
-    shelf: number
+    row: string | null
+    shelf: number | null
     label: string | null
     notes: string | null
     active: boolean
@@ -29568,8 +29564,8 @@ export namespace Prisma {
     scalars: $Extensions.GetPayloadResult<{
       id: string
       code: string
-      row: number
-      shelf: number
+      row: string | null
+      shelf: number | null
       label: string | null
       notes: string | null
       active: boolean
@@ -30000,7 +29996,7 @@ export namespace Prisma {
   interface StorageLocationFieldRefs {
     readonly id: FieldRef<"StorageLocation", 'String'>
     readonly code: FieldRef<"StorageLocation", 'String'>
-    readonly row: FieldRef<"StorageLocation", 'Int'>
+    readonly row: FieldRef<"StorageLocation", 'String'>
     readonly shelf: FieldRef<"StorageLocation", 'Int'>
     readonly label: FieldRef<"StorageLocation", 'String'>
     readonly notes: FieldRef<"StorageLocation", 'String'>
@@ -33381,8 +33377,8 @@ export namespace Prisma {
     NOT?: StorageLocationWhereInput | StorageLocationWhereInput[]
     id?: StringFilter<"StorageLocation"> | string
     code?: StringFilter<"StorageLocation"> | string
-    row?: IntFilter<"StorageLocation"> | number
-    shelf?: IntFilter<"StorageLocation"> | number
+    row?: StringNullableFilter<"StorageLocation"> | string | null
+    shelf?: IntNullableFilter<"StorageLocation"> | number | null
     label?: StringNullableFilter<"StorageLocation"> | string | null
     notes?: StringNullableFilter<"StorageLocation"> | string | null
     active?: BoolFilter<"StorageLocation"> | boolean
@@ -33393,8 +33389,8 @@ export namespace Prisma {
   export type StorageLocationOrderByWithRelationInput = {
     id?: SortOrder
     code?: SortOrder
-    row?: SortOrder
-    shelf?: SortOrder
+    row?: SortOrderInput | SortOrder
+    shelf?: SortOrderInput | SortOrder
     label?: SortOrderInput | SortOrder
     notes?: SortOrderInput | SortOrder
     active?: SortOrder
@@ -33408,8 +33404,8 @@ export namespace Prisma {
     AND?: StorageLocationWhereInput | StorageLocationWhereInput[]
     OR?: StorageLocationWhereInput[]
     NOT?: StorageLocationWhereInput | StorageLocationWhereInput[]
-    row?: IntFilter<"StorageLocation"> | number
-    shelf?: IntFilter<"StorageLocation"> | number
+    row?: StringNullableFilter<"StorageLocation"> | string | null
+    shelf?: IntNullableFilter<"StorageLocation"> | number | null
     label?: StringNullableFilter<"StorageLocation"> | string | null
     notes?: StringNullableFilter<"StorageLocation"> | string | null
     active?: BoolFilter<"StorageLocation"> | boolean
@@ -33420,8 +33416,8 @@ export namespace Prisma {
   export type StorageLocationOrderByWithAggregationInput = {
     id?: SortOrder
     code?: SortOrder
-    row?: SortOrder
-    shelf?: SortOrder
+    row?: SortOrderInput | SortOrder
+    shelf?: SortOrderInput | SortOrder
     label?: SortOrderInput | SortOrder
     notes?: SortOrderInput | SortOrder
     active?: SortOrder
@@ -33440,8 +33436,8 @@ export namespace Prisma {
     NOT?: StorageLocationScalarWhereWithAggregatesInput | StorageLocationScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"StorageLocation"> | string
     code?: StringWithAggregatesFilter<"StorageLocation"> | string
-    row?: IntWithAggregatesFilter<"StorageLocation"> | number
-    shelf?: IntWithAggregatesFilter<"StorageLocation"> | number
+    row?: StringNullableWithAggregatesFilter<"StorageLocation"> | string | null
+    shelf?: IntNullableWithAggregatesFilter<"StorageLocation"> | number | null
     label?: StringNullableWithAggregatesFilter<"StorageLocation"> | string | null
     notes?: StringNullableWithAggregatesFilter<"StorageLocation"> | string | null
     active?: BoolWithAggregatesFilter<"StorageLocation"> | boolean
@@ -36085,8 +36081,8 @@ export namespace Prisma {
   export type StorageLocationCreateInput = {
     id?: string
     code: string
-    row: number
-    shelf: number
+    row?: string | null
+    shelf?: number | null
     label?: string | null
     notes?: string | null
     active?: boolean
@@ -36097,8 +36093,8 @@ export namespace Prisma {
   export type StorageLocationUncheckedCreateInput = {
     id?: string
     code: string
-    row: number
-    shelf: number
+    row?: string | null
+    shelf?: number | null
     label?: string | null
     notes?: string | null
     active?: boolean
@@ -36109,8 +36105,8 @@ export namespace Prisma {
   export type StorageLocationUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     code?: StringFieldUpdateOperationsInput | string
-    row?: IntFieldUpdateOperationsInput | number
-    shelf?: IntFieldUpdateOperationsInput | number
+    row?: NullableStringFieldUpdateOperationsInput | string | null
+    shelf?: NullableIntFieldUpdateOperationsInput | number | null
     label?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
@@ -36121,8 +36117,8 @@ export namespace Prisma {
   export type StorageLocationUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     code?: StringFieldUpdateOperationsInput | string
-    row?: IntFieldUpdateOperationsInput | number
-    shelf?: IntFieldUpdateOperationsInput | number
+    row?: NullableStringFieldUpdateOperationsInput | string | null
+    shelf?: NullableIntFieldUpdateOperationsInput | number | null
     label?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
@@ -36133,8 +36129,8 @@ export namespace Prisma {
   export type StorageLocationCreateManyInput = {
     id?: string
     code: string
-    row: number
-    shelf: number
+    row?: string | null
+    shelf?: number | null
     label?: string | null
     notes?: string | null
     active?: boolean
@@ -36145,8 +36141,8 @@ export namespace Prisma {
   export type StorageLocationUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
     code?: StringFieldUpdateOperationsInput | string
-    row?: IntFieldUpdateOperationsInput | number
-    shelf?: IntFieldUpdateOperationsInput | number
+    row?: NullableStringFieldUpdateOperationsInput | string | null
+    shelf?: NullableIntFieldUpdateOperationsInput | number | null
     label?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
@@ -36157,8 +36153,8 @@ export namespace Prisma {
   export type StorageLocationUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     code?: StringFieldUpdateOperationsInput | string
-    row?: IntFieldUpdateOperationsInput | number
-    shelf?: IntFieldUpdateOperationsInput | number
+    row?: NullableStringFieldUpdateOperationsInput | string | null
+    shelf?: NullableIntFieldUpdateOperationsInput | number | null
     label?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
@@ -38168,7 +38164,6 @@ export namespace Prisma {
   }
 
   export type StorageLocationAvgOrderByAggregateInput = {
-    row?: SortOrder
     shelf?: SortOrder
   }
 
@@ -38197,7 +38192,6 @@ export namespace Prisma {
   }
 
   export type StorageLocationSumOrderByAggregateInput = {
-    row?: SortOrder
     shelf?: SortOrder
   }
 

@@ -255,10 +255,10 @@ export const api = {
     ),
   createLocation: (body: { code: string; label?: string; notes?: string }) =>
     http<StorageLocationRow>('/locations', { method: 'POST', body: JSON.stringify(body) }),
-  seedLocations: (rows: number, shelves: number) =>
+  seedLocations: (fromLetter: string, toLetter: string, shelves: number) =>
     http<{ created: number; requested: number }>('/locations/bulk', {
       method: 'POST',
-      body: JSON.stringify({ rows, shelves }),
+      body: JSON.stringify({ fromLetter, toLetter, shelves }),
     }),
   updateLocation: (code: string, body: { label?: string; notes?: string; active?: boolean }) =>
     http<StorageLocationRow>(`/locations/${encodeURIComponent(code)}`, {
@@ -414,8 +414,8 @@ export interface GroupDetail {
 export interface StorageLocationRow {
   id: string;
   code: string;
-  row: number;
-  shelf: number;
+  row: string | null;
+  shelf: number | null;
   label: string | null;
   notes: string | null;
   active: boolean;

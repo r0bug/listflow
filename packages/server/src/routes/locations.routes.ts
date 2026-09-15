@@ -10,6 +10,7 @@ import {
   InvalidLocationCode,
   normalizeLocationCode,
   parseLocationCode,
+  resolveOrCreateLocation,
 } from '../services/location.service.js';
 
 const router = Router();
@@ -29,7 +30,7 @@ router.get('/', staffOrMachine, async (req, res) => {
   const includeInactive = qstr(req.query.includeInactive) === '1';
   const locations = await prisma.storageLocation.findMany({
     where: includeInactive ? undefined : { active: true },
-    orderBy: [{ row: 'asc' }, { shelf: 'asc' }],
+    orderBy: [{ row: 'asc' }, { shelf: 'asc' }, { code: 'asc' }],
   });
 
   // Item counts come from Item.locationCode (a string, not a relation), so
@@ -60,6 +61,7 @@ router.post('/', staffAuth, async (req, res) => {
   }
   try {
     const code = normalizeLocationCode(parsed.data.code);
+    // row/shelf are sort keys only, and null for a free-form location.
     const { row, shelf } = parseLocationCode(code);
     const location = await prisma.storageLocation.upsert({
       where: { code },
@@ -74,11 +76,14 @@ router.post('/', staffAuth, async (req, res) => {
   }
 });
 
-// POST /api/v1/locations/bulk — seed a whole rack in one call:
-// { rows: 6, shelves: 4 } creates R1-S1 … R6-S4.
+// POST /api/v1/locations/bulk — convenience for the shop's PRINTED labels only.
+// { fromLetter: "A", toLetter: "Z", shelves: 6 } creates A-1 … Z-6, the default
+// set the vendor kiosk's shelf-labels.sh prints. Free-form locations are not
+// created here; they appear on first use (see resolveOrCreateLocation).
 const BulkSchema = z.object({
-  rows: z.number().int().min(1).max(200),
-  shelves: z.number().int().min(1).max(200),
+  fromLetter: z.string().regex(/^[A-Za-z]$/).default('A'),
+  toLetter: z.string().regex(/^[A-Za-z]$/),
+  shelves: z.number().int().min(1).max(99),
 });
 
 router.post('/bulk', staffAuth, requireRole('admin', 'manager'), async (req, res) => {
@@ -87,11 +92,18 @@ router.post('/bulk', staffAuth, requireRole('admin', 'manager'), async (req, res
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
     return;
   }
-  const { rows, shelves } = parsed.data;
+  const { fromLetter, toLetter, shelves } = parsed.data;
+  const first = fromLetter.toUpperCase().charCodeAt(0);
+  const last = toLetter.toUpperCase().charCodeAt(0);
+  if (last < first) {
+    res.status(400).json({ error: 'toLetter must not precede fromLetter' });
+    return;
+  }
   const data = [];
-  for (let row = 1; row <= rows; row++) {
+  for (let c = first; c <= last; c++) {
+    const row = String.fromCharCode(c);
     for (let shelf = 1; shelf <= shelves; shelf++) {
-      data.push({ code: `R${row}-S${shelf}`, row, shelf });
+      data.push({ code: `${row}-${shelf}`, row, shelf });
     }
   }
   const result = await prisma.storageLocation.createMany({ data, skipDuplicates: true });
@@ -139,11 +151,7 @@ router.post('/:code/move', staffAuth, async (req, res) => {
       res.status(400).json({ error: 'Source and destination are the same shelf' });
       return;
     }
-    const dest = await prisma.storageLocation.findUnique({ where: { code: to } });
-    if (!dest || !dest.active) {
-      res.status(400).json({ error: `Destination ${to} does not exist or is retired` });
-      return;
-    }
+    await resolveOrCreateLocation(to); // destinations may be brand new
     const result = await prisma.item.updateMany({
       where: { locationCode: from },
       data: { locationCode: to },
