@@ -822,6 +822,14 @@ function extractDescription(html) {
   // Scripts first, always. This is what put "(window.$ebay||…)" in the text.
   doc.querySelectorAll('script, style, noscript, link, meta, iframe, template').forEach((n) => n.remove());
 
+  // Then eBay's own controls. A seller description is prose, images and tables
+  // — never a button or a form — so these can only be page chrome. This is what
+  // left "Make me an offer" glued to the end of the text. <a> is deliberately
+  // NOT stripped: sellers legitimately link out of their descriptions.
+  doc
+    .querySelectorAll('button, [role="button"], form, input, select, textarea, nav, header, footer, [role="navigation"]')
+    .forEach((n) => n.remove());
+
   // Then narrow to the seller's own content. Whole-body is the last resort,
   // because that is what dragged eBay's chrome in alongside it.
   const container =
@@ -833,7 +841,9 @@ function extractDescription(html) {
   if (!container) return { html: '', text: '' };
 
   const htmlOut = container.innerHTML.trim();
-  const textOut = collapseRepeat((container.innerText || container.textContent || '').replace(/\s+\n/g, '\n').trim());
+  const textOut = trimTrailingChrome(
+    collapseRepeat((container.innerText || container.textContent || '').replace(/\s+\n/g, '\n').trim()),
+  );
   return { html: htmlOut, text: textOut };
 }
 
@@ -844,6 +854,32 @@ function collapseRepeat(text) {
   if (t.length < 80 || t.length % 2 !== 0) return t;
   const half = t.length / 2;
   return t.slice(0, half).trim() === t.slice(half).trim() ? t.slice(0, half).trim() : t;
+}
+
+// Backstop for eBay chrome that is neither a script nor a control — plain text
+// or a link the viewer page appends after the seller's content. Only trimmed
+// from the END, and only when it is the tail, so a description that genuinely
+// discusses "returns" mid-paragraph is untouched.
+const TRAILING_CHROME = [
+  'make me an offer',
+  'buy it now',
+  'add to cart',
+  'add to watchlist',
+  'see full description',
+  'report this item',
+  'shipping and handling',
+  'return policy',
+];
+
+function trimTrailingChrome(text) {
+  let t = text.trim();
+  for (let pass = 0; pass < TRAILING_CHROME.length; pass++) {
+    const lower = t.toLowerCase();
+    const hit = TRAILING_CHROME.find((phrase) => lower.endsWith(phrase));
+    if (!hit) break;
+    t = t.slice(0, t.length - hit.length).replace(/[\\\s|·•\-–—]+$/, '').trim();
+  }
+  return t;
 }
 
 function stripTags(html) {
