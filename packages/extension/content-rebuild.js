@@ -208,6 +208,13 @@ const STEPS = [
   {
     key: 'shipping',
     label: 'Shipping',
+    // Reference only — no fill button. eBay resolves shipping from the seller's
+    // business policy, so writing a weight or ZIP into this form is not how the
+    // listing actually gets its shipping. Showing the source values so they can
+    // be keyed (or checked against the chosen profile) is the honest thing to
+    // offer; a fill button here would imply a control we do not have.
+    reference: true,
+    note: 'Set by your shipping business policy. These are the source listing\u2019s values, for reference.',
     show: (p) =>
       [p.shipping?.weightOz && `${p.shipping.weightOz} oz`, p.shipping?.postalCode]
         .filter(Boolean).join(' · '),
@@ -312,6 +319,28 @@ function renderStep(step, value, payload) {
     warnEl.style.cssText =
       'font-size:11px;color:#111;background:#ea4;border-radius:3px;padding:4px 6px;margin-bottom:6px;';
     warnEl.textContent = warn;
+  }
+
+  if (step.note) {
+    const n = document.createElement('div');
+    n.style.cssText = 'font-size:10px;color:#888;margin:-2px 0 6px;line-height:1.4;';
+    n.textContent = step.note;
+    card.appendChild(n);
+  }
+
+  // A reference step has values to read and copy, but nothing to fill.
+  if (step.reference) {
+    status.style.color = '#888';
+    status.textContent = 'reference';
+    card.append(head, src);
+    if (values && values.length) { card.appendChild(renderValueRows(values)); src.style.display = 'none'; }
+    if (step.note) {
+      const n = document.createElement('div');
+      n.style.cssText = 'font-size:10px;color:#888;margin:2px 0 0;line-height:1.4;';
+      n.textContent = step.note;
+      card.appendChild(n);
+    }
+    return card;
   }
 
   const btn = document.createElement('button');

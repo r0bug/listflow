@@ -36,6 +36,12 @@ export interface CaptureInput {
   imageUrls?: string[];
   price?: number;
   sellerName?: string;
+  ebayCategoryId?: string;
+  weightOz?: number;
+  packageDimensions?: { length?: number; width?: number; height?: number };
+  postalCode?: string;
+  /** "revise-form" when captured from the seller's own form (richer). */
+  capturedFrom?: string;
   /** accountName of the eBay account this Chrome profile is pinned to. */
   sourceAccountName?: string;
   /** The whole scrape, exactly as the content script saw it. */
@@ -134,6 +140,10 @@ export async function captureListing(input: CaptureInput): Promise<CaptureResult
     condition: input.condition,
     itemSpecifics: specifics,
     buyNowPrice: input.price != null ? String(input.price) : undefined,
+    ebayCategoryId: input.ebayCategoryId,
+    weightOz: input.weightOz,
+    packageDimensions: input.packageDimensions as Prisma.InputJsonValue | undefined,
+    postalCode: input.postalCode,
     sourceEbayItemId: input.ebayItemId,
     sourceEbayAccountId: sourceAccount?.id ?? null,
     capturedAt: new Date(),

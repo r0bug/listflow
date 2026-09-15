@@ -26,6 +26,15 @@ const CaptureSchema = z.object({
   itemSpecifics: z.record(z.string()).optional(),
   imageUrls: z.array(z.string().url()).max(48).optional(),
   price: z.number().nonnegative().optional(),
+  // Only the revise form exposes these — the public item page never shows
+  // package dimensions or the numeric category id.
+  ebayCategoryId: z.string().optional(),
+  weightOz: z.number().positive().optional(),
+  packageDimensions: z
+    .object({ length: z.number().optional(), width: z.number().optional(), height: z.number().optional() })
+    .optional(),
+  postalCode: z.string().optional(),
+  capturedFrom: z.string().optional(),
   sellerName: z.string().optional(),
   sourceAccountName: z.string().optional(),
   raw: z.unknown().optional(),

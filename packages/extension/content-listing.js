@@ -28,6 +28,14 @@
   // flows (/lstng <-> /sl/list) and drops params it does not recognise, which
   // previously meant the whole thing silently did nothing.
   const reviseItemId = url.searchParams.get('listflowItemId') || (await claimPendingRevise());
+  if (/ReviseItem/i.test(url.search)) {
+    // A revise page is the RICHEST capture source we have: it is the seller's
+    // own form, so package dimensions, the numeric category id, the exact
+    // condition and the real specifics are present as field values. The public
+    // item page shows none of that. Offer the capture here regardless of
+    // whether we were sent to revise a label.
+    mountReviseCapture();
+  }
   if (reviseItemId) {
     await runReviseFlow(reviseItemId);
     return;
@@ -66,6 +74,105 @@ async function claimPendingRevise() {
   } catch {
     return null;
   }
+}
+
+// ── Capture from the revise form ───────────────────────────────────────
+
+function mountReviseCapture() {
+  if (document.getElementById('__listflow_revise_capture')) return;
+  const b = document.createElement('button');
+  b.id = '__listflow_revise_capture';
+  b.textContent = '\u{1F4CB} Copy this listing (full detail)';
+  b.title = 'Capture from this form — includes dimensions, category id and condition that the public item page does not show';
+  b.style.cssText = [
+    'position:fixed', 'bottom:22px', 'right:22px', 'z-index:2147483600',
+    'background:#0064d2', 'color:#fff', 'border:0', 'border-radius:6px',
+    'padding:10px 14px', 'font:600 13px -apple-system,system-ui,sans-serif',
+    'cursor:pointer', 'box-shadow:0 4px 14px rgba(0,0,0,0.35)',
+  ].join(';');
+  b.addEventListener('click', () => captureFromReviseForm(b));
+  document.body.appendChild(b);
+}
+
+async function captureFromReviseForm(btn) {
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = 'Reading form…';
+  try {
+    const scraped = scrapeReviseForm();
+    if (!scraped.ebayItemId) {
+      const typed = window.prompt(
+        'Could not find the eBay item number on this page.\nEnter it (the 12-digit number from the listing URL):',
+      );
+      if (!typed || !/^\d{8,}$/.test(typed.trim())) {
+        btn.textContent = original;
+        btn.disabled = false;
+        return;
+      }
+      scraped.ebayItemId = typed.trim();
+    }
+
+    const cfg = await window.swiftlist.settings();
+    btn.textContent = 'Saving…';
+    const res = await window.swiftlist.api('/api/v1/capture/listing', {
+      method: 'POST',
+      body: JSON.stringify({ ...scraped, sourceAccountName: cfg.pinnedAccount?.accountName, raw: scraped }),
+    });
+    btn.textContent = res.created ? `Saved ${res.item.sku}` : `Updated ${res.item.sku}`;
+    if (res.warnings?.length) window.alert('listflow:\n\n' + res.warnings.join('\n\n'));
+  } catch (err) {
+    btn.textContent = `Failed: ${err.message}`.slice(0, 46);
+    window.swiftlist.telemetry({ where: 'content-listing.reviseCapture', err: err.message, url: location.href });
+  } finally {
+    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 5000);
+  }
+}
+
+// Reads the seller's own form. Everything here is a FIELD VALUE, not rendered
+// prose, so it needs none of the scraping defences the item page does.
+function scrapeReviseForm() {
+  const val = (labels, selectors = []) => {
+    const el = pickTextInput(selectors) || labels.map(findFieldByLabel).find(Boolean);
+    return el && el.value ? String(el.value).trim() : undefined;
+  };
+  const num = (v) => {
+    const n = Number(String(v ?? '').replace(/[^\d.]/g, ''));
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+
+  const title = val(['Title'], ['[data-testid="title-input"]', '[name="title"]', 'input[aria-label*="Title" i]']);
+
+  // Item number: eBay prints it on the revise page; fall back to any 12-digit
+  // token in a URL on the page.
+  let ebayItemId =
+    (document.body.innerText.match(/item\s*(?:number|id)\s*:?\s*(\d{9,})/i) || [])[1] ||
+    (document.querySelector('a[href*="/itm/"]')?.href.match(/\/itm\/(?:[^/]+\/)?(\d{9,})/) || [])[1];
+
+  const specifics = {};
+  for (const lab of document.querySelectorAll('label')) {
+    const name = (lab.textContent || '').trim().replace(/\s*:\s*$/, '');
+    if (!name || name.length > 60) continue;
+    const el = findFieldByLabel(name);
+    if (!el || !el.value) continue;
+    const v = String(el.value).trim();
+    if (v && v.toLowerCase() !== name.toLowerCase()) specifics[name] = v;
+  }
+
+  const lengthIn = num(val(['Length'])); const widthIn = num(val(['Width'])); const heightIn = num(val(['Height']));
+
+  return {
+    ebayItemId,
+    title,
+    categoryPath: val(['Category']),
+    ebayCategoryId: val([], ['[data-testid="category-id-input"]', 'input[name="categoryId"]']),
+    condition: val(['Condition']),
+    price: num(val(['Buy It Now price', 'Price', 'Item price'], ['[name="binPrice"]'])),
+    itemSpecifics: specifics,
+    weightOz: num(val(['Weight', 'Package weight'])),
+    packageDimensions: (lengthIn || widthIn || heightIn) ? { length: lengthIn, width: widthIn, height: heightIn } : undefined,
+    postalCode: val(['ZIP code', 'Zip code', 'Postal code']),
+    capturedFrom: 'revise-form',
+  };
 }
 
 // ── Revise: Custom Label only ──────────────────────────────────────────
