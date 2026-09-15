@@ -18,13 +18,29 @@
   const url = new URL(location.href);
   if (/ReviseItem/i.test(url.search)) return; // revise is content-listing.js's job
 
-  const explicit = url.searchParams.get('listflowRebuild');
+  // Three ways to arrive, in order of directness. The stash is what the popup
+  // uses: eBay's listing entry points move around (/sl/sell is retired, the
+  // form is /lstng), so "open eBay and carry the intent" beats asking anyone to
+  // land on a particular URL.
+  const explicit = url.searchParams.get('listflowRebuild') || (await claimPendingRebuild());
   if (explicit) {
     await openPanel(explicit);
   } else {
     mountLauncher();
   }
 })();
+
+async function claimPendingRebuild() {
+  try {
+    const { pendingRebuild } = await chrome.storage.local.get('pendingRebuild');
+    if (!pendingRebuild) return null;
+    const fresh = Date.now() - (pendingRebuild.at || 0) < 10 * 60 * 1000;
+    await chrome.storage.local.remove('pendingRebuild');
+    return fresh ? pendingRebuild.itemId : null;
+  } catch {
+    return null;
+  }
+}
 
 function mountLauncher() {
   const b = document.createElement('button');

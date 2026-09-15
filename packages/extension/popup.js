@@ -142,6 +142,71 @@ configForm.addEventListener('submit', async (e) => {
   }
 });
 
+// ── Relist queue ───────────────────────────────────────────────────
+//
+// The entry point for rebuilding a captured listing on THIS account. It lives
+// here rather than only on eBay's sell page because eBay keeps moving that page
+// (/sl/sell is retired; the form is /lstng), and "which URL do I go to" was the
+// single most confusing part of the flow. Pick an item, we stash the intent and
+// open eBay — content-rebuild.js picks it up wherever it lands.
+
+async function loadRelistQueue(state) {
+  const box = el('relist-queue');
+  const account = state.pinnedAccount?.accountName || '';
+  if (!account) {
+    box.className = 'empty';
+    box.textContent = 'Pin this profile to an eBay account first (above).';
+    return;
+  }
+  box.className = '';
+  try {
+    const data = await window.swiftlist.api(
+      `/api/v1/capture/relist-queue?account=${encodeURIComponent(account)}`,
+    );
+    const items = data.items || [];
+    if (items.length === 0) {
+      box.className = 'empty';
+      box.textContent = `Nothing captured on the other account yet.`;
+      return;
+    }
+    box.innerHTML = '';
+    for (const it of items) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      const t = document.createElement('span');
+      t.className = 't';
+      const shelf = it.locationCode
+        ? `<span style="color:#6c6">${it.locationCode}</span>`
+        : '<span style="color:#ea4">no shelf</span>';
+      t.innerHTML = `${escapeHtmlPopup(it.title || '(untitled)')}<br><span style="font-size:10px;color:#888">${it.sku || ''} · ${shelf} · ${it.photoCount} photo(s)</span>`;
+      t.title = it.title || '';
+      const btn = document.createElement('button');
+      btn.textContent = 'Rebuild →';
+      btn.addEventListener('click', async () => {
+        await chrome.storage.local.set({
+          pendingRebuild: { itemId: it.id, at: Date.now() },
+        });
+        await window.swiftlist.setLastItem(it.id);
+        // eBay's own "sell" entry point, which redirects to whatever the
+        // current listing form is. We do not hardcode the form URL.
+        chrome.tabs.create({ url: 'https://www.ebay.com/sl/prelist/identify' });
+        window.close();
+      });
+      row.appendChild(t);
+      row.appendChild(btn);
+      box.appendChild(row);
+    }
+  } catch (err) {
+    box.className = 'empty';
+    box.textContent = `Failed: ${err.message}`;
+  }
+}
+
+function escapeHtmlPopup(x) {
+  return String(x ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 // ── Items needing sold comps ───────────────────────────────────────
 
 async function loadNeedsComps() {
@@ -314,6 +379,7 @@ async function refreshAll() {
     show('session-section', false);
     show('nav', false);
     show('scan-section', false);
+    show('relist-section', false);
     show('needs-comps-section', false);
     setStatus('warn', state.hasKey ? 'Signed out' : 'First sign-in needed');
     if (state.user?.email) el('login-email').value = state.user.email;
@@ -324,6 +390,7 @@ async function refreshAll() {
   show('session-section', true);
   show('nav', true);
   show('scan-section', true);
+  show('relist-section', true);
   show('needs-comps-section', true);
   el('user-name').textContent = state.user?.name || '';
   await loadPinnedAccountSelect(state);
@@ -332,6 +399,7 @@ async function refreshAll() {
     await window.swiftlist.ping();
     setStatus('ok', new URL(state.baseUrl).host);
     await refreshScanFolder();
+    await loadRelistQueue(state);
     await loadNeedsComps();
   } catch {
     setStatus('err', `Can't reach ${state.baseUrl}`);
