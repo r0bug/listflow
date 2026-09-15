@@ -261,6 +261,13 @@ async function openPanel(itemId, existing) {
   await window.listflow.setLastItem(itemId);
   panel.setSubtitle(payload.title ? payload.title.slice(0, 48) : itemId);
 
+  // Link this rebuild to an EbayDraft and watch for the publish. Without this
+  // nothing records that the relist happened: the item stays in the queue, and
+  // the next person working the queue lists it a SECOND time. Reuses the draft
+  // machinery the resume flow already has — the server flips the Item to LISTED
+  // and stores the new eBay item id when the draft goes SUBMITTED.
+  void trackPublish(itemId);
+
   const wrap = document.createElement('div');
   for (const step of STEPS) {
     const value = step.show(payload) || '';
@@ -533,6 +540,78 @@ function showPhotoFallback(photos) {
     box.appendChild(img);
   }
   document.querySelector('#__listflow_panel_body')?.appendChild(box);
+}
+
+// ── Publish tracking ───────────────────────────────────────────────────
+
+async function trackPublish(itemId) {
+  let draftId = null;
+  try {
+    const cfg = await window.listflow.settings();
+    const draft = await window.listflow.api(`/api/v1/items/${itemId}/drafts`, {
+      method: 'POST',
+      body: JSON.stringify({
+        ebayDraftUrl: location.href,
+        ebayDraftId: new URL(location.href).searchParams.get('draftId') || undefined,
+        accountHint: cfg.pinnedAccount?.accountName,
+      }),
+    });
+    draftId = draft.id;
+  } catch (err) {
+    // A rebuild that cannot be tracked is still worth doing, but the operator
+    // must know the queue will not clear itself.
+    console.warn('[listflow] publish tracking unavailable', err);
+    flagUntracked();
+    return;
+  }
+
+  const seen = new Set();
+  const check = async () => {
+    const m = location.pathname.match(/\/itm\/(?:[^/]+\/)?(\d{8,})/);
+    if (!m || seen.has(m[1])) return;
+    seen.add(m[1]);
+    try {
+      await window.listflow.api(`/api/v1/drafts/${draftId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'SUBMITTED', ebayItemId: m[1] }),
+      });
+      announcePublished(m[1]);
+    } catch (err) {
+      console.warn('[listflow] could not record the publish', err);
+    }
+  };
+
+  // eBay's flow is a SPA: the URL changes without a navigation, so polling the
+  // location is more reliable here than listening for page loads.
+  setInterval(check, 1500);
+  new MutationObserver(check).observe(document.documentElement, { childList: true, subtree: true });
+}
+
+function flagUntracked() {
+  const panel = document.getElementById('__listflow_panel_body');
+  if (!panel || document.getElementById('lf-untracked')) return;
+  const d = document.createElement('div');
+  d.id = 'lf-untracked';
+  d.style.cssText =
+    'background:#ea4;color:#111;border-radius:4px;padding:8px 10px;margin-bottom:10px;font-size:12px;line-height:1.4;';
+  d.innerHTML =
+    '<b>Publish will not be recorded.</b> This item will stay in the relist queue after you list it — ' +
+    'and could be listed twice. Mark it listed in listflow by hand, or reload and try again.';
+  panel.insertBefore(d, panel.firstChild);
+}
+
+function announcePublished(ebayItemId) {
+  const panel = document.getElementById('__listflow_panel_body');
+  if (!panel) return;
+  document.getElementById('lf-published')?.remove();
+  const d = document.createElement('div');
+  d.id = 'lf-published';
+  d.style.cssText =
+    'background:#1f3a2c;color:#9f9;border:1px solid #3ecf7a;border-radius:4px;padding:8px 10px;margin-bottom:10px;font-size:12px;line-height:1.4;';
+  d.innerHTML =
+    `<b>Listed as ${esc(ebayItemId)}.</b> Recorded in listflow and removed from the relist queue. ` +
+    'You can now end the original listing on the other account.';
+  panel.insertBefore(d, panel.firstChild);
 }
 
 // ── Panel shell ────────────────────────────────────────────────────────

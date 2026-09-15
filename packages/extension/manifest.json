@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "listflow",
-  "version": "1.3.3",
+  "version": "1.4.0",
   "description": "YF eBay suite front door: capture a live listing, stamp SKU|LOC shelf codes, rebuild it on the other account, plus comps research and draft resume.",
   "permissions": ["storage", "activeTab", "scripting", "tabs", "alarms"],
   "host_permissions": [
