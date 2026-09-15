@@ -636,21 +636,13 @@ function scrape(ebayItemId) {
     .filter(Boolean);
   const categoryPath = breadcrumbs.join(' > ');
 
-  const specifics = {};
-  const specRows = document.querySelectorAll(
-    '.ux-layout-section-evo--features dl, .itemAttr table tr, .ux-layout-section__item--table-view dl',
-  );
-  for (const row of specRows) {
-    const dt = row.querySelector('dt, td:nth-child(1)');
-    const dd = row.querySelector('dd, td:nth-child(2)');
-    if (dt && dd) {
-      const k = dt.textContent.trim().replace(/\s+/g, ' ');
-      const v = dd.textContent.trim().replace(/\s+/g, ' ');
-      if (k && v) specifics[k] = v;
-    }
-  }
+  const specifics = collectItemSpecifics();
 
-  const condition = specifics['Condition'] || textOf('.x-item-condition-text, [data-testid="x-item-condition"]') || undefined;
+  const condition = normalizeCondition(
+    specifics['Condition'] ||
+      textOf('.x-item-condition-value, [data-testid="x-item-condition-value"]') ||
+      textOf('.x-item-condition-text, [data-testid="x-item-condition"]'),
+  );
   const brand = specifics['Brand'] || undefined;
   const model = specifics['Model'] || specifics['Model Number'] || undefined;
 
@@ -780,4 +772,103 @@ async function scrapeFull(ebayItemId) {
   const base = scrape(ebayItemId);
   const desc = await fetchDescription(base.descriptionHtml);
   return { ...base, description: desc.text || base.description, descriptionHtml: desc.html || base.descriptionHtml };
+}
+
+
+// ── Item specifics ─────────────────────────────────────────────────────
+//
+// Real-page result 2026-09-14: the original single-selector version returned
+// {} on a live listing — eBay had moved on from `.ux-layout-section-evo--features
+// dl` / `.itemAttr table tr`. Item specifics are most of a listing, so an empty
+// object is a silent, expensive failure.
+//
+// Rather than chase one class name, try every shape eBay is known to use and
+// merge. First writer wins, so the most specific strategy runs first.
+function collectItemSpecifics() {
+  const out = {};
+
+  const add = (rawKey, rawVal) => {
+    const k = clean(rawKey).replace(/\s*:\s*$/, '');
+    const v = clean(rawVal);
+    if (!k || !v) return;
+    if (k.length > 60 || v.length > 300) return;          // a paragraph, not a spec
+    if (/^(more information|about this item|read more|see all)/i.test(k)) return;
+    if (k.toLowerCase() === v.toLowerCase()) return;      // label echoed as value
+    if (!(k in out)) out[k] = v;
+  };
+
+  // 1. Modern eBay: .ux-labels-values rows with labels/values sub-blocks.
+  for (const row of document.querySelectorAll('.ux-labels-values')) {
+    const l = row.querySelector('.ux-labels-values__labels-content, .ux-labels-values__labels');
+    const v = row.querySelector('.ux-labels-values__values-content, .ux-labels-values__values');
+    if (l && v) add(textIn(l), textIn(v));
+  }
+
+  // 2. Definition lists (older evo layouts), pairing dt->dd positionally.
+  for (const dl of document.querySelectorAll('dl')) {
+    const dts = [...dl.querySelectorAll(':scope > dt, :scope > div > dt')];
+    const dds = [...dl.querySelectorAll(':scope > dd, :scope > div > dd')];
+    if (dts.length && dts.length === dds.length) {
+      for (let i = 0; i < dts.length; i++) add(textIn(dts[i]), textIn(dds[i]));
+    }
+  }
+
+  // 3. Legacy two-column tables (.itemAttr), which pack several pairs per row.
+  for (const tr of document.querySelectorAll('.itemAttr table tr, table.attrLabels tr')) {
+    const cells = [...tr.children];
+    for (let i = 0; i + 1 < cells.length; i += 2) add(textIn(cells[i]), textIn(cells[i + 1]));
+  }
+
+  return out;
+}
+
+function textIn(el) {
+  return el ? el.innerText || el.textContent || '' : '';
+}
+
+function clean(s) {
+  return String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+}
+
+// ── Condition ──────────────────────────────────────────────────────────
+//
+// Real-page result 2026-09-14: this came back as
+//   "Condition:UsedUsedMore information - About this item condition"
+// because the block selector swept up the label, eBay's doubled value, and the
+// help link. The rebuild panel matches this string against eBay's condition
+// dropdown, so anything but a clean vocabulary term silently fails to fill.
+const EBAY_CONDITIONS = [
+  'New with tags', 'New without tags', 'New with box', 'New without box',
+  'New with defects', 'Open box', 'Certified - Refurbished',
+  'Excellent - Refurbished', 'Very Good - Refurbished', 'Good - Refurbished',
+  'Seller refurbished', 'Manufacturer refurbished', 'For parts or not working',
+  'Like New', 'Very Good', 'Acceptable', 'Pre-owned', 'Brand New', 'New', 'Used', 'Good',
+];
+
+function normalizeCondition(raw) {
+  let s = clean(raw);
+  if (!s) return undefined;
+
+  s = s.replace(/^condition\s*:?\s*/i, '');
+  // Cut eBay's trailing help affordances.
+  s = s.split(/more information|about this item condition|read more|see full description/i)[0];
+  s = clean(s);
+  if (!s) return undefined;
+
+  // eBay renders the value twice back-to-back in some layouts ("UsedUsed").
+  if (s.length % 2 === 0) {
+    const half = s.length / 2;
+    if (s.slice(0, half) === s.slice(half)) s = s.slice(0, half);
+  }
+
+  const exact = EBAY_CONDITIONS.find((c) => c.toLowerCase() === s.toLowerCase());
+  if (exact) return exact;
+
+  // Longest known term the string starts with — "Used" out of "Used Very good".
+  const prefix = EBAY_CONDITIONS
+    .filter((c) => s.toLowerCase().startsWith(c.toLowerCase()))
+    .sort((a, b) => b.length - a.length)[0];
+  if (prefix) return prefix;
+
+  return s.slice(0, 60);
 }

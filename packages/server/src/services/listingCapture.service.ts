@@ -44,9 +44,14 @@ export interface CaptureInput {
 
 export interface CaptureResult {
   item: { id: string; sku: string | null; title: string | null; locationCode: string | null };
+  /** false = this eBay listing was already held; the existing Item was updated. */
   created: boolean;
   photosAdded: number;
   photosFailed: number;
+  /** Fields refreshed from the page on a re-capture. */
+  refreshed?: string[];
+  /** Fields the scrape came back empty for, where the stored value was kept. */
+  keptFromBefore?: string[];
   warnings: string[];
 }
 
@@ -137,10 +142,51 @@ export async function captureListing(input: CaptureInput): Promise<CaptureResult
 
   let item;
   let created = false;
+  const refreshed: string[] = [];
+  const keptFromBefore: string[] = [];
+
   if (existing) {
-    // Re-capture refreshes the fields but must NOT discard a location an
-    // operator has already assigned, nor the SKU already on a printed label.
-    item = await prisma.item.update({ where: { id: existing.id }, data: core });
+    // RE-CAPTURE of a listing we already hold. Update in place — never a
+    // second row. Two things are deliberately protected:
+    //
+    //  1. locationCode and sku are absent from `core`, so a re-copy can never
+    //     move an item off its shelf or invalidate a printed label.
+    //  2. A field the scraper FAILED to read this time must not wipe a good
+    //     value we already have. eBay changes its markup, and a selector that
+    //     silently returns '' would otherwise turn a re-copy into data loss —
+    //     exactly what happened to itemSpecifics on 2026-09-14. Empty never
+    //     beats non-empty.
+    const guarded: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(core)) {
+      const incomingEmpty =
+        value === undefined ||
+        value === null ||
+        (typeof value === 'string' && value.trim() === '') ||
+        (typeof value === 'object' &&
+          value !== null &&
+          !(value instanceof Date) &&
+          Object.keys(value as object).length === 0);
+
+      const prior = (existing as unknown as Record<string, unknown>)[key];
+      const priorEmpty =
+        prior === undefined ||
+        prior === null ||
+        (typeof prior === 'string' && (prior as string).trim() === '');
+
+      if (incomingEmpty && !priorEmpty) {
+        keptFromBefore.push(key);
+        continue; // keep what we already had
+      }
+      guarded[key] = value;
+      if (!incomingEmpty && key !== 'capturedAt' && key !== 'capturedPayload') {
+        refreshed.push(key);
+      }
+    }
+
+    item = await prisma.item.update({
+      where: { id: existing.id },
+      data: guarded as Prisma.ItemUpdateInput,
+    });
   } else {
     item = await prisma.item.create({
       data: { ...core, status: 'IN_PROCESS', stage: 'IDENTIFIED' },
@@ -152,14 +198,18 @@ export async function captureListing(input: CaptureInput): Promise<CaptureResult
 
   // Photos. Only fetch what we do not already have for this item — re-capture
   // should not re-download a gallery every time.
-  let photosAdded = 0;
+  const photosBefore = await prisma.photo.count({ where: { itemId: item.id } });
   let photosFailed = 0;
   const urls = [...new Set(input.imageUrls ?? [])];
   for (const url of urls) {
     const photoId = await downloadAndAttachImage(item.id, url);
-    if (photoId) photosAdded++;
-    else photosFailed++;
+    if (!photoId) photosFailed++;
   }
+  // Count the delta rather than the loop's successes: sha256 dedup means a
+  // re-copy "succeeds" on photos it already had, and reporting "4 added" on a
+  // re-copy that added nothing is a lie the operator would act on.
+  const photosAfter = await prisma.photo.count({ where: { itemId: item.id } });
+  const photosAdded = photosAfter - photosBefore;
 
   const withPhotos = await prisma.item.findUnique({
     where: { id: item.id },
@@ -190,11 +240,19 @@ export async function captureListing(input: CaptureInput): Promise<CaptureResult
   }
   if (!input.title) warnings.push('No title captured.');
 
+  if (!created && keptFromBefore.length) {
+    warnings.push(
+      `Re-copy: the page gave nothing for ${keptFromBefore.join(', ')} — kept the previously stored value. If that looks wrong, the scraper may need updating for a changed eBay layout.`,
+    );
+  }
+
   return {
     item: { id: item.id, sku, title: item.title, locationCode: item.locationCode },
     created,
     photosAdded,
     photosFailed,
+    refreshed: created ? undefined : refreshed,
+    keptFromBefore: created ? undefined : keptFromBefore,
     warnings,
   };
 }
