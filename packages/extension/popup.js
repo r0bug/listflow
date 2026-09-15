@@ -371,6 +371,10 @@ scanBtn.addEventListener('click', startScan);
 
 // ── Boot ───────────────────────────────────────────────────────────
 
+try {
+  el('ver').textContent = 'v' + chrome.runtime.getManifest().version;
+} catch { /* non-extension context */ }
+
 async function refreshAll() {
   const state = await send({ type: 'auth-state' });
 

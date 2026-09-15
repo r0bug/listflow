@@ -354,8 +354,12 @@ function markPresence() {
   if (document.getElementById('__listflow_present')) return;
   const dot = document.createElement('div');
   dot.id = '__listflow_present';
-  dot.title = 'listflow content script is running on this page';
-  dot.textContent = 'listflow';
+  // The VERSION is the point. Several dead ends today were an older build
+  // still loaded, and nothing on the page could say so — "is this even the
+  // code I just wrote?" should never cost a round trip to answer.
+  const v = (chrome.runtime.getManifest && chrome.runtime.getManifest().version) || '?';
+  dot.title = `listflow ${v} content script is running on this page`;
+  dot.textContent = `listflow ${v}`;
   dot.style.cssText =
     'position:fixed;bottom:6px;left:6px;z-index:2147483600;background:#181818;color:#6af;' +
     'border:1px solid #3a3a3a;border-radius:3px;padding:2px 6px;font:11px -apple-system,system-ui,sans-serif;opacity:0.65;';
