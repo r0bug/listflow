@@ -272,11 +272,11 @@ async function openShelfPrompt(bar, ebayItemId, item) {
     overlay,
     `<div style="padding:20px;display:flex;flex-direction:column;gap:12px;">
       <div style="font-size:16px;font-weight:600;">Shelf for ${escapeHtml(item.sku || 'this item')}</div>
-      <div style="color:#666;font-size:12px;">Scan the shelf barcode or type a code like R3-S2.${
+      <div style="color:#666;font-size:12px;">Scan the shelf tag, or type anything — "A-1", "johns garage", wherever it actually is.${
         item.locationCode ? ` Currently <b>${escapeHtml(item.locationCode)}</b>.` : ''
       }</div>
-      <input id="lf-shelf" list="lf-shelves" placeholder="R3-S2" autocomplete="off"
-        style="padding:10px;border:1px solid #ccc;border-radius:4px;font:inherit;font-size:18px;text-transform:uppercase;" />
+      <input id="lf-shelf" list="lf-shelves" placeholder="A-1" autocomplete="off"
+        style="padding:10px;border:1px solid #ccc;border-radius:4px;font:inherit;font-size:18px;" />
       <datalist id="lf-shelves">${locations.map((l) => `<option value="${escapeAttr(l.code)}">`).join('')}</datalist>
       <div id="lf-shelf-msg" style="font-size:12px;color:#b91c1c;min-height:16px;"></div>
       <div style="display:flex;justify-content:flex-end;gap:8px;">
