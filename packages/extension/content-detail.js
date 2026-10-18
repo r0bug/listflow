@@ -24,6 +24,12 @@
   const ebayItemId = (location.pathname.match(/\/itm\/(?:[^/]+\/)?(\d{8,})/) || [])[1];
   if (!ebayItemId) return;
 
+  // Arriving straight from the listing flow means a draft was just published
+  // and eBay redirected here; report it so the Item flips to LISTED.
+  if (/ebay\.com\/(lstng|sl\/)/.test(document.referrer || '')) {
+    await window.swiftlist.reportPendingSubmit(ebayItemId);
+  }
+
   const bar = mountBar();
   await refreshBar(bar, ebayItemId);
 
@@ -121,7 +127,7 @@ async function refreshBar(bar, ebayItemId) {
   const ownership = detectOwnListing(pinned?.accountName);
   const isMine = ownership.mine;
 
-  const item = status?.captured ? status.item : null;
+  let item = status?.captured ? status.item : null;
 
   if (!item) {
     setBarState(bar, `not saved${seller ? ` · seller ${escapeHtml(seller)}` : ''}`, '#bbb');
@@ -165,6 +171,12 @@ async function refreshBar(bar, ebayItemId) {
         )}&listflowItemId=${encodeURIComponent(item.id)}`;
       }),
     );
+  } else if (item && !pinned?.accountName) {
+    const note = document.createElement('span');
+    note.style.cssText = 'color:#ea4;font-size:11px;white-space:nowrap;';
+    note.textContent = 'no eBay account pinned';
+    note.title = 'Pin this Chrome profile to an eBay account in the listflow popup to enable Revise.';
+    bar.actions.appendChild(note);
   } else if (item) {
     const note = document.createElement('span');
     note.style.cssText = 'color:#777;font-size:11px;white-space:nowrap;cursor:help;';
@@ -174,12 +186,6 @@ async function refreshBar(bar, ebayItemId) {
       `Seller shown: ${seller || 'unknown'}\n` +
       `Profile pinned to: ${pinned?.accountName || '(none)'}\n` +
       `Checked for: ${ownership.checked.join(', ')}`;
-    bar.actions.appendChild(note);
-  } else if (item && !pinned?.accountName) {
-    const note = document.createElement('span');
-    note.style.cssText = 'color:#ea4;font-size:11px;white-space:nowrap;';
-    note.textContent = 'no eBay account pinned';
-    note.title = 'Pin this Chrome profile to an eBay account in the listflow popup to enable Revise.';
     bar.actions.appendChild(note);
   }
 
@@ -209,7 +215,9 @@ function detectOwnListing(pinnedAccountName) {
   const body = document.body?.innerText || '';
 
   // 1. A link into the revise/relist flow — the strongest possible signal.
-  if (document.querySelector('a[href*="mode=ReviseItem"], a[href*="/lstng?"]')) {
+  // Only the revise mode counts: "Sell one like this" is also a /lstng? link
+  // (mode=SellLikeItem) and appears on every listing, including other sellers'.
+  if (document.querySelector('a[href*="mode=ReviseItem"]')) {
     checked.push('revise link');
     return { mine: true, checked };
   }

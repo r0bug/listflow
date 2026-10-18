@@ -44,25 +44,40 @@ export function signStaffToken(user: {
   );
 }
 
-export const staffAuth: RequestHandler = (req, res, next) => {
+type StaffClaims = { sub: string; name: string; role: string; tt: string | null };
+
+/** Verify a staff JWT AND re-check the user in the DB, so a TeamTime
+ *  deactivation or role change takes effect on the next request rather than
+ *  when the 12h token happens to expire. */
+async function resolveStaff(token: string): Promise<StaffContext | null> {
+  let d: StaffClaims;
+  try {
+    d = jwt.verify(token, env.JWT_SECRET) as StaffClaims;
+  } catch {
+    return null;
+  }
+  const user = await prisma.staffUser.findUnique({
+    where: { id: d.sub },
+    select: { id: true, name: true, role: true, active: true, teamtimeUserId: true },
+  });
+  if (!user || !user.active) return null;
+  return { id: user.id, name: user.name, role: user.role, teamtimeUserId: user.teamtimeUserId };
+}
+
+export const staffAuth: RequestHandler = async (req, res, next) => {
   const token =
     req.cookies?.listflow_jwt || req.header('Authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
-  try {
-    const d = jwt.verify(token, env.JWT_SECRET) as {
-      sub: string;
-      name: string;
-      role: string;
-      tt: string | null;
-    };
-    req.staff = { id: d.sub, name: d.name, role: d.role, teamtimeUserId: d.tt };
-    next();
-  } catch {
+  const staff = await resolveStaff(token);
+  if (!staff) {
     res.status(401).json({ error: 'Invalid token' });
+    return;
   }
+  req.staff = staff;
+  next();
 };
 
 export function requireRole(...roles: string[]): RequestHandler {
@@ -117,17 +132,8 @@ export const machineAuth: RequestHandler = async (req, res, next) => {
   // an invalid/missing one never fails a machine-authenticated call.
   const bearer = req.header('Authorization')?.replace(/^Bearer\s+/i, '');
   if (bearer) {
-    try {
-      const d = jwt.verify(bearer, env.JWT_SECRET) as {
-        sub: string;
-        name: string;
-        role: string;
-        tt: string | null;
-      };
-      req.staff = { id: d.sub, name: d.name, role: d.role, teamtimeUserId: d.tt };
-    } catch {
-      /* ignore — machine auth stands on its own */
-    }
+    const staff = await resolveStaff(bearer);
+    if (staff) req.staff = staff; // invalid/inactive: machine auth stands on its own
   }
   next();
 };

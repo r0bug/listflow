@@ -15,7 +15,9 @@ let apiOriginCache = '';
 export async function initApiOrigin(): Promise<void> {
   if (!EXT) return;
   const { baseUrl } = await (chrome as any).storage.sync.get('baseUrl');
-  apiOriginCache = ((baseUrl as string) || 'http://localhost:3005').replace(/\/$/, '');
+  // Same default as the service worker (background.js), so the bundled app
+  // and the content scripts can never talk to two different servers.
+  apiOriginCache = ((baseUrl as string) || 'https://listflow.robug.com').replace(/\/$/, '');
 }
 export function apiOrigin(): string {
   return apiOriginCache;
@@ -76,7 +78,70 @@ function withAdmin(u: Omit<Me, 'isAdmin'>): Me {
   return { ...u, isAdmin: u.role === 'admin' };
 }
 
+/** Multipart upload: no JSON Content-Type, so the browser sets the boundary. */
+async function upload<T>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(`${apiOrigin()}${BASE}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: await authHeaders(),
+    body: form,
+  });
+  if (res.status === 401) throw new AuthError();
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    let msg = text || res.statusText;
+    try {
+      msg = (JSON.parse(text) as { error?: string }).error ?? msg;
+    } catch {
+      /* not JSON */
+    }
+    throw new Error(`HTTP ${res.status}: ${msg}`);
+  }
+  return (await res.json()) as T;
+}
+
+export interface EbayAccountRow {
+  id: string;
+  accountName: string;
+  isActive: boolean;
+}
+export interface OrdersImportResult {
+  created: number;
+  skipped: number;
+  duplicates: number;
+  matchedToItems: number;
+  locMismatches: unknown[];
+  errors: { row: number; reason: string }[];
+  dryRun: boolean;
+}
+export interface EarningsImportResult {
+  rows: number;
+  matched: number;
+  updated: number;
+  created: number;
+  unmatched: number;
+  skipped: number;
+  dryRun: boolean;
+}
+
 export const api = {
+  listEbayAccounts: () => http<{ accounts: EbayAccountRow[] }>('/ebay-accounts'),
+  importSalesCsv: (
+    kind: 'orders' | 'earnings',
+    file: File,
+    ebayAccountId: string,
+    opts: { dryRun: boolean; createMissing?: boolean },
+  ) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('ebayAccountId', ebayAccountId);
+    form.append('dryRun', String(opts.dryRun));
+    if (kind === 'earnings') form.append('createMissing', String(Boolean(opts.createMissing)));
+    return upload<OrdersImportResult | EarningsImportResult>(
+      kind === 'orders' ? '/sales/import' : '/sales/import-earnings',
+      form,
+    );
+  },
   login: async (email: string, password: string): Promise<{ token?: string; user: Me }> => {
     if (EXT) {
       // Through the SW: stores JWT + provisions the machine key.

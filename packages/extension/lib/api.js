@@ -54,6 +54,40 @@
     return api('/api/v1/health');
   }
 
-  window.swiftlist = { api, settings, setLastItem, telemetry, ping };
+  // Publishing a draft is a FULL page navigation (draft → confirmation → /itm),
+  // which tears down the content script that was watching the draft. So the
+  // draft page leaves a note in storage, and whichever page loads next reports
+  // the publish if it can see the new item id.
+  function armSubmitWatch(draftId) {
+    return chrome.storage.local.set({ pendingSubmit: { draftId, at: Date.now() } });
+  }
+
+  async function reportPendingSubmit(ebayItemId) {
+    if (!ebayItemId) return false;
+    let pendingSubmit;
+    try {
+      ({ pendingSubmit } = await chrome.storage.local.get('pendingSubmit'));
+    } catch {
+      return false;
+    }
+    if (!pendingSubmit?.draftId) return false;
+    if (Date.now() - (pendingSubmit.at || 0) > 15 * 60 * 1000) {
+      await chrome.storage.local.remove('pendingSubmit');
+      return false;
+    }
+    try {
+      await api(`/api/v1/drafts/${encodeURIComponent(pendingSubmit.draftId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'SUBMITTED', ebayItemId: String(ebayItemId) }),
+      });
+      await chrome.storage.local.remove('pendingSubmit');
+      return true;
+    } catch (err) {
+      console.warn('[listflow] submission report failed', err);
+      return false;
+    }
+  }
+
+  window.swiftlist = { api, settings, setLastItem, telemetry, ping, armSubmitWatch, reportPendingSubmit };
   window.listflow = window.swiftlist; // forward-facing alias
 })();

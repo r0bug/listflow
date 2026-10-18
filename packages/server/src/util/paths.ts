@@ -70,3 +70,35 @@ export function inboxDirAbs(): string {
   fs.mkdirSync(p, { recursive: true });
   return p;
 }
+
+/** Folders that path-based ingest (/ingest/photo {path}, /ingest/scan) may
+ *  read. Anything else on the host is off limits: a machine key must not be
+ *  able to pull arbitrary server files into the photo pool. */
+export function ingestAllowedRoots(): string[] {
+  const extra = env.INGEST_ALLOWED_ROOTS.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => path.resolve(s));
+  return [FILE_ROOT, ...extra];
+}
+
+/** Resolved real path if `p` sits inside an allowed ingest root, else null.
+ *  Symlinks are resolved so a link inside the inbox cannot point outside it. */
+export function resolveIngestPath(p: string): string | null {
+  let real: string;
+  try {
+    real = fs.realpathSync(path.resolve(p));
+  } catch {
+    return null;
+  }
+  for (const root of ingestAllowedRoots()) {
+    let rootReal = root;
+    try {
+      rootReal = fs.realpathSync(root);
+    } catch {
+      /* root may not exist yet */
+    }
+    if (real === rootReal || real.startsWith(rootReal + path.sep)) return real;
+  }
+  return null;
+}

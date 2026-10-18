@@ -6,14 +6,14 @@ import { z } from 'zod';
 import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../db/prisma.js';
-import { staffAuth, staffOrMachine } from '../middleware/auth.js';
+import { staffAuth, staffOrMachine, requireRole } from '../middleware/auth.js';
 import { sha256String } from '../util/sha256.js';
 import { pstr } from '../util/req.js';
 
 const router = Router();
 
 // GET /api/v1/settings/api-keys — list machine keys (hashed at rest).
-router.get('/api-keys', staffAuth, async (_req, res) => {
+router.get('/api-keys', staffAuth, requireRole('admin', 'manager'), async (_req, res) => {
   const keys = await prisma.apiKey.findMany({
     orderBy: { createdAt: 'desc' },
     include: { machines: { select: { machineId: true, label: true, kind: true, lastSeenAt: true } } },
@@ -36,7 +36,7 @@ const CreateKeySchema = z.object({
   name: z.string().min(1),
 });
 
-router.post('/api-keys', staffAuth, async (req, res) => {
+router.post('/api-keys', staffAuth, requireRole('admin', 'manager'), async (req, res) => {
   const parsed = CreateKeySchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
@@ -50,7 +50,7 @@ router.post('/api-keys', staffAuth, async (req, res) => {
 });
 
 // POST /api/v1/settings/api-keys/:id/revoke — mark revokedAt = now.
-router.post('/api-keys/:id/revoke', staffAuth, async (req, res) => {
+router.post('/api-keys/:id/revoke', staffAuth, requireRole('admin', 'manager'), async (req, res) => {
   const existing = await prisma.apiKey.findUnique({ where: { id: pstr(req.params.id) } });
   if (!existing) {
     res.status(404).json({ error: 'Not found' });
@@ -87,7 +87,7 @@ router.get('/ai-provider', staffOrMachine, async (_req, res) => {
 
 const AiProviderSchema = z.object({ provider: z.enum(AI_PROVIDERS) });
 
-router.put('/ai-provider', staffOrMachine, async (req, res) => {
+router.put('/ai-provider', staffAuth, requireRole('admin', 'manager'), async (req, res) => {
   const parsed = AiProviderSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
@@ -113,7 +113,7 @@ router.get('/ingest-hint', staffAuth, async (_req, res) => {
 
 const IngestHintSchema = z.object({ hint: z.string().max(4000) });
 
-router.put('/ingest-hint', staffAuth, async (req, res) => {
+router.put('/ingest-hint', staffAuth, requireRole('admin', 'manager'), async (req, res) => {
   const parsed = IngestHintSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });

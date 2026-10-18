@@ -120,6 +120,26 @@ router.patch('/:id', staffAuth, async (req, res) => {
     return;
   }
   const data = parsed.data as Prisma.ItemUpdateInput;
+  // A shelf set from the web app must go through the same path as the
+  // extension's /location call: validate/create the location and make sure the
+  // item has a SKU, or the Custom Label "<SKU>|<LOC>" comes out half-empty.
+  if (typeof parsed.data.locationCode === 'string' && parsed.data.locationCode.trim()) {
+    try {
+      data.locationCode = (await resolveOrCreateLocation(parsed.data.locationCode)).code;
+    } catch (err) {
+      if (err instanceof InvalidLocationCode) {
+        res.status(400).json({ error: err.message });
+        return;
+      }
+      throw err;
+    }
+    const existing = await prisma.item.findUnique({ where: { id: pstr(req.params.id) } });
+    if (!existing) {
+      res.status(404).json({ error: 'Item not found' });
+      return;
+    }
+    await ensureItemSku(existing);
+  }
   const updated = await prisma.item.update({
     where: { id: pstr(req.params.id) },
     data,
@@ -198,6 +218,13 @@ router.post('/:id/photos/reorder', staffAuth, async (req, res) => {
     res.status(400).json({ error: 'photoIds must be an array' });
     return;
   }
+  const itemId = pstr(req.params.id);
+  // Only photos that belong to THIS item; a stray id must not reorder another item.
+  const owned = await prisma.photo.count({ where: { id: { in: photoIds }, itemId } });
+  if (owned !== new Set(photoIds).size) {
+    res.status(400).json({ error: 'photoIds must all belong to this item' });
+    return;
+  }
   await prisma.$transaction(
     photoIds.map((pid, idx) => prisma.photo.update({ where: { id: pid }, data: { order: idx } })),
   );
@@ -207,6 +234,11 @@ router.post('/:id/photos/reorder', staffAuth, async (req, res) => {
 router.post('/:id/photos/:photoId/primary', staffAuth, async (req, res) => {
   const id = pstr(req.params.id);
   const photoId = pstr(req.params.photoId);
+  const photo = await prisma.photo.findFirst({ where: { id: photoId, itemId: id }, select: { id: true } });
+  if (!photo) {
+    res.status(404).json({ error: 'Photo not found on this item' });
+    return;
+  }
   await prisma.$transaction([
     prisma.photo.updateMany({ where: { itemId: id }, data: { isPrimary: false } }),
     prisma.photo.update({ where: { id: photoId }, data: { isPrimary: true } }),
@@ -215,7 +247,13 @@ router.post('/:id/photos/:photoId/primary', staffAuth, async (req, res) => {
 });
 
 router.delete('/:id/photos/:photoId', staffAuth, async (req, res) => {
-  await prisma.photo.delete({ where: { id: pstr(req.params.photoId) } });
+  const deleted = await prisma.photo.deleteMany({
+    where: { id: pstr(req.params.photoId), itemId: pstr(req.params.id) },
+  });
+  if (!deleted.count) {
+    res.status(404).json({ error: 'Photo not found on this item' });
+    return;
+  }
   res.json({ ok: true });
 });
 
@@ -412,7 +450,8 @@ router.post('/photo/:photoId/image-search', staffOrMachine, async (req, res) => 
   }
   try {
     // eBay rejects extremely large payloads; resize to 1024 longedge + JPEG.
-    const buf = await sharp(source)
+    // Stored paths are relative to FILE_ROOT (Standards §4).
+    const buf = await sharp(absPath(source))
       .rotate()
       .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 80 })
@@ -493,6 +532,9 @@ router.post('/:id/merge-into', staffAuth, async (req, res) => {
     await moveItemComps(tx, sourceId, targetId);
     await tx.ebayDraft.updateMany({ where: { itemId: sourceId }, data: { itemId: targetId } });
     await tx.ingestEvent.updateMany({ where: { itemId: sourceId }, data: { itemId: targetId } });
+    // Sales too: deleting the source would otherwise null their itemId and
+    // drop the sale out of every item-based report.
+    await tx.sale.updateMany({ where: { itemId: sourceId }, data: { itemId: targetId } });
     await tx.item.update({
       where: { id: targetId },
       data: { aiCost: { increment: Number(source.aiCost) } },

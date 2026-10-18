@@ -18,7 +18,7 @@ import { machineAuth, staffOrMachine } from '../middleware/auth.js';
 import { ingestService, type IngestContext } from '../services/ingest.service.js';
 import { scanInbox } from '../services/scanInbox.service.js';
 import { prisma } from '../db/prisma.js';
-import { inboxDirAbs } from '../util/paths.js';
+import { inboxDirAbs, resolveIngestPath } from '../util/paths.js';
 
 const router = Router();
 
@@ -101,6 +101,14 @@ router.post('/photo', staffOrMachine, upload.single('file'), (req, res) => {
     return;
   }
   let sourcePath = parsed.data.path;
+  if (sourcePath && !parsed.data.inline) {
+    const safe = resolveIngestPath(sourcePath);
+    if (!safe) {
+      res.status(403).json({ error: 'path is outside the allowed ingest folders' });
+      return;
+    }
+    sourcePath = safe;
+  }
   if (parsed.data.inline) {
     const dir = path.join(inboxDirAbs(), '_uploads');
     fs.mkdirSync(dir, { recursive: true });
@@ -125,9 +133,16 @@ router.post('/batch', staffOrMachine, (req, res) => {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
     return;
   }
+  // Reject the whole batch up front rather than queue half of it.
+  for (const p of parsed.data.photos) {
+    if (p.path && !p.inline && !resolveIngestPath(p.path)) {
+      res.status(403).json({ error: `path is outside the allowed ingest folders: ${p.path}` });
+      return;
+    }
+  }
   const jobIds: string[] = [];
   for (const p of parsed.data.photos) {
-    let sourcePath = p.path;
+    let sourcePath = p.path && !p.inline ? resolveIngestPath(p.path)! : p.path;
     if (p.inline) {
       const dir = path.join(inboxDirAbs(), '_uploads');
       fs.mkdirSync(dir, { recursive: true });
@@ -149,7 +164,16 @@ router.post('/scan', staffOrMachine, async (req, res) => {
     res.status(400).json({ error: 'Invalid body', issues: parsed.error.issues });
     return;
   }
-  const folder = path.resolve(parsed.data.folder?.trim() || inboxDirAbs());
+  const requested = path.resolve(parsed.data.folder?.trim() || inboxDirAbs());
+  if (!fs.existsSync(requested)) {
+    res.status(404).json({ error: 'Folder does not exist' });
+    return;
+  }
+  const folder = resolveIngestPath(requested);
+  if (!folder) {
+    res.status(403).json({ error: 'folder is outside the allowed ingest folders' });
+    return;
+  }
   if (!fs.existsSync(folder)) {
     res.status(404).json({ error: `Folder does not exist: ${folder}` });
     return;

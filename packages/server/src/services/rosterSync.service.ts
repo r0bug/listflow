@@ -68,6 +68,12 @@ export async function syncRoster(): Promise<RosterSyncResult> {
     synced++;
   }
 
+  // A TeamTime outage or a bad payload can look like "nobody works here".
+  // Never act on an empty roster.
+  if (seen.size === 0) {
+    logger.warn('roster sync: TeamTime returned no staff; skipping deactivation');
+    return { synced, deactivated: 0, skipped: false };
+  }
   const deactivated = await prisma.staffUser.updateMany({
     where: { source: 'teamtime', active: true, teamtimeUserId: { notIn: [...seen] } },
     data: { active: false },

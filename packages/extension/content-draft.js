@@ -29,6 +29,10 @@
   const { pendingRebuild } = await chrome.storage.local.get('pendingRebuild').catch(() => ({}));
   if (pendingRebuild || window.__listflow_rebuilding) return;
 
+  // Landed on the post-publish confirmation after a reload? Report it.
+  const publishedId = publishedItemIdOnPage();
+  if (publishedId) await window.swiftlist.reportPendingSubmit(publishedId);
+
   const ebayDraftId = extractDraftId(url);
   const isDraftPage = !!ebayDraftId || url.pathname.includes('/lstng') || url.searchParams.has('mode') || hasDraftBadge();
   if (!isDraftPage) return;
@@ -250,21 +254,33 @@ function startHeartbeat(draftId) {
 }
 
 function watchForSubmission(draftId) {
-  // If the URL transitions to /itm/<id>, we successfully published.
+  // Publishing usually reloads the page, which kills this script, so arm a
+  // storage note that the confirmation page or the new /itm page reports
+  // (see reportPendingSubmit in lib/api.js). The observer still covers eBay
+  // flows that publish in place without a reload.
+  window.swiftlist.armSubmitWatch(draftId);
   const observer = new MutationObserver(async () => {
-    const m = location.pathname.match(/\/itm\/(?:[^/]+\/)?(\d{8,})/);
-    if (!m) return;
+    const id = publishedItemIdOnPage();
+    if (!id) return;
     observer.disconnect();
-    try {
-      await window.swiftlist.api(`/api/v1/drafts/${draftId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'SUBMITTED', ebayItemId: m[1] }),
-      });
-    } catch (err) {
-      console.warn('[swiftlist] submission report failed', err);
-    }
+    await window.swiftlist.reportPendingSubmit(id);
   });
   observer.observe(document.body, { childList: true, subtree: true });
+}
+
+// The new item id, if this page is the post-publish confirmation (or the
+// SPA already moved to /itm). Only trusted on a page that says it published,
+// so an unrelated /itm link in a sidebar is never reported.
+function publishedItemIdOnPage() {
+  const here = location.pathname.match(/\/itm\/(?:[^/]+\/)?(\d{8,})/);
+  if (here) return here[1];
+  const text = document.body?.innerText || '';
+  if (!/(your listing is (now )?live|listing (has been )?(created|submitted)|congratulations|you.re all set)/i.test(text)) return null;
+  for (const a of document.querySelectorAll('a[href*="/itm/"]')) {
+    const m = a.getAttribute('href').match(/\/itm\/(?:[^/]+\/)?(\d{8,})/);
+    if (m) return m[1];
+  }
+  return null;
 }
 
 function renderBanner() {

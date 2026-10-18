@@ -46,6 +46,11 @@ const EnvSchema = z.object({
 
   IMAGE_MIRROR: z.enum(['', 's3']).default(''),
 
+  // Extra folders (comma-separated, absolute) that server-side ingest may read
+  // from, beyond FILE_ROOT. The same-host watcher's inbox must be listed here
+  // when it lives outside FILE_ROOT.
+  INGEST_ALLOWED_ROOTS: z.string().default(''),
+
   // M2M secret TeamTime presents to pull /api/v1/sales/feed
   LISTFLOW_API_SECRET: z.string().optional(),
 

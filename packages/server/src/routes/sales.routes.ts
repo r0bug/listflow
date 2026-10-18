@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 // Sales ledger routes.
 //
 //   GET   /            staff: list/filter sales
@@ -235,7 +236,9 @@ router.post('/sync', staffAuth, async (_req, res) => {
 const feedAuth: RequestHandler = (req, res, next) => {
   const secret = env.LISTFLOW_API_SECRET;
   const token = req.header('Authorization')?.replace(/^Bearer\s+/i, '');
-  if (!secret || !token || token !== secret) {
+  const a = Buffer.from(token ?? '');
+  const b = Buffer.from(secret ?? '');
+  if (!secret || !token || a.length !== b.length || !timingSafeEqual(a, b)) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }

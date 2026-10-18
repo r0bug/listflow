@@ -45,6 +45,20 @@ async function verifyWithTeamTime(email: string, secret: string): Promise<
   return { ok: true, user: data.user };
 }
 
+// PINs are short, so cap wrong guesses per email: 10 failures in 15 minutes
+// locks that email out until the window passes. In-memory is enough for one
+// server process; a restart simply forgives everyone.
+const FAIL_WINDOW_MS = 15 * 60 * 1000;
+const FAIL_LIMIT = 10;
+const failures = new Map<string, number[]>();
+function recentFailures(email: string): number[] {
+  const cutoff = Date.now() - FAIL_WINDOW_MS;
+  const list = (failures.get(email) ?? []).filter((t) => t > cutoff);
+  if (list.length) failures.set(email, list);
+  else failures.delete(email);
+  return list;
+}
+
 router.post('/login', async (req, res) => {
   const parsed = LoginSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -53,6 +67,10 @@ router.post('/login', async (req, res) => {
   }
   const email = parsed.data.email.toLowerCase();
   const secret = parsed.data.pin ?? parsed.data.password;
+  if (recentFailures(email).length >= FAIL_LIMIT) {
+    res.status(429).json({ error: 'Too many failed attempts — try again in 15 minutes' });
+    return;
+  }
 
   // ── Real path: TeamTime credential proxy ──
   if (env.TEAMTIME_URL && env.TEAMTIME_API_SECRET) {
@@ -68,6 +86,7 @@ router.post('/login', async (req, res) => {
       return;
     }
     if (!verdict.ok) {
+      failures.set(email, [...recentFailures(email), Date.now()]);
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
@@ -82,6 +101,7 @@ router.post('/login', async (req, res) => {
       role: verdict.user.role,
       canListOnEbay: verdict.user.canListOnEbay,
       source: 'teamtime',
+      active: true, // TeamTime just verified them; undo any roster-sync deactivation
       lastSyncedAt: new Date(),
     };
     const existing = await prisma.staffUser.findFirst({
@@ -99,7 +119,7 @@ router.post('/login', async (req, res) => {
     const staff =
       (await prisma.staffUser.findUnique({ where: { email } })) ??
       (await prisma.staffUser.create({
-        data: { email, name: email.split('@')[0] ?? email, role: 'admin', source: 'manual', canListOnEbay: true },
+        data: { email, name: email.split('@')[0] ?? email, role: 'staff', source: 'manual', canListOnEbay: true },
       }));
     issue(res, staff);
     return;
@@ -116,6 +136,7 @@ function issue(
   res.cookie('listflow_jwt', token, {
     httpOnly: true,
     sameSite: 'lax',
+    secure: env.NODE_ENV === 'production',
     maxAge: 12 * 60 * 60 * 1000,
   });
   res.json({

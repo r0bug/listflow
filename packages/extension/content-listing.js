@@ -416,7 +416,9 @@ function markPresence() {
 }
 
 function looksLikeDraft(url) {
-  return url.searchParams.has('draftId') || url.pathname.includes('/lstng');
+  // Only a real saved draft. A plain /lstng page with ?swiftlistItemId is a new
+  // listing, which is exactly the case the auto-fill above exists for.
+  return url.searchParams.has('draftId');
 }
 
 // fillForm walks the payload and writes each present field into the form.

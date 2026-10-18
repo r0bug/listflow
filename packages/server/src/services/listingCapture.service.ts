@@ -11,6 +11,7 @@
 //   - the result carries explicit warnings, which are what the relist gate
 //     reads before anyone is told it is safe to end the original.
 
+import { fetchAllowedImage } from '../util/remoteUrl.js';
 import os from 'node:os';
 import path from 'node:path';
 import fsp from 'node:fs/promises';
@@ -66,7 +67,7 @@ export async function downloadAndAttachImage(itemId: string, url: string): Promi
   // sha256-based dedup: if any Photo with this hash already exists, link or skip.
   let tmpPath: string | null = null;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+    const res = await fetchAllowedImage(url, 20_000);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const buf = Buffer.from(await res.arrayBuffer());
     const ext = (path.extname(new URL(url).pathname) || '.jpg').toLowerCase();

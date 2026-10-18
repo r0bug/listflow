@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type SaleRow } from '../api/client.js';
+import { SalesImportPanel } from './SalesImportPanel.js';
 
 const STATUS_STYLES: Record<SaleRow['attributionStatus'], string> = {
   PENDING: 'bg-amber-900/40 text-amber-300 border-amber-800',
@@ -116,6 +117,10 @@ export function SalesPage() {
           <option value={3650}>All time</option>
         </select>
         {note && <span className="text-neutral-400">{note}</span>}
+      </div>
+
+      <div className="mb-4">
+        <SalesImportPanel />
       </div>
 
       {groupsUnavailable && (

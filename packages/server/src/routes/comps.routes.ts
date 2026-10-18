@@ -8,6 +8,7 @@
 // Progressive enrichment: repeated scrapes only overwrite fields they
 // actually carry (comps.service.upsertComp).
 
+import { fetchAllowedImage } from '../util/remoteUrl.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db/prisma.js';
@@ -178,7 +179,7 @@ router.get('/:id/thumb', staffOrMachine, async (req, res) => {
     }
     try {
       const sharp = (await import('sharp')).default;
-      const resp = await fetch(comp.imageUrl, { signal: AbortSignal.timeout(15000) });
+      const resp = await fetchAllowedImage(comp.imageUrl, 15000);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const buf = Buffer.from(await resp.arrayBuffer());
       rel = path.join('comps', `${comp.id}.jpg`);
